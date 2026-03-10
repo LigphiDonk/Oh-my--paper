@@ -344,7 +344,7 @@ function App() {
           messages={messages}
           profiles={snapshot.profiles}
           activeProfileId={activeProfileId}
-          onSelectProfile={(profileId) => setActiveProfileId(profileId as AgentProfileId)}
+          onSelectProfile={(profileId: string) => setActiveProfileId(profileId as AgentProfileId)}
           onRunAgent={handleRunAgent}
           pendingPatchSummary={pendingPatch?.summary}
           onApplyPatch={handleApplyPatch}
@@ -358,51 +358,130 @@ function App() {
           onRunFigureSkill={handleRunFigureSkill}
           onGenerateFigure={handleGenerateFigure}
           onInsertFigure={handleInsertFigure}
-          onSelectBrief={(briefId) => setSelectedBrief(snapshot.figureBriefs.find(b => b.id === briefId) ?? null)}
-          onSelectAsset={(assetId) => setSelectedAsset(snapshot.assets.find(a => a.id === assetId) ?? null)}
-          skills={snapshot.skills}
+          onSelectBrief={(briefId: string) => setSelectedBrief(snapshot.figureBriefs.find(b => b.id === briefId) ?? null)}
+          onSelectAsset={(assetId: string) => setSelectedAsset(snapshot.assets.find(a => a.id === assetId) ?? null)}
           providers={snapshot.providers}
           explorerNode={
             <ProjectTree nodes={snapshot.tree} activeFile={activeFilePath} onOpenFile={handleOpenFile} />
           }
         />
 
-        <div className="editor-area">
-          <div className="editor-tabs">
-            {openTabs.map((tab) => (
-              <button
-                key={tab}
-                className={`editor-tab ${tab === activeFilePath ? "is-active" : ""}`}
-                onClick={() => handleOpenFile(tab)}
-                type="button"
-              >
-                <span style={{ marginRight: 8 }}>{tab.split("/").at(-1)}</span>
-                <span className="icon-btn" style={{ width: 16, height: 16 }} onClick={(e) => {
-                  e.stopPropagation();
-                  setOpenTabs(current => current.filter(t => t !== tab));
-                }}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </span>
-              </button>
-            ))}
-          </div>
-          <div className="editor-content">
-            <EditorPane
-              file={deferredActiveFile}
-              openTabs={openTabs}
-              onChange={handleFileChange}
-              onCursorChange={(line, selection) => {
-                setCursorLine(line);
-                setSelectedText(selection);
-              }}
-              onSelectTab={handleOpenFile}
-            />
-          </div>
-        </div>
+        {drawerTab === "skills" ? (
+          <div className="full-page-view" style={{ flex: 1, display: "flex", flexDirection: "column", background: "var(--bg-app)", overflow: "auto", padding: "32px" }}>
+            <div style={{ maxWidth: "1000px", margin: "0 auto", width: "100%" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", borderBottom: "1px solid var(--border-light)", paddingBottom: "16px", marginBottom: "32px" }}>
+                <div>
+                  <h1 style={{ fontSize: "28px", fontWeight: 600, color: "var(--text-primary)", margin: "0 0 8px 0" }}>所有应用与技能</h1>
+                  <p style={{ color: "var(--text-secondary)", margin: 0, fontSize: "14px" }}>管理安装在工作区中的自定义处理脚本和智能体工作流，像使用手机 App 一样简单。</p>
+                </div>
+                <button className="btn-primary hover-spring" style={{ padding: "10px 20px", fontSize: "14px" }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "8px" }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                  导入自定义技能
+                </button>
+              </div>
 
-        <div className="preview-area">
-          <PdfPane compileResult={snapshot.compileResult} highlightedPage={highlightedPage} onPageJump={handlePageJump} />
-        </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "24px" }}>
+                {snapshot.skills.map((skill) => {
+                  const getAppIcon = (name: string) => name.substring(0, 2).toUpperCase();
+
+                  return (
+                    <div key={skill.id} className={`hover-spring ${skill.enabled ? "enabled" : ""}`} style={{
+                      background: "var(--bg-surface)",
+                      border: "1px solid var(--border-light)",
+                      borderRadius: "var(--radius-xl)",
+                      padding: "24px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "16px",
+                      cursor: "pointer",
+                      boxShadow: "var(--shadow-sm)"
+                    }}>
+                      <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
+                        <div style={{
+                          width: "64px", height: "64px", borderRadius: "18px",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: "28px", fontWeight: 600,
+                          background: skill.enabled ? "linear-gradient(135deg, #e0f2fe, #bae6fd)" : "linear-gradient(135deg, #f0f0f0, #e0e0e0)",
+                          color: skill.enabled ? "#0284c7" : "var(--text-tertiary)",
+                          boxShadow: "inset 0 2px 4px rgba(255,255,255,0.5), 0 4px 12px rgba(0,0,0,0.05)"
+                        }}>
+                          {getAppIcon(skill.name)}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <h3 style={{ margin: "0 0 4px 0", fontSize: "16px", fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{skill.name}</h3>
+                          <div style={{ fontSize: "12px", color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span style={{
+                              display: "inline-block", width: "8px", height: "8px", borderRadius: "50%",
+                              background: skill.enabled ? "var(--accent-primary)" : "var(--text-tertiary)"
+                            }}></span>
+                            {skill.enabled ? "已启用" : "未启用"}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: "13px", color: "var(--text-muted)", lineHeight: 1.5, flex: 1 }}>
+                        这个技能可以通过 {skill.source} 源获取，并在系统流水线中使用。
+                      </div>
+                      <div style={{ display: "flex", gap: "8px", marginTop: "auto" }}>
+                        <button className={skill.enabled ? "btn-secondary hover-spring" : "btn-primary hover-spring"} style={{ flex: 1 }}>
+                          {skill.enabled ? "停用" : "启用"}
+                        </button>
+                        <button className="btn-secondary hover-spring" style={{ flex: 1 }}>配置</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {snapshot.skills.length === 0 && (
+                <div style={{ textAlign: "center", padding: "64px", background: "var(--bg-sidebar)", borderRadius: "var(--radius-xl)", border: "1px dashed var(--border-light)" }}>
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text-tertiary)", marginBottom: "16px" }}><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                  <h3 style={{ margin: "0 0 8px 0", color: "var(--text-primary)" }}>暂无技能应用</h3>
+                  <p style={{ color: "var(--text-secondary)", margin: "0 0 24px 0", fontSize: "14px" }}>您还没有导入任何技能应用。请导入技能工作流文件来扩展排版工作台的功能。</p>
+                  <button className="btn-primary hover-spring">前往市场下载</button>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="editor-area">
+              <div className="editor-tabs">
+                {openTabs.map((tab) => (
+                  <button
+                    key={tab}
+                    className={`editor-tab ${tab === activeFilePath ? "is-active" : ""}`}
+                    onClick={() => handleOpenFile(tab)}
+                    type="button"
+                  >
+                    <span style={{ marginRight: 8 }}>{tab.split("/").at(-1)}</span>
+                    <span className="icon-btn" style={{ width: 16, height: 16 }} onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenTabs(current => current.filter(t => t !== tab));
+                    }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <div className="editor-content">
+                <EditorPane
+                  file={deferredActiveFile}
+                  openTabs={openTabs}
+                  onChange={handleFileChange}
+                  onCursorChange={(line, selection) => {
+                    setCursorLine(line);
+                    setSelectedText(selection);
+                  }}
+                  onSelectTab={handleOpenFile}
+                />
+              </div>
+            </div>
+
+            <div className="preview-area">
+              <PdfPane compileResult={snapshot.compileResult} highlightedPage={highlightedPage} onPageJump={handlePageJump} />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

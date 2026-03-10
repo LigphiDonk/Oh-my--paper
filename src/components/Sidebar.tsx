@@ -6,7 +6,6 @@ import type {
     FigureBriefDraft,
     GeneratedAsset,
     ProviderConfig,
-    SkillManifest,
 } from "../types";
 
 interface SidebarProps {
@@ -30,7 +29,6 @@ interface SidebarProps {
     onInsertFigure: () => void;
     onSelectBrief: (briefId: string) => void;
     onSelectAsset: (assetId: string) => void;
-    skills: SkillManifest[];
     providers: ProviderConfig[];
     explorerNode: ReactNode; // Pass ProjectTree here
 }
@@ -56,15 +54,9 @@ export function Sidebar({
     onInsertFigure,
     onSelectBrief,
     onSelectAsset,
-    skills,
     providers,
     explorerNode,
 }: SidebarProps) {
-
-    // Icon placeholder for App store
-    const getAppIcon = (name: string) => {
-        return name.substring(0, 2).toUpperCase();
-    };
 
     return (
         <div className="primary-sidebar">
@@ -112,7 +104,7 @@ export function Sidebar({
 
                         <div className="message-list">
                             {messages.map((message) => (
-                                <div key={message.id} className={clsx("message", `role-${message.role}`)}>
+                                <div key={message.id} className={clsx("message", `role - ${message.role} `)}>
                                     <div className="message-header">
                                         {message.role === "user" ? "用户 (User)" : "助手 (Assistant)"} · {message.profileId}
                                     </div>
@@ -193,41 +185,6 @@ export function Sidebar({
                                 </div>
                             ))}
                             {assets.length === 0 && <div className="text-subtle text-xs">暂无数据</div>}
-                        </div>
-                    </div>
-                </>
-            )}
-
-            {tab === "skills" && (
-                <>
-                    <div className="sidebar-header">
-                        应用与技能 (App Store)
-                    </div>
-                    <div className="sidebar-content">
-                        <div style={{ padding: "0 4px 16px" }}>
-                            <button className="btn-secondary hover-spring" style={{ width: "100%", display: "flex", gap: "8px", alignItems: "center", justifyContent: "center", padding: "10px" }}>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                                导入自定义技能 (Import App)
-                            </button>
-                        </div>
-                        <div className="app-grid">
-                            {skills.map((skill) => (
-                                <div key={skill.id} className={clsx("app-card hover-spring", skill.enabled && "enabled")}>
-                                    <div className="app-icon">
-                                        {getAppIcon(skill.name)}
-                                    </div>
-                                    <div className="app-title" title={skill.name}>{skill.name}</div>
-                                    <div className="app-subtitle">{skill.enabled ? "已启用" : "未启用"}</div>
-                                    <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginTop: "auto" }}>
-                                        {skill.source}
-                                    </div>
-                                </div>
-                            ))}
-                            {skills.length === 0 && (
-                                <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "20px", color: "var(--text-tertiary)", fontSize: "13px" }}>
-                                    暂无可用技能应用
-                                </div>
-                            )}
                         </div>
                     </div>
                 </>
