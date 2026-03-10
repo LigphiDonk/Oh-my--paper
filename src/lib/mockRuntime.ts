@@ -429,6 +429,16 @@ export const mockRuntime = {
     };
   },
 
+  async switchProject(rootPath: string): Promise<WorkspaceSnapshot> {
+    projectConfig.rootPath = rootPath;
+    return this.openProject();
+  },
+
+  async createProject(parentDir: string, projectName: string): Promise<WorkspaceSnapshot> {
+    projectConfig.rootPath = `${parentDir}/${projectName}`;
+    return this.openProject();
+  },
+
   async saveFile(filePath: string, content: string) {
     const file = getFile(filePath);
     if (file) {

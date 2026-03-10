@@ -11,9 +11,22 @@ pub struct AppState {
     pub project_config: RwLock<ProjectConfig>,
     pub last_compile: RwLock<CompileResult>,
     pub app_root: PathBuf,
+    pub app_data_dir: PathBuf,
 }
 
 pub fn default_compile_result(project_root: &Path, main_tex: &str) -> CompileResult {
+    if project_root.as_os_str().is_empty() {
+        return CompileResult {
+            status: "idle".into(),
+            pdf_path: None,
+            synctex_path: None,
+            diagnostics: Vec::new(),
+            log_path: String::new(),
+            log_output: "No project opened.".into(),
+            timestamp: iso_now(),
+        };
+    }
+
     CompileResult {
         status: "idle".into(),
         pdf_path: Some(
@@ -38,27 +51,44 @@ pub fn default_compile_result(project_root: &Path, main_tex: &str) -> CompileRes
     }
 }
 
-pub fn ensure_workspace_root() -> PathBuf {
-    if let Ok(current_dir) = std::env::current_dir() {
-        if looks_like_dev_workspace(&current_dir) {
-            return current_dir;
-        }
+pub fn empty_project_config() -> ProjectConfig {
+    ProjectConfig {
+        root_path: String::new(),
+        main_tex: "main.tex".into(),
+        engine: "xelatex".into(),
+        bib_tool: "biber".into(),
+        auto_compile: true,
+        forward_sync: true,
     }
+}
 
-    let base_dir = dirs::document_dir()
-        .or_else(dirs::home_dir)
-        .or_else(|| std::env::current_dir().ok())
-        .unwrap_or_else(|| PathBuf::from("."));
-    let root = base_dir.join("ViewerLeaf Demo");
+pub fn resolve_initial_workspace(app_data_dir: &Path) -> Option<PathBuf> {
+    load_recent_workspace(app_data_dir).filter(|path| path.exists())
+}
 
-    if let Err(err) = seed_demo_workspace(&root) {
-        eprintln!("failed to prepare demo workspace at {}: {err}", root.display());
-    }
+pub fn load_recent_workspace(app_data_dir: &Path) -> Option<PathBuf> {
+    let state_path = app_data_dir.join("workspace-state.json");
+    let raw = fs::read_to_string(state_path).ok()?;
+    let value: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    value
+        .get("rootPath")
+        .and_then(|item| item.as_str())
+        .map(PathBuf::from)
+}
 
-    root
+pub fn persist_recent_workspace(app_data_dir: &Path, root: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(app_data_dir)?;
+    fs::write(
+        app_data_dir.join("workspace-state.json"),
+        serde_json::to_string_pretty(&serde_json::json!({ "rootPath": root }))?,
+    )
 }
 
 pub fn load_project_config(root: &Path) -> ProjectConfig {
+    if root.as_os_str().is_empty() {
+        return empty_project_config();
+    }
+
     let config_path = root.join(".viewerleaf").join("project.json");
     if let Ok(raw) = fs::read_to_string(&config_path) {
         if let Ok(config) = serde_json::from_str::<ProjectConfig>(&raw) {
@@ -68,7 +98,7 @@ pub fn load_project_config(root: &Path) -> ProjectConfig {
 
     ProjectConfig {
         root_path: root.to_string_lossy().to_string(),
-        main_tex: "main.tex".into(),
+        main_tex: infer_main_tex(root),
         engine: "xelatex".into(),
         bib_tool: "biber".into(),
         auto_compile: true,
@@ -76,60 +106,62 @@ pub fn load_project_config(root: &Path) -> ProjectConfig {
     }
 }
 
-fn looks_like_dev_workspace(path: &Path) -> bool {
-    path.join("package.json").exists() && path.join("src-tauri").exists()
+fn infer_main_tex(root: &Path) -> String {
+    if root.join("main.tex").exists() {
+        return "main.tex".into();
+    }
+
+    let Ok(entries) = fs::read_dir(root) else {
+        return "main.tex".into();
+    };
+
+    entries
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            if path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("tex") {
+                path.file_name().map(|name| name.to_string_lossy().to_string())
+            } else {
+                None
+            }
+        })
+        .next()
+        .unwrap_or_else(|| "main.tex".into())
 }
 
-fn seed_demo_workspace(root: &Path) -> std::io::Result<()> {
+pub fn initialize_project(root: &Path, project_name: &str) -> std::io::Result<()> {
     fs::create_dir_all(root.join("sections"))?;
     fs::create_dir_all(root.join("refs"))?;
     fs::create_dir_all(root.join(".viewerleaf"))?;
 
+    let title = if project_name.trim().is_empty() {
+        root.file_name()
+            .map(|name| name.to_string_lossy().to_string())
+            .unwrap_or_else(|| "ViewerLeaf Project".into())
+    } else {
+        project_name.trim().to_string()
+    };
+
     write_if_missing(
         &root.join("main.tex"),
-        r"\documentclass[11pt]{article}
-\usepackage{graphicx}
-\usepackage{booktabs}
-\usepackage{hyperref}
-\usepackage{biblatex}
-\addbibresource{refs/references.bib}
-\title{ViewerLeaf Demo Paper}
-\author{ViewerLeaf}
-\begin{document}
-\maketitle
-\input{sections/abstract}
-\input{sections/introduction}
-\printbibliography
-\end{document}
-",
+        &format!(
+            "\\documentclass[11pt]{{article}}\n\\usepackage{{graphicx}}\n\\usepackage{{booktabs}}\n\\usepackage{{hyperref}}\n\\usepackage{{biblatex}}\n\\addbibresource{{refs/references.bib}}\n\\title{{{title}}}\n\\author{{}}\n\\begin{{document}}\n\\maketitle\n\\input{{sections/abstract}}\n\\input{{sections/introduction}}\n\\printbibliography\n\\end{{document}}\n"
+        ),
     )?;
 
     write_if_missing(
         &root.join("sections/abstract.tex"),
-        r"\begin{abstract}
-ViewerLeaf ships with a writable demo workspace so the installed app opens into a valid project instead of an empty shell.
-\end{abstract}
-",
+        "\\begin{abstract}\nWrite your abstract here.\n\\end{abstract}\n",
     )?;
 
     write_if_missing(
         &root.join("sections/introduction.tex"),
-        r"\section{Introduction}
-This sample project is created automatically for packaged builds.
-
-\subsection{Why it exists}
-Desktop apps launched from Finder do not start inside your repository, so ViewerLeaf needs its own default workspace.
-",
+        "\\section{Introduction}\nStart drafting here.\n",
     )?;
 
     write_if_missing(
         &root.join("refs/references.bib"),
-        r"@article{viewerleaf2026,
-  title={ViewerLeaf Demo Workspace},
-  author={ViewerLeaf},
-  year={2026}
-}
-",
+        "@article{example2026,\n  title={Example Reference},\n  author={Author, Example},\n  year={2026}\n}\n",
     )?;
 
     let config = serde_json::json!({
@@ -140,9 +172,9 @@ Desktop apps launched from Finder do not start inside your repository, so Viewer
         "autoCompile": true,
         "forwardSync": true
     });
-    write_if_missing(
-        &root.join(".viewerleaf/project.json"),
-        &serde_json::to_string_pretty(&config).unwrap_or_else(|_| "{}".into()),
+    fs::write(
+        root.join(".viewerleaf/project.json"),
+        serde_json::to_string_pretty(&config)?,
     )?;
 
     Ok(())

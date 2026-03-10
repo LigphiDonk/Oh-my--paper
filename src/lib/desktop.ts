@@ -33,6 +33,16 @@ export const desktop = {
   openProject() {
     return runOrMock<WorkspaceSnapshot>("open_project", {}, () => mockRuntime.openProject());
   },
+  switchProject(rootPath: string) {
+    return runOrMock<WorkspaceSnapshot>("switch_project", { rootPath }, () =>
+      mockRuntime.switchProject?.(rootPath) ?? mockRuntime.openProject(),
+    );
+  },
+  createProject(parentDir: string, projectName: string) {
+    return runOrMock<WorkspaceSnapshot>("create_project", { parentDir, projectName }, () =>
+      mockRuntime.createProject?.(parentDir, projectName) ?? mockRuntime.openProject(),
+    );
+  },
   saveFile(filePath: string, content: string) {
     return runOrMock("save_file", { filePath, content }, () => mockRuntime.saveFile(filePath, content));
   },

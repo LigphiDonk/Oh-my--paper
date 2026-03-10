@@ -17,6 +17,24 @@ pub fn open_project(state: State<'_, AppState>) -> Result<WorkspaceSnapshot, Str
 }
 
 #[tauri::command]
+pub fn switch_project(
+    state: State<'_, AppState>,
+    root_path: String,
+) -> Result<WorkspaceSnapshot, String> {
+    project::switch_project(&state, Path::new(&root_path)).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn create_project(
+    state: State<'_, AppState>,
+    parent_dir: String,
+    project_name: String,
+) -> Result<WorkspaceSnapshot, String> {
+    project::create_project(&state, Path::new(&parent_dir), &project_name)
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
 pub fn save_file(
     state: State<'_, AppState>,
     file_path: String,

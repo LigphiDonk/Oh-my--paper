@@ -6,6 +6,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
 import { EditorPane } from "./components/EditorPane";
 import { PdfPane } from "./components/PdfPane";
@@ -56,11 +57,15 @@ function App() {
 
   const deferredActiveFile = useDeferredValue(activeFile);
 
-  const refreshWorkspace = useEffectEvent(async (options?: {
-    activeFilePath?: string;
-    openTabs?: string[];
-  }) => {
-    const nextSnapshot = await desktop.openProject();
+  const hasProject = Boolean(snapshot?.projectConfig.rootPath);
+
+  const applySnapshot = useEffectEvent((
+    nextSnapshot: WorkspaceSnapshot,
+    options?: {
+      activeFilePath?: string;
+      openTabs?: string[];
+    },
+  ) => {
     const requestedActiveFile = options?.activeFilePath;
     const nextActiveFile =
       requestedActiveFile && nextSnapshot.files.some((file) => file.path === requestedActiveFile)
@@ -69,8 +74,8 @@ function App() {
     const nextTabsSource = options?.openTabs ?? openTabs;
     const nextTabs = Array.from(
       new Set(
-        [nextActiveFile, ...nextTabsSource].filter((path) =>
-          nextSnapshot.files.some((file) => file.path === path),
+        [nextActiveFile, ...nextTabsSource].filter(
+          (path) => path && nextSnapshot.files.some((file) => file.path === path),
         ),
       ),
     );
@@ -84,7 +89,14 @@ function App() {
     setSelectedAsset((current) =>
       current ? nextSnapshot.assets.find((item) => item.id === current.id) ?? null : null,
     );
+  });
 
+  const refreshWorkspace = useEffectEvent(async (options?: {
+    activeFilePath?: string;
+    openTabs?: string[];
+  }) => {
+    const nextSnapshot = await desktop.openProject();
+    applySnapshot(nextSnapshot, options);
     return nextSnapshot;
   });
 
@@ -384,11 +396,41 @@ function App() {
     await refreshWorkspace({ activeFilePath: nextActive, openTabs: nextOpenTabs });
   }
 
+  async function pickDirectory() {
+    const selected = await openDialog({
+      directory: true,
+      multiple: false,
+    });
+    return typeof selected === "string" ? selected : null;
+  }
+
+  async function handleOpenExistingProject() {
+    const selectedDir = await pickDirectory();
+    if (!selectedDir) {
+      return;
+    }
+    const nextSnapshot = await desktop.switchProject(selectedDir);
+    applySnapshot(nextSnapshot, { openTabs: [] });
+  }
+
+  async function handleCreateNewProject() {
+    const parentDir = await pickDirectory();
+    if (!parentDir) {
+      return;
+    }
+    const projectName = window.prompt("输入项目名称", "MyPaper");
+    if (!projectName?.trim()) {
+      return;
+    }
+    const nextSnapshot = await desktop.createProject(parentDir, projectName.trim());
+    applySnapshot(nextSnapshot, { openTabs: [] });
+  }
+
   if (bootstrapError) {
     return <div className="app-shell loading-shell">ViewerLeaf failed to start: {bootstrapError}</div>;
   }
 
-  if (!snapshot || !deferredActiveFile) {
+  if (!snapshot) {
     return <div className="app-shell loading-shell">正在启动 ViewerLeaf…</div>;
   }
 
@@ -397,6 +439,12 @@ function App() {
       <header className="topbar">
         <div className="topbar-left">
           <span className="brand-title">ViewerLeaf 工作台</span>
+          {hasProject && (
+            <span className="topbar-metric" style={{ marginLeft: 12 }}>
+              项目
+              <strong>{snapshot.projectConfig.rootPath.split("/").at(-1) || "未命名"}</strong>
+            </span>
+          )}
         </div>
         <div className="topbar-center">
           <span className="topbar-metric">排版引擎 <strong>{snapshot.projectConfig.engine}</strong></span>
@@ -414,13 +462,67 @@ function App() {
           </span>
         </div>
         <div className="topbar-right">
-          <span className="topbar-metric">诊断结果 <strong>{snapshot.compileResult.diagnostics.length} 项</strong></span>
-          <button className="btn-primary hover-spring" onClick={handleRunAgent} type="button" disabled={isStreaming}>
-            {isStreaming ? "执行中..." : `执行 ${activeProfile?.label ?? "当前配置"}`}
+          <button className="btn-secondary hover-spring" onClick={() => void handleOpenExistingProject()} type="button">
+            打开项目
           </button>
+          <button className="btn-secondary hover-spring" onClick={() => void handleCreateNewProject()} type="button">
+            新建项目
+          </button>
+          {hasProject && (
+            <>
+              <span className="topbar-metric">诊断结果 <strong>{snapshot.compileResult.diagnostics.length} 项</strong></span>
+              <button className="btn-primary hover-spring" onClick={handleRunAgent} type="button" disabled={isStreaming}>
+                {isStreaming ? "执行中..." : `执行 ${activeProfile?.label ?? "当前配置"}`}
+              </button>
+            </>
+          )}
         </div>
       </header>
 
+      {!hasProject && (
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 40,
+            background:
+              "radial-gradient(circle at top left, rgba(184, 164, 125, 0.18), transparent 35%), linear-gradient(180deg, var(--bg-app), var(--bg-sidebar))",
+          }}
+        >
+          <div
+            style={{
+              width: "min(720px, 100%)",
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border-light)",
+              borderRadius: 24,
+              boxShadow: "var(--shadow-lg)",
+              padding: 36,
+            }}
+          >
+            <div style={{ fontSize: 14, color: "var(--text-secondary)", marginBottom: 12 }}>Workspace</div>
+            <h1 style={{ margin: "0 0 12px 0", fontSize: 34, color: "var(--text-primary)" }}>打开已有项目，或创建新的论文工程</h1>
+            <p style={{ margin: "0 0 24px 0", color: "var(--text-secondary)", lineHeight: 1.6 }}>
+              现在不会再强制进入示例项目。先选择你的 LaTeX 工程目录，或者新建一个 ViewerLeaf 项目，再开始编辑、编译和调用 Agent。
+            </p>
+            <div style={{ display: "flex", gap: 12 }}>
+              <button className="btn-primary hover-spring" type="button" onClick={() => void handleOpenExistingProject()}>
+                打开已有项目
+              </button>
+              <button className="btn-secondary hover-spring" type="button" onClick={() => void handleCreateNewProject()}>
+                创建项目
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {hasProject && !deferredActiveFile && (
+        <div className="app-shell loading-shell">正在载入项目文件…</div>
+      )}
+
+      {hasProject && deferredActiveFile && (
       <div className="workspace-container">
         <div className="activity-bar">
           <button
@@ -665,6 +767,7 @@ function App() {
           </>
         )}
       </div>
+      )}
     </div>
   );
 }

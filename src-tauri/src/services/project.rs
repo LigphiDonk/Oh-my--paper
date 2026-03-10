@@ -6,7 +6,10 @@ use walkdir::WalkDir;
 
 use crate::models::{FigureBriefDraft, GeneratedAsset, ProjectFile, ProjectNode, WorkspaceSnapshot};
 use crate::services::{figure, profile, provider, skill};
-use crate::state::{load_project_config, AppState};
+use crate::state::{
+    default_compile_result, initialize_project, load_project_config, persist_recent_workspace,
+    AppState,
+};
 
 fn detect_language(path: &str) -> String {
     if path.ends_with(".tex") || path.ends_with(".sty") || path.ends_with(".cls") {
@@ -101,6 +104,9 @@ pub fn load_project_snapshot(state: &AppState) -> Result<WorkspaceSnapshot> {
         let current = state.project_config.read().expect("project config lock poisoned");
         current.root_path.clone()
     };
+    if root_path.trim().is_empty() {
+        return empty_snapshot(state);
+    }
     let root = Path::new(&root_path);
 
     let config = load_project_config(root);
@@ -191,6 +197,84 @@ pub fn load_project_snapshot(state: &AppState) -> Result<WorkspaceSnapshot> {
         figure_briefs: briefs,
         assets,
     })
+}
+
+fn empty_snapshot(state: &AppState) -> Result<WorkspaceSnapshot> {
+    let conn = state.db.lock().expect("db lock poisoned");
+    let providers = provider::list_providers(&conn).map_err(anyhow::Error::msg)?;
+    let profiles = profile::list_profiles(&conn).map_err(anyhow::Error::msg)?;
+    let skills = skill::list_skills(&conn).map_err(anyhow::Error::msg)?;
+    drop(conn);
+
+    let config = state
+        .project_config
+        .read()
+        .expect("project config lock poisoned")
+        .clone();
+    let compile_result = state
+        .last_compile
+        .read()
+        .expect("compile result lock poisoned")
+        .clone();
+
+    Ok(WorkspaceSnapshot {
+        project_config: config,
+        tree: Vec::new(),
+        files: Vec::new(),
+        active_file: String::new(),
+        providers,
+        skills,
+        profiles,
+        compile_result,
+        figure_briefs: Vec::new(),
+        assets: Vec::new(),
+    })
+}
+
+pub fn switch_project(state: &AppState, root: &Path) -> Result<WorkspaceSnapshot> {
+    let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    if !root.exists() || !root.is_dir() {
+        anyhow::bail!("project directory does not exist: {}", root.display());
+    }
+
+    let config = load_project_config(&root);
+    {
+        let mut project_config = state
+            .project_config
+            .write()
+            .expect("project config lock poisoned");
+        *project_config = config.clone();
+    }
+    {
+        let mut last_compile = state
+            .last_compile
+            .write()
+            .expect("compile result lock poisoned");
+        *last_compile = default_compile_result(&root, &config.main_tex);
+    }
+    persist_recent_workspace(&state.app_data_dir, &root)
+        .context("failed to persist recent workspace")?;
+
+    let conn = state.db.lock().expect("db lock poisoned");
+    skill::discover_skills(&conn, &[root.join("skills")], "project").map_err(anyhow::Error::msg)?;
+    drop(conn);
+
+    load_project_snapshot(state)
+}
+
+pub fn create_project(
+    state: &AppState,
+    parent_dir: &Path,
+    project_name: &str,
+) -> Result<WorkspaceSnapshot> {
+    let folder_name = if project_name.trim().is_empty() {
+        "ViewerLeaf Project"
+    } else {
+        project_name.trim()
+    };
+    let root = parent_dir.join(folder_name);
+    initialize_project(&root, folder_name).context("failed to initialize project")?;
+    switch_project(state, &root)
 }
 
 pub fn save_file(state: &AppState, file_path: &str, content: &str) -> Result<()> {

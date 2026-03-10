@@ -8,11 +8,15 @@ use std::sync::{Mutex, RwLock};
 
 use tauri::Manager;
 
-use state::{default_compile_result, ensure_workspace_root, load_project_config, AppState};
+use state::{
+    default_compile_result, empty_project_config, load_project_config, resolve_initial_workspace,
+    AppState,
+};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             let app_data_dir = app
@@ -22,8 +26,11 @@ pub fn run() {
             let conn = db::init_db(&app_data_dir).expect("failed to init database");
 
             let app_root = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-            let workspace_root = ensure_workspace_root();
-            let project_config = load_project_config(&workspace_root);
+            let workspace_root = resolve_initial_workspace(&app_data_dir);
+            let project_config = workspace_root
+                .as_ref()
+                .map(|root| load_project_config(root))
+                .unwrap_or_else(empty_project_config);
 
             services::skill::discover_skills(
                 &conn,
@@ -31,25 +38,33 @@ pub fn run() {
                 "builtin",
             )
             .expect("failed to discover builtin skills");
-            services::skill::discover_skills(
-                &conn,
-                &[workspace_root.join("skills")],
-                "project",
-            )
-            .expect("failed to discover project skills");
+            if let Some(workspace_root) = workspace_root.as_ref() {
+                services::skill::discover_skills(
+                    &conn,
+                    &[workspace_root.join("skills")],
+                    "project",
+                )
+                .expect("failed to discover project skills");
+            }
 
-            let last_compile = default_compile_result(&workspace_root, &project_config.main_tex);
+            let last_compile = workspace_root
+                .as_ref()
+                .map(|root| default_compile_result(root, &project_config.main_tex))
+                .unwrap_or_else(|| default_compile_result(std::path::Path::new(""), &project_config.main_tex));
 
             app.manage(AppState {
                 db: Mutex::new(conn),
                 project_config: RwLock::new(project_config),
                 last_compile: RwLock::new(last_compile),
                 app_root,
+                app_data_dir,
             });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             commands::open_project,
+            commands::switch_project,
+            commands::create_project,
             commands::save_file,
             commands::compile_project,
             commands::forward_search,

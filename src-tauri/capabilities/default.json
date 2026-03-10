@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Default desktop capability for ViewerLeaf",
   "windows": ["main"],
-  "permissions": ["core:default", "shell:default"]
+  "permissions": ["core:default", "shell:default", "dialog:default"]
 }
