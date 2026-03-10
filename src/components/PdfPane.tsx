@@ -6,33 +6,66 @@ import type { CompileResult } from "../types";
 import pdfjsWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
 
-interface PdfPaneProps {
-  compileResult: CompileResult;
+export type PreviewPaneState =
+  | {
+      kind: "compile";
+      compileResult: CompileResult;
+      fileUrl?: string;
+      highlightedPage: number;
+      onPageJump: (page: number) => void;
+    }
+  | {
+      kind: "pdf";
+      title: string;
+      fileUrl: string;
+      highlightedPage: number;
+      onPageJump: (page: number) => void;
+    }
+  | {
+      kind: "image";
+      title: string;
+      fileUrl: string;
+    }
+  | {
+      kind: "unsupported";
+      title: string;
+      description: string;
+    };
+
+function PdfPreview({
+  file,
+  highlightedPage,
+  onPageJump,
+  statusLabel,
+}: {
+  file?: { data: Uint8Array } | string;
   highlightedPage: number;
   onPageJump: (page: number) => void;
-}
-
-export function PdfPane({ compileResult, highlightedPage, onPageJump }: PdfPaneProps) {
+  statusLabel: string;
+}) {
   const [pageCount, setPageCount] = useState(0);
-  const file = useMemo(() => {
-    if (!compileResult.pdfData) {
-      return undefined;
-    }
-    return { data: compileResult.pdfData };
-  }, [compileResult.pdfData]);
 
   return (
     <>
       <div className="preview-header">
         <span style={{ fontWeight: 500 }}>PDF 预览</span>
         <div style={{ display: "flex", gap: "12px", color: "var(--text-secondary)" }}>
-          <span>{compileResult.status === "success" ? "编译成功" : compileResult.status === "failed" ? "编译失败" : compileResult.status}</span>
+          <span>{statusLabel}</span>
           <span>{pageCount ? `共 ${pageCount} 页` : "暂无页面"}</span>
         </div>
       </div>
 
       {pageCount > 0 && (
-        <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--border-light)", display: "flex", gap: "6px", overflowX: "auto", background: "var(--bg-sidebar)" }}>
+        <div
+          style={{
+            padding: "8px 16px",
+            borderBottom: "1px solid var(--border-light)",
+            display: "flex",
+            gap: "6px",
+            overflowX: "auto",
+            background: "var(--bg-sidebar)",
+          }}
+        >
           {Array.from({ length: Math.max(pageCount, 1) }, (_, index) => (
             <button
               key={`jump-${index + 1}`}
@@ -66,9 +99,83 @@ export function PdfPane({ compileResult, highlightedPage, onPageJump }: PdfPaneP
             })}
           </Document>
         ) : (
-          <div className="pdf-placeholder">编译项目以查看 PDF 预览</div>
+          <div className="pdf-placeholder">暂无可预览的 PDF</div>
         )}
       </div>
     </>
+  );
+}
+
+export function PdfPane({ preview }: { preview: PreviewPaneState }) {
+  const pdfFile = useMemo(() => {
+    if (preview.kind === "compile") {
+      if (preview.compileResult.pdfData) {
+        return { data: preview.compileResult.pdfData };
+      }
+      return preview.fileUrl;
+    }
+    if (preview.kind === "pdf") {
+      return preview.fileUrl;
+    }
+    return undefined;
+  }, [preview]);
+
+  if (preview.kind === "image") {
+    return (
+      <>
+        <div className="preview-header">
+          <span style={{ fontWeight: 500 }}>图片预览</span>
+          <div style={{ color: "var(--text-secondary)" }}>{preview.title}</div>
+        </div>
+        <div className="preview-content" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <img
+            src={preview.fileUrl}
+            alt={preview.title}
+            style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 12 }}
+          />
+        </div>
+      </>
+    );
+  }
+
+  if (preview.kind === "unsupported") {
+    return (
+      <>
+        <div className="preview-header">
+          <span style={{ fontWeight: 500 }}>预览不可用</span>
+          <div style={{ color: "var(--text-secondary)" }}>{preview.title}</div>
+        </div>
+        <div className="preview-content">
+          <div className="pdf-placeholder">{preview.description}</div>
+        </div>
+      </>
+    );
+  }
+
+  if (preview.kind === "pdf") {
+    return (
+      <PdfPreview
+        file={pdfFile}
+        highlightedPage={preview.highlightedPage}
+        onPageJump={preview.onPageJump}
+        statusLabel={preview.title}
+      />
+    );
+  }
+
+  const statusLabel =
+    preview.compileResult.status === "success"
+      ? "编译成功"
+      : preview.compileResult.status === "failed"
+        ? "编译失败"
+        : preview.compileResult.status;
+
+  return (
+    <PdfPreview
+      file={pdfFile}
+      highlightedPage={preview.highlightedPage}
+      onPageJump={preview.onPageJump}
+      statusLabel={statusLabel}
+    />
   );
 }

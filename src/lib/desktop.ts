@@ -1,12 +1,14 @@
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 
 import type {
   AgentMessage,
   AgentProfileId,
   AgentRunResult,
+  AssetResource,
   FigureBriefDraft,
   GeneratedAsset,
+  ProjectFile,
   ProfileConfig,
   ProviderConfig,
   SkillManifest,
@@ -29,9 +31,26 @@ async function runOrMock<T>(command: string, args: Record<string, unknown>, fall
   return fallback();
 }
 
+function resolveAssetResource(asset: AssetResource): AssetResource {
+  if (asset.resourceUrl) {
+    return asset;
+  }
+  return {
+    ...asset,
+    resourceUrl: isTauriRuntime() ? convertFileSrc(asset.absolutePath) : asset.absolutePath,
+  };
+}
+
 export const desktop = {
   openProject() {
     return runOrMock<WorkspaceSnapshot>("open_project", {}, () => mockRuntime.openProject());
+  },
+  readFile(path: string) {
+    return runOrMock<ProjectFile>("read_file", { path }, () => mockRuntime.readFile(path));
+  },
+  async readAsset(path: string) {
+    const asset = await runOrMock<AssetResource>("read_asset", { path }, () => mockRuntime.readAsset(path));
+    return resolveAssetResource(asset);
   },
   switchProject(rootPath: string) {
     return runOrMock<WorkspaceSnapshot>("switch_project", { rootPath }, () =>
@@ -152,6 +171,12 @@ export const desktop = {
     return listen<StreamChunk>("agent:stream", (event) => {
       callback(event.payload);
     });
+  },
+  resolveResourceUrl(path?: string) {
+    if (!path) {
+      return "";
+    }
+    return isTauriRuntime() ? convertFileSrc(path) : path;
   },
 };
 

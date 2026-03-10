@@ -6,7 +6,7 @@ import type { ProjectNode } from "../types";
 interface ProjectTreeProps {
   nodes: ProjectNode[];
   activeFile: string;
-  onOpenFile: (path: string) => void;
+  onOpenNode: (node: ProjectNode) => void;
   onCreateFile?: (parentDir: string, fileName: string) => void | Promise<void>;
   onDeleteFile?: (path: string) => void | Promise<void>;
   onRenameFile?: (oldPath: string, newPath: string) => void | Promise<void>;
@@ -16,11 +16,30 @@ interface TreeNodeProps {
   node: ProjectNode;
   activeFile: string;
   depth: number;
-  onOpenFile: (path: string) => void;
+  onOpenNode: (node: ProjectNode) => void;
   onContextMenu: (event: MouseEvent, node: ProjectNode) => void;
 }
 
-function TreeNode({ node, activeFile, depth, onOpenFile, onContextMenu }: TreeNodeProps) {
+function fileIcon(node: ProjectNode) {
+  if (node.kind === "directory") {
+    return "▾";
+  }
+  if (node.fileType === "pdf") {
+    return "PDF";
+  }
+  if (node.fileType === "image") {
+    return "IMG";
+  }
+  if (node.fileType === "bib") {
+    return "BIB";
+  }
+  if (node.fileType === "json") {
+    return "{ }";
+  }
+  return "T";
+}
+
+function TreeNode({ node, activeFile, depth, onOpenNode, onContextMenu }: TreeNodeProps) {
   const paddingLeft = 8 + depth * 12;
   const isActive = node.path === activeFile;
 
@@ -41,7 +60,7 @@ function TreeNode({ node, activeFile, depth, onOpenFile, onContextMenu }: TreeNo
             node={child}
             activeFile={activeFile}
             depth={depth + 1}
-            onOpenFile={onOpenFile}
+            onOpenNode={onOpenNode}
             onContextMenu={onContextMenu}
           />
         ))}
@@ -53,10 +72,10 @@ function TreeNode({ node, activeFile, depth, onOpenFile, onContextMenu }: TreeNo
     <div
       className={`list-item ${isActive ? "is-active" : ""}`}
       style={{ paddingLeft }}
-      onClick={() => onOpenFile(node.path)}
+      onClick={() => onOpenNode(node)}
       onContextMenu={(event) => onContextMenu(event, node)}
     >
-      <span className="list-item-icon">{node.kind === "asset" ? "🖼" : "📄"}</span>
+      <span className="list-item-icon">{fileIcon(node)}</span>
       <span>{node.name}</span>
     </div>
   );
@@ -70,7 +89,7 @@ function dirname(path: string) {
 export function ProjectTree({
   nodes,
   activeFile,
-  onOpenFile,
+  onOpenNode,
   onCreateFile,
   onDeleteFile,
   onRenameFile,
@@ -145,7 +164,7 @@ export function ProjectTree({
           node={node}
           activeFile={activeFile}
           depth={0}
-          onOpenFile={onOpenFile}
+          onOpenNode={onOpenNode}
           onContextMenu={handleContextMenu}
         />
       ))}

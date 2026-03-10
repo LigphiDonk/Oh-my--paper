@@ -5,6 +5,18 @@ export type AgentProfileId = "outline" | "draft" | "polish" | "de_ai" | "review"
 export type FigureBriefStatus = "draft" | "ready" | "generated";
 export type AssetKind = "figure" | "table" | "diagram";
 export type DrawerTab = "explorer" | "ai" | "logs" | "figures" | "skills" | "providers" | "usage";
+export type ProjectFileType =
+  | "latex"
+  | "bib"
+  | "json"
+  | "markdown"
+  | "text"
+  | "yaml"
+  | "xml"
+  | "csv"
+  | "pdf"
+  | "image"
+  | "unsupported";
 
 export interface ProjectConfig {
   rootPath: string;
@@ -26,6 +38,10 @@ export interface ProjectNode {
   name: string;
   path: string;
   kind: "directory" | "file" | "asset";
+  fileType?: ProjectFileType;
+  isText?: boolean;
+  isPreviewable?: boolean;
+  size?: number;
   children?: ProjectNode[];
 }
 
@@ -60,6 +76,14 @@ export interface SyncLocation {
   line: number;
   column: number;
   page: number;
+}
+
+export interface AssetResource {
+  path: string;
+  absolutePath: string;
+  resourceUrl?: string;
+  mimeType: string;
+  size?: number;
 }
 
 export interface SkillManifest {

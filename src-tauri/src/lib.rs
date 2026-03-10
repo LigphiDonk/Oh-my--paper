@@ -63,6 +63,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::open_project,
+            commands::read_file,
+            commands::read_asset,
             commands::switch_project,
             commands::create_project,
             commands::save_file,

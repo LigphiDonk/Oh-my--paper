@@ -5,8 +5,8 @@ use std::time::Instant;
 use tauri::{AppHandle, State};
 
 use crate::models::{
-    AgentMessage, AgentRunResult, FigureBriefDraft, GeneratedAsset, ProfileConfig, ProviderConfig,
-    SkillManifest, TestResult, UsageRecord, WorkspaceSnapshot,
+    AgentMessage, AgentRunResult, AssetResource, FigureBriefDraft, GeneratedAsset, ProfileConfig,
+    ProjectFile, ProviderConfig, SkillManifest, TestResult, UsageRecord, WorkspaceSnapshot,
 };
 use crate::services::{agent, compile, figure, profile, project, provider, skill, sync};
 use crate::state::AppState;
@@ -14,6 +14,16 @@ use crate::state::AppState;
 #[tauri::command]
 pub fn open_project(state: State<'_, AppState>) -> Result<WorkspaceSnapshot, String> {
     project::load_project_snapshot(&state).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn read_file(state: State<'_, AppState>, path: String) -> Result<ProjectFile, String> {
+    project::read_file(&state, &path).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn read_asset(state: State<'_, AppState>, path: String) -> Result<AssetResource, String> {
+    project::read_asset(&state, &path).map_err(|err| err.to_string())
 }
 
 #[tauri::command]

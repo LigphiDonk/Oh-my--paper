@@ -5,6 +5,7 @@ import type {
   AgentProfile,
   AgentProfileId,
   AgentRunResult,
+  AssetResource,
   CompileResult,
   Diagnostic,
   FigureBriefDraft,
@@ -18,6 +19,12 @@ import type {
   WorkspaceSnapshot,
 } from "../types";
 import { buildFigureSnippet, insertAtLine, summarizeDiagnostics } from "./latex";
+import {
+  detectProjectFileType,
+  isPreviewableFileType,
+  isTextFileType,
+  mimeTypeForPath,
+} from "./workspace";
 
 const projectConfig: ProjectConfig = {
   rootPath: "/Users/donkfeng/Documents/papers/viewerleaf-demo",
@@ -222,6 +229,35 @@ The integrated workflow reduces context switching and preserves revision localit
   },
 ];
 
+const fixtureAssets: Array<{ path: string; resourceUrl: string; mimeType: string }> = [
+  {
+    path: "assets/figures/workflow-overview.svg",
+    resourceUrl: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+        <rect width="1200" height="720" fill="#f5efe4"/>
+        <rect x="64" y="74" width="1072" height="572" rx="30" fill="#fffaf2" stroke="#c7b08a" stroke-width="4"/>
+        <text x="110" y="150" font-size="36" font-family="Georgia, serif" fill="#33281f">ViewerLeaf Workflow</text>
+        <g font-family="Menlo, monospace" font-size="22">
+          <rect x="112" y="240" width="220" height="112" rx="20" fill="#efe2ce"/>
+          <text x="145" y="305" fill="#5c4934">LaTeX Editing</text>
+          <rect x="390" y="240" width="220" height="112" rx="20" fill="#dfece1"/>
+          <text x="440" y="305" fill="#345241">Compile</text>
+          <rect x="668" y="240" width="220" height="112" rx="20" fill="#e8dfcf"/>
+          <text x="718" y="305" fill="#4b4032">Agent Review</text>
+          <rect x="946" y="240" width="140" height="112" rx="20" fill="#efe7da"/>
+          <text x="980" y="305" fill="#5f4f40">Figures</text>
+        </g>
+        <g stroke="#b38b53" stroke-width="8" fill="none" stroke-linecap="round">
+          <path d="M332 296 H390"/>
+          <path d="M610 296 H668"/>
+          <path d="M888 296 H946"/>
+        </g>
+      </svg>`,
+    )}`,
+    mimeType: "image/svg+xml",
+  },
+];
+
 let activeFile = "sections/introduction.tex";
 let compileCounter = 0;
 const figureBriefs: FigureBriefDraft[] = [];
@@ -248,16 +284,26 @@ function getFile(path: string) {
 }
 
 function detectLanguage(path: string): ProjectFile["language"] {
-  if (path.endsWith(".tex") || path.endsWith(".sty") || path.endsWith(".cls")) {
-    return "latex";
+  const fileType = detectProjectFileType(path);
+  switch (fileType) {
+    case "latex":
+      return "latex";
+    case "bib":
+      return "bib";
+    case "json":
+      return "json";
+    default:
+      return "text";
   }
-  if (path.endsWith(".bib")) {
-    return "bib";
-  }
-  if (path.endsWith(".json")) {
-    return "json";
-  }
-  return "text";
+}
+
+function buildNodeMeta(path: string) {
+  const fileType = detectProjectFileType(path);
+  return {
+    fileType,
+    isText: isTextFileType(fileType),
+    isPreviewable: isPreviewableFileType(fileType),
+  };
 }
 
 function buildTree(paths: string[]) {
@@ -277,11 +323,20 @@ function buildTree(paths: string[]) {
       const isLeaf = index === parts.length - 1;
       let child = current.children?.find((node) => node.path === joined);
       if (!child) {
+        const nodeMeta = isLeaf ? buildNodeMeta(fullPath) : undefined;
         child = {
           id: joined,
           name: part,
           path: joined,
-          kind: isLeaf ? (fullPath.startsWith("assets/") ? "asset" : "file") : "directory",
+          kind:
+            isLeaf && nodeMeta && !nodeMeta.isText
+              ? "asset"
+              : isLeaf
+                ? "file"
+                : "directory",
+          fileType: nodeMeta?.fileType,
+          isText: nodeMeta?.isText,
+          isPreviewable: nodeMeta?.isPreviewable,
           children: isLeaf ? undefined : [],
         };
         current.children?.push(child);
@@ -302,6 +357,14 @@ function buildTree(paths: string[]) {
 
   sortNodes(root.children);
   return root.children ?? [];
+}
+
+function listTreePaths() {
+  return [
+    ...files.map((item) => item.path),
+    ...fixtureAssets.map((item) => item.path),
+    ...assets.map((item) => item.filePath),
+  ];
 }
 
 async function generatePreviewPdf(snapshotName: string, diagnostics: Diagnostic[]) {
@@ -414,11 +477,11 @@ function createRunSummary(profileId: AgentProfileId, selection: string) {
 
 export const mockRuntime = {
   async openProject(): Promise<WorkspaceSnapshot> {
-    const tree = buildTree([...files.map((item) => item.path), ...assets.map((item) => item.filePath)]);
+    const tree = buildTree(listTreePaths());
     return {
       projectConfig,
       tree,
-      files: structuredClone(files),
+      files: [],
       activeFile,
       providers: structuredClone(providers),
       skills: structuredClone(skills),
@@ -437,6 +500,51 @@ export const mockRuntime = {
   async createProject(parentDir: string, projectName: string): Promise<WorkspaceSnapshot> {
     projectConfig.rootPath = `${parentDir}/${projectName}`;
     return this.openProject();
+  },
+
+  async readFile(path: string) {
+    const file = getFile(path);
+    if (!file) {
+      throw new Error(`File not found: ${path}`);
+    }
+    return structuredClone(file);
+  },
+
+  async readAsset(path: string): Promise<AssetResource> {
+    const generatedAsset = assets.find((item) => item.filePath === path);
+    if (generatedAsset) {
+      return {
+        path,
+        absolutePath: `${projectConfig.rootPath}/${path}`,
+        resourceUrl: generatedAsset.previewUri,
+        mimeType: mimeTypeForPath(path),
+      };
+    }
+
+    const fixtureAsset = fixtureAssets.find((item) => item.path === path);
+    if (fixtureAsset) {
+      return {
+        path,
+        absolutePath: `${projectConfig.rootPath}/${path}`,
+        resourceUrl: fixtureAsset.resourceUrl,
+        mimeType: fixtureAsset.mimeType,
+      };
+    }
+
+    if (path.endsWith(".pdf")) {
+      const pdfData = lastCompile.pdfData ?? (await generatePreviewPdf(path, []));
+      const blob = new Blob([Uint8Array.from(pdfData)], {
+        type: "application/pdf",
+      });
+      return {
+        path,
+        absolutePath: `${projectConfig.rootPath}/${path}`,
+        resourceUrl: URL.createObjectURL(blob),
+        mimeType: "application/pdf",
+      };
+    }
+
+    throw new Error(`Asset not found: ${path}`);
   },
 
   async saveFile(filePath: string, content: string) {

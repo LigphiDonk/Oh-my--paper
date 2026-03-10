@@ -26,6 +26,10 @@ pub struct ProjectNode {
     pub name: String,
     pub path: String,
     pub kind: String,
+    pub file_type: Option<String>,
+    pub is_text: Option<bool>,
+    pub is_previewable: Option<bool>,
+    pub size: Option<u64>,
     pub children: Option<Vec<ProjectNode>>,
 }
 
@@ -129,6 +133,16 @@ pub struct SyncLocation {
     pub line: usize,
     pub column: usize,
     pub page: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetResource {
+    pub path: String,
+    pub absolute_path: String,
+    pub resource_url: Option<String>,
+    pub mime_type: String,
+    pub size: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
