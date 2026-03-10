@@ -4,6 +4,7 @@ use std::path::Path;
 use std::process::Command;
 
 use crate::models::SyncLocation;
+use crate::services::enriched_path;
 use crate::state::AppState;
 
 pub fn forward_search(state: &AppState, file_path: &str, line: usize) -> Result<SyncLocation> {
@@ -24,6 +25,7 @@ pub fn forward_search(state: &AppState, file_path: &str, line: usize) -> Result<
             "-o",
             &pdf_path.to_string_lossy(),
         ])
+        .env("PATH", enriched_path())
         .current_dir(root)
         .output()
         .context("failed to run synctex view")?;
@@ -55,6 +57,7 @@ pub fn reverse_search(state: &AppState, page: usize) -> Result<SyncLocation> {
 
     let output = Command::new("synctex")
         .args(["edit", "-o", &format!("{page}:0:0:{}", pdf_path.to_string_lossy())])
+        .env("PATH", enriched_path())
         .current_dir(root)
         .output()
         .context("failed to run synctex edit")?;

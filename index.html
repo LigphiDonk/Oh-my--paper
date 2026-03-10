@@ -1,13 +1,26 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ViewerLeaf</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ViewerLeaf</title>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script>
+    window.addEventListener('error', function (e) {
+      document.body.style.cssText = 'background:#1a1a2e;color:#e94560;font:14px/1.6 monospace;padding:2em;white-space:pre-wrap';
+      document.body.textContent = 'ViewerLeaf Error:\n' + e.message + '\n\nFile: ' + e.filename + '\nLine: ' + e.lineno + ':' + e.colno + '\n\nStack: ' + (e.error && e.error.stack || 'N/A');
+    });
+    window.addEventListener('unhandledrejection', function (e) {
+      document.body.style.cssText = 'background:#1a1a2e;color:#e94560;font:14px/1.6 monospace;padding:2em;white-space:pre-wrap';
+      document.body.textContent = 'ViewerLeaf Unhandled Promise Rejection:\n' + (e.reason && e.reason.stack || e.reason || 'Unknown');
+    });
+  </script>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
 </html>

@@ -1,9 +1,10 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use regex::Regex;
 use std::path::Path;
 use std::process::Command;
 
 use crate::models::{CompileResult, Diagnostic};
+use crate::services::enriched_path;
 use crate::state::AppState;
 
 fn parse_diagnostics(output: &str) -> Vec<Diagnostic> {
@@ -53,7 +54,7 @@ pub fn compile_project(state: &AppState, file_path: &str) -> Result<CompileResul
         _ => "-xelatex",
     };
 
-    let output = Command::new("latexmk")
+    let output = match Command::new("latexmk")
         .args([
             engine_flag,
             "-synctex=1",
@@ -61,9 +62,23 @@ pub fn compile_project(state: &AppState, file_path: &str) -> Result<CompileResul
             "-file-line-error",
             &main_tex,
         ])
+        .env("PATH", enriched_path())
         .current_dir(root)
         .output()
-        .with_context(|| format!("failed to run latexmk for {file_path}"))?;
+    {
+        Ok(output) => output,
+        Err(err) => {
+            let result = failed_compile_result(
+                root,
+                &main_tex,
+                format!("failed to run latexmk for {file_path}: {err}"),
+            );
+
+            let mut store = state.store.write().expect("store lock poisoned");
+            store.last_compile = result.clone();
+            return Ok(result);
+        }
+    };
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -92,4 +107,23 @@ pub fn compile_project(state: &AppState, file_path: &str) -> Result<CompileResul
     let mut store = state.store.write().expect("store lock poisoned");
     store.last_compile = result.clone();
     Ok(result)
+}
+
+fn failed_compile_result(root: &Path, main_tex: &str, log_output: String) -> CompileResult {
+    CompileResult {
+        status: "failed".into(),
+        pdf_path: Some(root.join(main_tex.replace(".tex", ".pdf")).to_string_lossy().to_string()),
+        synctex_path: Some(
+            root.join(main_tex.replace(".tex", ".synctex.gz"))
+                .to_string_lossy()
+                .to_string(),
+        ),
+        diagnostics: parse_diagnostics(&log_output),
+        log_path: root
+            .join(".viewerleaf/logs/latest.log")
+            .to_string_lossy()
+            .to_string(),
+        log_output,
+        timestamp: format!("{:?}", std::time::SystemTime::now()),
+    }
 }

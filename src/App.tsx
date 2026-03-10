@@ -24,6 +24,7 @@ import type {
 
 function App() {
   const [snapshot, setSnapshot] = useState<WorkspaceSnapshot | null>(null);
+  const [bootstrapError, setBootstrapError] = useState("");
   const [openTabs, setOpenTabs] = useState<string[]>([]);
   const [activeFilePath, setActiveFilePath] = useState("");
   const [highlightedPage, setHighlightedPage] = useState(1);
@@ -52,32 +53,42 @@ function App() {
 
   useEffect(() => {
     void (async () => {
-      const nextSnapshot = await desktop.openProject();
-      const nextMessages = await desktop.getAgentMessages();
-      setSnapshot(nextSnapshot);
-      setOpenTabs([nextSnapshot.activeFile, nextSnapshot.projectConfig.mainTex]);
-      setActiveFilePath(nextSnapshot.activeFile);
-      setMessages(nextMessages);
-      if (nextSnapshot.compileResult.status === "idle") {
-        const compileResult = await desktop.compileProject(nextSnapshot.activeFile);
-        setSnapshot((current) =>
-          current
-            ? {
-                ...current,
-                compileResult,
-              }
-            : current,
-        );
+      try {
+        const nextSnapshot = await desktop.openProject();
+        const nextMessages = await desktop.getAgentMessages();
+        setSnapshot(nextSnapshot);
+        setOpenTabs([nextSnapshot.activeFile, nextSnapshot.projectConfig.mainTex]);
+        setActiveFilePath(nextSnapshot.activeFile);
+        setMessages(nextMessages);
+
+        if (nextSnapshot.projectConfig.autoCompile && nextSnapshot.compileResult.status === "idle") {
+          const compileResult = await desktop.compileProject(nextSnapshot.activeFile);
+          setSnapshot((current) =>
+            current
+              ? {
+                  ...current,
+                  compileResult,
+                }
+              : current,
+          );
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setBootstrapError(message);
       }
     })();
   }, []);
 
   const runForwardSync = useEffectEvent(async (filePath: string, line: number) => {
-    if (!snapshot?.projectConfig.forwardSync) {
+    if (!snapshot?.projectConfig.forwardSync || snapshot.compileResult.status !== "success") {
       return;
     }
-    const location = await desktop.forwardSearch(filePath, line);
-    setHighlightedPage(location.page);
+    try {
+      const location = await desktop.forwardSearch(filePath, line);
+      setHighlightedPage(location.page);
+    } catch (error) {
+      console.warn("forward sync failed", error);
+    }
   });
 
   useEffect(() => {
@@ -88,7 +99,7 @@ function App() {
       void runForwardSync(deferredActiveFile.path, cursorLine);
     }, 420);
     return () => window.clearTimeout(timer);
-  }, [cursorLine, deferredActiveFile]);
+  }, [cursorLine, deferredActiveFile, snapshot?.compileResult.status]);
 
   async function saveAndCompile(filePath: string, content: string) {
     await desktop.saveFile(filePath, content);
@@ -232,10 +243,21 @@ function App() {
   }
 
   async function handlePageJump(page: number) {
+    if (snapshot?.compileResult.status !== "success") {
+      return;
+    }
     setHighlightedPage(page);
-    const location = await desktop.reverseSearch(page);
-    handleOpenFile(location.filePath);
-    setCursorLine(location.line);
+    try {
+      const location = await desktop.reverseSearch(page);
+      handleOpenFile(location.filePath);
+      setCursorLine(location.line);
+    } catch (error) {
+      console.warn("reverse sync failed", error);
+    }
+  }
+
+  if (bootstrapError) {
+    return <div className="app-shell loading-shell">ViewerLeaf failed to start: {bootstrapError}</div>;
   }
 
   if (!snapshot || !deferredActiveFile) {
