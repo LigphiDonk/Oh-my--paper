@@ -53,30 +53,14 @@ export class PDFJSWrapper {
     this.linkService.setViewer(this.viewer);
   }
 
-  private async toPdfData(source: Uint8Array | string) {
-    if (source instanceof Uint8Array) {
-      return source;
-    }
-
-    const response = await fetch(source, { cache: "no-store" });
-    if (!response.ok) {
-      throw new Error(`PDF request failed: ${response.status} ${response.statusText}`);
-    }
-
-    const buffer = await response.arrayBuffer();
-    return new Uint8Array(buffer);
-  }
-
   async loadDocument(source: Uint8Array | string): Promise<PDFDocumentProxy | null> {
     const version = ++this.loadVersion;
     await this.disposeTaskAndDoc();
 
-    const data = await this.toPdfData(source);
-    if (version !== this.loadVersion) {
-      return null;
-    }
-
-    const loadingTask = getDocument({ data });
+    const loadingTask =
+      source instanceof Uint8Array
+        ? getDocument({ data: source })
+        : getDocument({ url: source });
     this.loadingTask = loadingTask;
 
     const document = await loadingTask.promise;
@@ -97,6 +81,8 @@ export class PDFJSWrapper {
     if (this.viewer.currentScaleValue === "1") {
       this.viewer.currentScaleValue = "page-width";
     }
+
+    this.viewer.update();
 
     return document;
   }

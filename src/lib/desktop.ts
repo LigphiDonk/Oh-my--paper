@@ -41,25 +41,18 @@ async function runOrMock<T>(command: string, args: Record<string, unknown>, fall
 
 function resolveAssetResource(asset: AssetResource): AssetResource {
   const data = normalizeBinary(asset.data);
-
-  if (asset.resourceUrl) {
-    return {
-      ...asset,
-      data,
-    };
-  }
-
-  if (data) {
-    return {
-      ...asset,
-      data,
-    };
-  }
+  const resourceUrl =
+    asset.resourceUrl ||
+    (asset.absolutePath
+      ? isTauriRuntime()
+        ? convertFileSrc(asset.absolutePath)
+        : asset.absolutePath
+      : undefined);
 
   return {
     ...asset,
     data,
-    resourceUrl: isTauriRuntime() ? convertFileSrc(asset.absolutePath) : asset.absolutePath,
+    resourceUrl,
   };
 }
 
