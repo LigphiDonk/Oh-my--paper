@@ -1260,6 +1260,22 @@ function App() {
     setSnapshot((current) => (current ? { ...current, providers } : current));
   }
 
+  async function handleUpdateProvider(providerId: string, patch: Partial<ProviderConfig>) {
+    await desktop.updateProvider(providerId, patch);
+    const providers = await desktop.listProviders();
+    setSnapshot((current) => (current ? { ...current, providers } : current));
+  }
+
+  async function handleActivateProvider(providerId: string) {
+    // Set this one as enabled, disable others
+    const current = snapshot?.providers ?? [];
+    await Promise.all(
+      current.map((p) => desktop.updateProvider(p.id, { isEnabled: p.id === providerId }))
+    );
+    const providers = await desktop.listProviders();
+    setSnapshot((prev) => (prev ? { ...prev, providers } : prev));
+  }
+
   async function handleDeleteProvider(providerId: string) {
     await desktop.deleteProvider(providerId);
     const providers = await desktop.listProviders();
@@ -1844,11 +1860,14 @@ function App() {
             onSelectBrief={(briefId: string) => setSelectedBrief(snapshot.figureBriefs.find((brief) => brief.id === briefId) ?? null)}
             onSelectAsset={(assetId: string) => setSelectedAsset(snapshot.assets.find((asset) => asset.id === assetId) ?? null)}
             providers={snapshot.providers}
+            activeProviderId={snapshot.providers.find((p) => p.isEnabled)?.id}
             skills={snapshot.skills}
             usageRecords={usageRecords}
             onAddProvider={handleAddProvider}
+            onUpdateProvider={handleUpdateProvider}
             onDeleteProvider={handleDeleteProvider}
             onTestProvider={handleTestProvider}
+            onActivateProvider={(id) => void handleActivateProvider(id)}
             onToggleSkill={handleToggleSkill}
             streamText={streamText}
             isStreaming={isStreaming}

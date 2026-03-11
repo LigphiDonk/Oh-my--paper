@@ -1,8 +1,8 @@
 import clsx from "clsx";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { ChatPanel } from "./ChatPanel";
-import { PROVIDER_PRESETS } from "../lib/providerPresets";
+import { ProviderCard, ProviderEditModal } from "./ProviderCard";
 import type {
   AgentMessage,
   AgentProfile,
@@ -47,20 +47,19 @@ interface SidebarProps {
   onSelectBrief: (briefId: string) => void;
   onSelectAsset: (assetId: string) => void;
   providers: ProviderConfig[];
+  activeProviderId?: string;
   skills: SkillManifest[];
   usageRecords: UsageRecord[];
   onAddProvider: (provider: ProviderConfig) => Promise<void>;
+  onUpdateProvider: (providerId: string, patch: Partial<ProviderConfig>) => Promise<void>;
   onDeleteProvider: (providerId: string) => Promise<void>;
   onTestProvider: (providerId: string) => Promise<TestResult>;
+  onActivateProvider: (providerId: string) => void;
   onToggleSkill: (skill: SkillManifest) => Promise<void>;
   streamText?: string;
   isStreaming?: boolean;
   onSendMessage: (text: string) => void;
   onDismissPatch: () => void;
-}
-
-function providerEnabled(provider: ProviderConfig) {
-  return provider.isEnabled ?? true;
 }
 
 function skillEnabled(skill: SkillManifest) {
@@ -103,69 +102,53 @@ export function Sidebar({
   onSelectBrief,
   onSelectAsset,
   providers,
+  activeProviderId,
   skills,
   usageRecords,
   onAddProvider,
+  onUpdateProvider,
   onDeleteProvider,
   onTestProvider,
+  onActivateProvider,
   onToggleSkill,
   streamText,
   isStreaming,
   onSendMessage,
   onDismissPatch,
 }: SidebarProps) {
-  const [selectedVendor, setSelectedVendor] = useState(PROVIDER_PRESETS[0]?.vendor ?? "openai");
-  const [providerForm, setProviderForm] = useState(() => {
-    const preset = PROVIDER_PRESETS[0];
-    return {
-      name: preset?.name ?? "OpenAI",
-      baseUrl: preset?.baseUrl ?? "",
-      apiKey: "",
-      defaultModel: preset?.models[0] ?? "",
-    };
+  // Provider form state (blank by default — no presets)
+  const [providerForm, setProviderForm] = useState({
+    name: "",
+    baseUrl: "",
+    apiKey: "",
+    defaultModel: "",
+    vendor: "custom" as string,
   });
   const [providerActionState, setProviderActionState] = useState<Record<string, string>>({});
   const [isSubmittingProvider, setIsSubmittingProvider] = useState(false);
-
-  const selectedPreset = useMemo(
-    () => PROVIDER_PRESETS.find((preset) => preset.vendor === selectedVendor) ?? PROVIDER_PRESETS[0],
-    [selectedVendor],
-  );
-  const availableEngineSet = useMemo(
-    () => new Set<LatexEngine>(compileEnvironment?.availableEngines ?? []),
-    [compileEnvironment],
-  );
+  const [editingProviderId, setEditingProviderId] = useState<string | null>(null);
+  const availableEngineSet = new Set<LatexEngine>(compileEnvironment?.availableEngines ?? []);
   const selectedEngineAvailable = availableEngineSet.has(projectConfig.engine as LatexEngine);
 
   const totalInputTokens = usageRecords.reduce((sum, item) => sum + item.inputTokens, 0);
   const totalOutputTokens = usageRecords.reduce((sum, item) => sum + item.outputTokens, 0);
 
-  function updateProviderForm(nextVendor: string) {
-    const preset = PROVIDER_PRESETS.find((item) => item.vendor === nextVendor);
-    setSelectedVendor(nextVendor);
-    setProviderForm((current) => ({
-      ...current,
-      name: preset?.name ?? current.name,
-      baseUrl: preset?.baseUrl ?? current.baseUrl,
-      defaultModel: preset?.models[0] ?? current.defaultModel,
-    }));
-  }
-
   async function handleAddProvider() {
+    if (!providerForm.name.trim() || !providerForm.baseUrl.trim() || !providerForm.defaultModel.trim()) return;
     setIsSubmittingProvider(true);
     try {
       await onAddProvider({
-        id: `${selectedVendor}-${Date.now()}`,
-        name: providerForm.name,
-        vendor: selectedVendor,
-        baseUrl: providerForm.baseUrl,
+        id: `custom-${Date.now()}`,
+        name: providerForm.name.trim(),
+        vendor: "custom",
+        baseUrl: providerForm.baseUrl.trim(),
         apiKey: providerForm.apiKey,
-        defaultModel: providerForm.defaultModel,
+        defaultModel: providerForm.defaultModel.trim(),
         isEnabled: true,
         sortOrder: providers.length,
         metaJson: "{}",
       });
-      setProviderForm((current) => ({ ...current, apiKey: "" }));
+      setProviderForm({ name: "", baseUrl: "", apiKey: "", defaultModel: "", vendor: "custom" });
     } finally {
       setIsSubmittingProvider(false);
     }
@@ -337,6 +320,9 @@ curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh`}</pre>
               onDismissPatch={onDismissPatch}
               streamText={streamText}
               isStreaming={isStreaming}
+              skills={skills}
+              onToggleSkill={onToggleSkill}
+              usageRecords={usageRecords}
             />
           </div>
         </>
@@ -462,101 +448,79 @@ curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh`}</pre>
         <>
           <div className="sidebar-header">API 配置</div>
           <div className="sidebar-content sidebar-stack">
+            {/* Add provider form */}
             <div className="card">
               <div className="card-header">添加 Provider</div>
               <div className="sidebar-stack-compact">
-                <select
-                  value={selectedVendor}
-                  onChange={(event) => updateProviderForm(event.target.value)}
-                  className="sidebar-input"
-                >
-                  {PROVIDER_PRESETS.map((preset) => (
-                    <option key={preset.vendor} value={preset.vendor}>
-                      {preset.name}
-                    </option>
-                  ))}
-                </select>
                 <input
                   className="sidebar-input"
                   value={providerForm.name}
                   onChange={(event) => setProviderForm((current) => ({ ...current, name: event.target.value }))}
-                  placeholder="名称"
+                  placeholder="名称（如：Fastcode、88code、我的Key）"
+                  autoFocus
                 />
                 <input
                   className="sidebar-input"
                   value={providerForm.baseUrl}
                   onChange={(event) => setProviderForm((current) => ({ ...current, baseUrl: event.target.value }))}
-                  placeholder="Base URL"
+                  placeholder="Base URL（如：https://api.openai.com/v1）"
                 />
                 <input
                   className="sidebar-input"
                   value={providerForm.defaultModel}
                   onChange={(event) => setProviderForm((current) => ({ ...current, defaultModel: event.target.value }))}
-                  placeholder="默认模型"
-                  list="provider-models"
+                  placeholder="默认模型（如：claude-sonnet-4）"
                 />
-                <datalist id="provider-models">
-                  {selectedPreset?.models.map((model) => (
-                    <option key={model} value={model} />
-                  ))}
-                </datalist>
                 <input
                   className="sidebar-input"
                   type="password"
                   value={providerForm.apiKey}
                   onChange={(event) => setProviderForm((current) => ({ ...current, apiKey: event.target.value }))}
-                  placeholder="API Key"
+                  placeholder="API Key（如：sk-…）"
                 />
                 <button
                   className="btn-primary"
+                  type="button"
                   onClick={() => void handleAddProvider()}
-                  disabled={isSubmittingProvider || !providerForm.name || !providerForm.defaultModel}
+                  disabled={isSubmittingProvider || !providerForm.name.trim() || !providerForm.baseUrl.trim() || !providerForm.defaultModel.trim()}
                 >
-                  {isSubmittingProvider ? "保存中..." : "添加 Provider"}
+                  {isSubmittingProvider ? "保存中…" : "+ 添加 Provider"}
                 </button>
               </div>
             </div>
 
-            <div className="sidebar-stack-compact">
+            {/* Provider cards */}
+            <div className="pcard-list">
               {providers.map((provider) => (
-                <div key={provider.id} className="card sidebar-compact-card">
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "13px" }}>
-                        {provider.name ?? provider.vendor}
-                      </div>
-                      <div className="text-muted text-xs" style={{ marginTop: 4 }}>
-                        默认模型: {provider.defaultModel}
-                      </div>
-                      <div className="text-subtle text-xs" style={{ marginTop: 2, wordBreak: "break-all" }}>
-                        {provider.baseUrl}
-                      </div>
-                      <div
-                        className="text-xs"
-                        style={{ color: providerEnabled(provider) ? "var(--accent-primary)" : "var(--text-tertiary)", marginTop: 6 }}
-                      >
-                        {providerEnabled(provider) ? "已启用" : "已禁用"}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                    <button className="btn-secondary" style={{ flex: 1 }} onClick={() => void handleTestProvider(provider.id)}>
-                      测试连接
-                    </button>
-                    <button className="btn-secondary" style={{ flex: 1 }} onClick={() => void onDeleteProvider(provider.id)}>
-                      删除
-                    </button>
-                  </div>
-                  {providerActionState[provider.id] && (
-                    <div style={{ marginTop: 8, fontSize: 11, color: "var(--text-secondary)" }}>
-                      {providerActionState[provider.id]}
-                    </div>
-                  )}
-                </div>
+                <ProviderCard
+                  key={provider.id}
+                  provider={provider}
+                  isActive={provider.id === activeProviderId}
+                  testState={providerActionState[provider.id]}
+                  onActivate={onActivateProvider}
+                  onTest={(id) => void handleTestProvider(id)}
+                  onDelete={(id) => void onDeleteProvider(id)}
+                  onEdit={(id) => setEditingProviderId(id)}
+                />
               ))}
-              {providers.length === 0 && <div className="sidebar-empty-state">未提供 API 配置</div>}
+              {providers.length === 0 && (
+                <div className="sidebar-empty-state">暂无 Provider，在上方添加第一个</div>
+              )}
             </div>
           </div>
+
+          {/* Edit modal */}
+          {editingProviderId && (() => {
+            const p = providers.find(pr => pr.id === editingProviderId);
+            if (!p) return null;
+            return (
+              <ProviderEditModal
+                provider={p}
+                onSave={(patch) => onUpdateProvider(p.id, patch)}
+                onClose={() => setEditingProviderId(null)}
+              />
+            );
+          })()}
         </>
       )}
 
