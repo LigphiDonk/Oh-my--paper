@@ -196,6 +196,9 @@ export interface StreamToolCall {
 }
 
 export type StreamChunk =
+  | { type: "thinking_delta"; content: string }
+  | { type: "thinking_clear" }
+  | { type: "thinking_commit" }
   | { type: "text_delta"; content: string }
   | { type: "tool_call_start"; toolId: string; args: Record<string, unknown> }
   | { type: "tool_call_result"; toolId: string; output: string; status?: "completed" | "error" }

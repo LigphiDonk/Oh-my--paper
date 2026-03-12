@@ -207,6 +207,23 @@ function writeStoredBoolean(key: string, value: boolean) {
   window.localStorage.setItem(key, value ? "true" : "false");
 }
 
+function safelyDisposeListener(listener?: (() => void | Promise<void>) | null) {
+  if (!listener) {
+    return;
+  }
+
+  try {
+    const result = listener();
+    if (result && typeof (result as Promise<unknown>).then === "function") {
+      void (result as Promise<unknown>).catch((error) => {
+        console.warn("failed to dispose listener", error);
+      });
+    }
+  } catch (error) {
+    console.warn("failed to dispose listener", error);
+  }
+}
+
 function upsertWorkspaceEntry(entries: WorkspaceEntry[], rootPath: string, max: number) {
   const nextEntry = toWorkspaceEntry(rootPath);
   return [nextEntry, ...entries.filter((entry) => entry.rootPath !== rootPath)].slice(0, max);
@@ -271,6 +288,7 @@ function App() {
   const [selectedBrief, setSelectedBrief] = useState<FigureBriefDraft | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<GeneratedAsset | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [streamThinkingText, setStreamThinkingText] = useState("");
   const [streamText, setStreamText] = useState("");
   const [streamToolCalls, setStreamToolCalls] = useState<StreamToolCall[]>([]);
   const [streamError, setStreamError] = useState("");
@@ -287,6 +305,7 @@ function App() {
   const pendingTextLoadsRef = useRef<Record<string, Promise<ProjectFile | null>>>({});
   const streamBufferRef = useRef("");
   const streamFlushTimerRef = useRef<number | null>(null);
+  const streamThinkingRef = useRef("");
   const streamToolSeqRef = useRef(0);
   const currentStreamSessionIdRef = useRef("");
   const snapshotRef = useRef<WorkspaceSnapshot | null>(null);
@@ -346,8 +365,31 @@ function App() {
     streamBufferRef.current = "";
   });
 
+  const appendThinkingDelta = useEffectEvent((delta: string) => {
+    if (!delta) {
+      return;
+    }
+    streamThinkingRef.current += delta;
+    setStreamThinkingText(streamThinkingRef.current);
+  });
+
+  const clearThinkingText = useEffectEvent(() => {
+    streamThinkingRef.current = "";
+    setStreamThinkingText("");
+  });
+
+  const commitThinkingText = useEffectEvent(() => {
+    const content = streamThinkingRef.current;
+    if (!content) {
+      return;
+    }
+    setStreamText((current) => current + content);
+    clearThinkingText();
+  });
+
   const resetStreamState = useEffectEvent(() => {
     clearStreamBuffer();
+    clearThinkingText();
     setStreamText("");
     setStreamToolCalls([]);
     setStreamError("");
@@ -1475,13 +1517,27 @@ function App() {
     resetStreamState();
     setPendingPatch(null);
 
-    let unlistenFn: (() => void) | undefined;
-    const stopStream = () => { unlistenFn?.(); };
+    let unlistenFn: (() => void | Promise<void>) | undefined;
+    const stopStream = () => {
+      const current = unlistenFn;
+      unlistenFn = undefined;
+      safelyDisposeListener(current);
+    };
 
     unlistenFn = await desktop.onAgentStream((chunk) => {
       switch (chunk.type) {
         case "text_delta":
+          clearThinkingText();
           queueStreamDelta(chunk.content);
+          break;
+        case "thinking_delta":
+          appendThinkingDelta(chunk.content);
+          break;
+        case "thinking_clear":
+          clearThinkingText();
+          break;
+        case "thinking_commit":
+          commitThinkingText();
           break;
         case "tool_call_start":
           pushStreamToolStart(chunk.toolId, chunk.args);
@@ -1497,6 +1553,7 @@ function App() {
           });
           break;
         case "error":
+          clearThinkingText();
           setStreamError(chunk.message);
           flushStreamBuffer();
           setIsStreaming(false);
@@ -1545,6 +1602,7 @@ function App() {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error("runAgent failed", error);
+      clearThinkingText();
       flushStreamBuffer();
       setStreamError(message);
       appendAssistantErrorMessage(message);
@@ -1587,13 +1645,27 @@ function App() {
     };
     setMessages((current) => [...current, userMsg]);
 
-    let unlistenFn: (() => void) | undefined;
-    const stopStream = () => { unlistenFn?.(); };
+    let unlistenFn: (() => void | Promise<void>) | undefined;
+    const stopStream = () => {
+      const current = unlistenFn;
+      unlistenFn = undefined;
+      safelyDisposeListener(current);
+    };
 
     unlistenFn = await desktop.onAgentStream((chunk) => {
       switch (chunk.type) {
         case "text_delta":
+          clearThinkingText();
           queueStreamDelta(chunk.content);
+          break;
+        case "thinking_delta":
+          appendThinkingDelta(chunk.content);
+          break;
+        case "thinking_clear":
+          clearThinkingText();
+          break;
+        case "thinking_commit":
+          commitThinkingText();
           break;
         case "tool_call_start":
           pushStreamToolStart(chunk.toolId, chunk.args);
@@ -1609,6 +1681,7 @@ function App() {
           });
           break;
         case "error":
+          clearThinkingText();
           setStreamError(chunk.message);
           flushStreamBuffer();
           setIsStreaming(false);
@@ -1659,6 +1732,7 @@ function App() {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error("runAgent failed", error);
+      clearThinkingText();
       flushStreamBuffer();
       setStreamError(message);
       appendAssistantErrorMessage(message);
@@ -2093,7 +2167,7 @@ function App() {
       return;
     }
 
-    let unlisten: (() => void) | undefined;
+    let unlisten: (() => void | Promise<void>) | undefined;
 
     void desktop.onAppMenuAction((payload) => {
       handleNativeMenuAction(payload);
@@ -2102,7 +2176,7 @@ function App() {
     });
 
     return () => {
-      unlisten?.();
+      safelyDisposeListener(unlisten);
     };
   }, [handleNativeMenuAction]);
 
@@ -2458,6 +2532,7 @@ function App() {
             onTestProvider={handleTestProvider}
             onActivateProvider={(id) => void handleActivateProvider(id)}
             onToggleSkill={handleToggleSkill}
+            streamThinkingText={streamThinkingText}
             streamText={streamText}
             streamToolCalls={streamToolCalls}
             streamError={streamError}

@@ -262,6 +262,12 @@ pub struct AgentContext {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum StreamChunk {
+    #[serde(rename = "thinking_delta")]
+    ThinkingDelta { content: String },
+    #[serde(rename = "thinking_clear")]
+    ThinkingClear,
+    #[serde(rename = "thinking_commit")]
+    ThinkingCommit,
     #[serde(rename = "text_delta")]
     TextDelta { content: String },
     #[serde(rename = "tool_call_start")]

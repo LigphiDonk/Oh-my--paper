@@ -1893,6 +1893,15 @@ button {
   40% { opacity: 1; transform: scale(1); }
 }
 
+.ag-assistant-thinking-copy {
+  margin-bottom: 8px;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text-tertiary);
+  opacity: 0.88;
+  white-space: pre-wrap;
+}
+
 /* Streaming cursor */
 .ag-cursor-blink {
   display: inline-block;
@@ -1978,6 +1987,41 @@ button {
   white-space: pre-wrap;
   word-break: break-all;
   margin: 0;
+}
+
+.ag-tool-status-row {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-tertiary);
+}
+.ag-tool-status-icon {
+  width: 12px;
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ag-tool-status-text {
+  color: var(--text-secondary);
+}
+.ag-tool-status-preview {
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.ag-tool-status-row--error .ag-tool-status-icon,
+.ag-tool-status-row--error .ag-tool-status-text {
+  color: #c45151;
+}
+.ag-tool-status-row--running .ag-tool-status-text {
+  color: var(--text-secondary);
 }
 
 /* ─── Patch card ────────────────────────────────────────── */

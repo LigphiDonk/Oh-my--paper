@@ -58,6 +58,7 @@ interface SidebarProps {
   onTestProvider: (providerId: string) => Promise<TestResult>;
   onActivateProvider: (providerId: string) => void;
   onToggleSkill: (skill: SkillManifest) => Promise<void>;
+  streamThinkingText?: string;
   streamText?: string;
   streamToolCalls?: StreamToolCall[];
   streamError?: string;
@@ -148,6 +149,7 @@ export function Sidebar({
   onTestProvider,
   onActivateProvider,
   onToggleSkill,
+  streamThinkingText,
   streamText,
   streamToolCalls,
   streamError,
@@ -361,6 +363,7 @@ curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh`}</pre>
               pendingPatchSummary={pendingPatchSummary}
               onApplyPatch={onApplyPatch}
               onDismissPatch={onDismissPatch}
+              streamThinkingText={streamThinkingText}
               streamText={streamText}
               streamToolCalls={streamToolCalls}
               streamError={streamError}

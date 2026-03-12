@@ -49,6 +49,79 @@ function toToolCallBlock(call: StreamToolCall): ToolCallBlock {
   };
 }
 
+function summarizeToolCall(call: ToolCallBlock) {
+  const firstStringArg = (() => {
+    if (!call.args) {
+      return "";
+    }
+    const candidates = [
+      call.args.filePath,
+      call.args.path,
+      call.args.query,
+      call.args.pattern,
+      call.args.oldString,
+    ].filter((value) => typeof value === "string" && value.trim().length > 0) as string[];
+    return candidates[0] ?? "";
+  })();
+
+  const target = firstStringArg.length > 36 ? `${firstStringArg.slice(0, 36)}…` : firstStringArg;
+  const prefix = call.status === "running" ? "正在" : call.status === "error" ? "失败" : "已完成";
+
+  switch (call.toolId) {
+    case "tool_search":
+      return `${prefix}分析可用工具`;
+    case "list":
+    case "list_files":
+      return `${prefix}查看项目结构${target ? ` · ${target}` : ""}`;
+    case "read":
+    case "read_section":
+      return `${prefix}读取文件${target ? ` · ${target}` : ""}`;
+    case "list_sections":
+      return `${prefix}提取章节结构`;
+    case "grep":
+    case "search_project":
+      return `${prefix}搜索内容${target ? ` · ${target}` : ""}`;
+    case "glob":
+      return `${prefix}查找匹配文件${target ? ` · ${target}` : ""}`;
+    case "read_bib_entries":
+      return `${prefix}读取参考文献`;
+    case "edit":
+    case "write":
+    case "apply_patch":
+    case "apply_text_patch":
+    case "insert_at_line":
+      return `${prefix}修改文件${target ? ` · ${target}` : ""}`;
+    default:
+      return `${prefix}调用 ${call.toolId}${target ? ` · ${target}` : ""}`;
+  }
+}
+
+function ToolStatusRow({ call }: { call: ToolCallBlock }) {
+  const summary = summarizeToolCall(call);
+  const preview = call.output?.trim()
+    ? call.output.trim().split("\n").find((line) => line.trim().length > 0) ?? ""
+    : "";
+  const shortPreview = preview.length > 88 ? `${preview.slice(0, 88)}…` : preview;
+
+  return (
+    <div className={`ag-tool-status-row ag-tool-status-row--${call.status}`}>
+      <span className="ag-tool-status-icon">
+        {call.status === "running" ? (
+          <span className="ag-tool-spinner" />
+        ) : call.status === "error" ? (
+          "!"
+        ) : (
+          "·"
+        )}
+      </span>
+      <span className="ag-tool-status-text">{summary}</span>
+      {call.status !== "running" && shortPreview && (
+        <span className="ag-tool-status-preview">{shortPreview}</span>
+      )}
+    </div>
+  );
+}
+
 /* ─── Tool call card ──────────────────────────────────── */
 function ToolCallCard({ call }: { call: ToolCallBlock }) {
   const [open, setOpen] = useState(false);
@@ -113,6 +186,7 @@ function UserMessage({ msg }: { msg: AgentMessage }) {
 function AssistantMessage({ msg, streaming }: {
   msg?: AgentMessage;
   streaming?: {
+    thinkingText?: string;
     text: string;
     toolCalls?: ToolCallBlock[];
     streamError?: string;
@@ -123,17 +197,23 @@ function AssistantMessage({ msg, streaming }: {
   const clean = parsed.text;
   const toolCalls = streaming?.toolCalls ?? parsed.toolCalls;
   const streamError = streaming?.streamError;
+  const thinkingText = streaming?.thinkingText?.trim() ?? "";
 
   return (
     <div className="ag-assistant-row">
-      {toolCalls.map((c, i) => <ToolCallCard key={i} call={c} />)}
+      {thinkingText && (
+        <div className="ag-assistant-thinking-copy">{thinkingText}</div>
+      )}
+      {toolCalls.map((c, i) => (
+        streaming ? <ToolStatusRow key={i} call={c} /> : <ToolCallCard key={i} call={c} />
+      ))}
       {streamError && <div className="ag-assistant-error">Error: {streamError}</div>}
       {clean && (
         <div className="ag-assistant-text">
           <ReactMarkdown>{clean}</ReactMarkdown>
         </div>
       )}
-      {!clean && toolCalls.length === 0 && (
+      {!clean && !thinkingText && toolCalls.length === 0 && (
         <div className="ag-assistant-text ag-thinking">
           <span className="ag-thinking-dot" />
           <span className="ag-thinking-dot" />
@@ -266,6 +346,7 @@ export interface ChatPanelProps {
   pendingPatchSummary?: string;
   onApplyPatch: () => void;
   onDismissPatch: () => void;
+  streamThinkingText?: string;
   streamText?: string;
   streamToolCalls?: StreamToolCall[];
   streamError?: string;
@@ -279,6 +360,7 @@ export function ChatPanel({
   messages, sessions, activeSessionId, onSelectSession, onNewSession,
   onRunAgent, onSendMessage,
   pendingPatchSummary, onApplyPatch, onDismissPatch,
+  streamThinkingText,
   streamText, streamToolCalls, streamError, isStreaming,
   skills, onToggleSkill,
   usageRecords,
@@ -290,7 +372,7 @@ export function ChatPanel({
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: isStreaming ? "auto" : "smooth" });
-  }, [isStreaming, messages, streamError, streamText, normalizedStreamToolCalls.length]);
+  }, [isStreaming, messages, streamError, streamText, streamThinkingText, normalizedStreamToolCalls.length]);
 
   useEffect(() => {
     const ta = textareaRef.current;
@@ -355,6 +437,7 @@ export function ChatPanel({
         {isStreaming && streamText !== undefined && (
           <AssistantMessage
             streaming={{
+              thinkingText: streamThinkingText,
               text: streamText,
               toolCalls: normalizedStreamToolCalls,
               streamError,
