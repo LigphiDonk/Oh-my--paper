@@ -973,6 +973,83 @@ button {
   color: var(--text-primary);
 }
 
+.usage-summary-grid {
+  gap: 8px;
+}
+
+.usage-summary-card {
+  padding: 10px 12px;
+}
+
+.usage-summary-card .sidebar-metric-value {
+  margin-top: 6px;
+  font-size: 17px;
+}
+
+.usage-record-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.usage-record-row {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.usage-record-top,
+.usage-record-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.usage-record-model,
+.usage-record-provider {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.usage-record-model {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.usage-record-time {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-record-provider,
+.usage-record-tokens {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-record-tokens {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.usage-record-token {
+  display: inline-flex;
+  align-items: center;
+}
+
 .latex-status-card {
   background:
     radial-gradient(circle at top right, rgba(37, 180, 96, 0.1), transparent 42%),

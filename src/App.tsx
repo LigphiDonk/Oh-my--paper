@@ -2326,7 +2326,6 @@ function App() {
         {hasProject && (
           <>
             <div className="topbar-center" data-tauri-drag-region={isMacOverlayWindow ? "true" : undefined}>
-              <span className="topbar-metric">当前配置 <strong>{activeProfile?.label ?? "未选择"}</strong></span>
               <span className="topbar-metric">
                 编译状态
                 <strong>{compileStatusLabel}</strong>
@@ -2345,9 +2344,6 @@ function App() {
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <polygon points="8,5 19,12 8,19" fill="currentColor"></polygon>
                 </svg>
-              </button>
-              <button className="btn-primary hover-spring" onClick={handleRunAgent} type="button" disabled={isStreaming}>
-                {isStreaming ? "执行中..." : `执行 ${activeProfile?.label ?? "当前配置"}`}
               </button>
             </div>
           </>
@@ -2430,9 +2426,6 @@ function App() {
             activeSessionId={activeSessionId}
             onSelectSession={(sessionId) => void handleSelectSession(sessionId)}
             onNewSession={() => void handleNewSession()}
-            profiles={snapshot.profiles}
-            activeProfileId={activeProfileId}
-            onSelectProfile={(profileId: string) => setActiveProfileId(profileId as AgentProfileId)}
             onRunAgent={handleRunAgent}
             pendingPatchSummary={pendingPatch?.summary}
             onApplyPatch={handleApplyPatch}

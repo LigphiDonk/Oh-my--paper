@@ -1069,7 +1069,7 @@ function touchSession(sessionId: string, lastMessage: string) {
 function truncateTitle(text: string, max = 36) {
   const compact = text.replaceAll("\n", " ").trim();
   if (!compact) {
-    return "New Chat";
+    return "新对话";
   }
   return compact.length > max ? `${compact.slice(0, max)}...` : compact;
 }

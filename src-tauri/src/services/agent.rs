@@ -809,7 +809,7 @@ fn value_to_text(value: &serde_json::Value) -> String {
 fn build_session_title(text: &str) -> String {
     let compact = text.replace('\n', " ").trim().to_string();
     if compact.is_empty() {
-        return "New Chat".to_string();
+        return "新对话".to_string();
     }
     truncate_preview(&compact, 40)
 }

@@ -3,7 +3,6 @@ import ReactMarkdown from "react-markdown";
 
 import type {
   AgentMessage,
-  AgentProfile,
   AgentSessionSummary,
   SkillManifest,
   StreamToolCall,
@@ -118,7 +117,6 @@ function AssistantMessage({ msg, streaming }: {
     toolCalls?: ToolCallBlock[];
     streamError?: string;
   };
-  label: string;
 }) {
   const raw = msg?.content ?? streaming?.text ?? "";
   const parsed = parseStreamBlocks(raw);
@@ -171,25 +169,17 @@ function PatchCard({ summary, onApply, onDismiss }: {
 
 /* ─── Bottom toolbar ──────────────────────────────────── */
 function BottomBar({
-  profiles,
-  activeProfileId,
-  onSelectProfile,
   onRunAgent,
   skills,
   onToggleSkill,
   usageRecords,
 }: {
-  profiles: AgentProfile[];
-  activeProfileId: string;
-  onSelectProfile: (id: string) => void;
   onRunAgent: () => void;
   skills: SkillManifest[];
   onToggleSkill: (skill: SkillManifest) => Promise<void>;
   usageRecords: UsageRecord[];
-  isStreaming?: boolean;
 }) {
   const [showSkills, setShowSkills] = useState(false);
-  const activeProfile = profiles.find(p => p.id === activeProfileId);
   const lastRecord = usageRecords[usageRecords.length - 1];
   const ctxPct = lastRecord
     ? Math.min(100, Math.round((lastRecord.inputTokens / 200_000) * 100))
@@ -220,7 +210,7 @@ function BottomBar({
       <div className="ag-toolbar">
         {/* Left side: + and skill toggle */}
         <div className="ag-toolbar-left">
-          <button type="button" className="ag-toolbar-btn" title="附件" onClick={onRunAgent}>
+          <button type="button" className="ag-toolbar-btn" title="执行 AI" aria-label="执行 AI" onClick={onRunAgent}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
               <path d="M12 5v14M5 12h14"/>
             </svg>
@@ -239,9 +229,8 @@ function BottomBar({
           )}
         </div>
 
-        {/* Right side: model + ctx ring */}
+        {/* Right side: ctx ring */}
         <div className="ag-toolbar-right">
-          {/* Context ring */}
           {ctxPct > 0 && (
             <div className="ag-ctx-ring" title={`上下文 ${ctxPct}%`}>
               <svg viewBox="0 0 20 20" width="16" height="16">
@@ -259,25 +248,6 @@ function BottomBar({
               </svg>
             </div>
           )}
-
-          {/* Model selector */}
-          <div className="ag-model-select-wrap">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13" className="ag-model-chevron-up">
-              <path d="M18 15l-6-6-6 6"/>
-            </svg>
-            <select
-              className="ag-model-select"
-              value={activeProfileId}
-              onChange={e => onSelectProfile(e.target.value)}
-            >
-              {profiles.map(p => (
-                <option key={p.id} value={p.id}>{p.label}</option>
-              ))}
-            </select>
-            <span className="ag-model-label">
-              {activeProfile?.label ?? activeProfileId}
-            </span>
-          </div>
         </div>
       </div>
     </div>
@@ -291,9 +261,6 @@ export interface ChatPanelProps {
   activeSessionId: string;
   onSelectSession: (sessionId: string) => void;
   onNewSession: () => void;
-  profiles: AgentProfile[];
-  activeProfileId: string;
-  onSelectProfile: (id: string) => void;
   onRunAgent: () => void;
   onSendMessage: (text: string) => void;
   pendingPatchSummary?: string;
@@ -310,7 +277,6 @@ export interface ChatPanelProps {
 
 export function ChatPanel({
   messages, sessions, activeSessionId, onSelectSession, onNewSession,
-  profiles, activeProfileId, onSelectProfile,
   onRunAgent, onSendMessage,
   pendingPatchSummary, onApplyPatch, onDismissPatch,
   streamText, streamToolCalls, streamError, isStreaming,
@@ -320,7 +286,6 @@ export function ChatPanel({
   const [inputText, setInputText] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const activeProfile = profiles.find(p => p.id === activeProfileId);
   const normalizedStreamToolCalls = (streamToolCalls ?? []).map(toToolCallBlock);
 
   useEffect(() => {
@@ -384,13 +349,7 @@ export function ChatPanel({
         {messages.map(msg => {
           if (msg.role === "user") return <UserMessage key={msg.id} msg={msg} />;
           if (msg.role === "tool") return null; // folded into assistant card
-          return (
-            <AssistantMessage
-              key={msg.id}
-              msg={msg}
-              label={activeProfile?.label ?? activeProfileId}
-            />
-          );
+          return <AssistantMessage key={msg.id} msg={msg} />;
         })}
 
         {isStreaming && streamText !== undefined && (
@@ -400,7 +359,6 @@ export function ChatPanel({
               toolCalls: normalizedStreamToolCalls,
               streamError,
             }}
-            label={activeProfile?.label ?? activeProfileId}
           />
         )}
 
@@ -446,14 +404,10 @@ export function ChatPanel({
 
       {/* Bottom toolbar */}
       <BottomBar
-        profiles={profiles}
-        activeProfileId={activeProfileId}
-        onSelectProfile={onSelectProfile}
         onRunAgent={onRunAgent}
         skills={skills}
         onToggleSkill={onToggleSkill}
         usageRecords={usageRecords}
-        isStreaming={isStreaming}
       />
     </div>
   );

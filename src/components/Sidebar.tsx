@@ -5,7 +5,6 @@ import { ChatPanel } from "./ChatPanel";
 import { ProviderCard, ProviderEditModal } from "./ProviderCard";
 import type {
   AgentMessage,
-  AgentProfile,
   AgentSessionSummary,
   CompileEnvironmentStatus,
   DrawerTab,
@@ -27,9 +26,6 @@ interface SidebarProps {
   activeSessionId: string;
   onSelectSession: (sessionId: string) => void;
   onNewSession: () => void;
-  profiles: AgentProfile[];
-  activeProfileId: string;
-  onSelectProfile: (profileId: string) => void;
   onRunAgent: () => void;
   pendingPatchSummary?: string;
   onApplyPatch: () => void;
@@ -74,6 +70,38 @@ function skillEnabled(skill: SkillManifest) {
   return skill.isEnabled ?? skill.enabled ?? false;
 }
 
+function formatUsageTimestamp(createdAt: string) {
+  if (!createdAt.trim()) {
+    return "";
+  }
+
+  const normalized = createdAt.includes("T") ? createdAt : createdAt.replace(" ", "T");
+  const withTimezone = normalized.endsWith("Z") ? normalized : `${normalized}Z`;
+  const date = new Date(withTimezone);
+  if (Number.isNaN(date.getTime())) {
+    return createdAt;
+  }
+
+  const now = new Date();
+  const sameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+
+  return sameDay
+    ? date.toLocaleTimeString("zh-CN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+    : date.toLocaleString("zh-CN", {
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+}
+
 const LATEX_ENGINES: LatexEngine[] = ["xelatex", "pdflatex", "lualatex"];
 const LATEX_ENGINE_LABELS: Record<LatexEngine, string> = {
   xelatex: "XeLaTeX",
@@ -88,9 +116,6 @@ export function Sidebar({
   activeSessionId,
   onSelectSession,
   onNewSession,
-  profiles,
-  activeProfileId,
-  onSelectProfile,
   onRunAgent,
   pendingPatchSummary,
   onApplyPatch,
@@ -143,6 +168,9 @@ export function Sidebar({
   const [editingProviderId, setEditingProviderId] = useState<string | null>(null);
   const availableEngineSet = new Set<LatexEngine>(compileEnvironment?.availableEngines ?? []);
   const selectedEngineAvailable = availableEngineSet.has(projectConfig.engine as LatexEngine);
+  const providerLabelById = new Map(
+    providers.map((provider) => [provider.id, provider.name?.trim() || provider.vendor || provider.id]),
+  );
 
   const totalInputTokens = usageRecords.reduce((sum, item) => sum + item.inputTokens, 0);
   const totalOutputTokens = usageRecords.reduce((sum, item) => sum + item.outputTokens, 0);
@@ -328,9 +356,6 @@ curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh`}</pre>
               activeSessionId={activeSessionId}
               onSelectSession={onSelectSession}
               onNewSession={onNewSession}
-              profiles={profiles}
-              activeProfileId={activeProfileId}
-              onSelectProfile={onSelectProfile}
               onRunAgent={onRunAgent}
               onSendMessage={onSendMessage}
               pendingPatchSummary={pendingPatchSummary}
@@ -548,36 +573,35 @@ curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh`}</pre>
         <>
           <div className="sidebar-header">用量统计</div>
           <div className="sidebar-content sidebar-stack">
-            <div className="sidebar-metrics-grid">
-              <div className="card sidebar-metric-card">
+            <div className="sidebar-metrics-grid usage-summary-grid">
+              <div className="card sidebar-metric-card usage-summary-card">
                 <div className="text-subtle text-xs">调用次数</div>
                 <div className="sidebar-metric-value">{usageRecords.length}</div>
               </div>
-              <div className="card sidebar-metric-card">
+              <div className="card sidebar-metric-card usage-summary-card">
                 <div className="text-subtle text-xs">输入 Tokens</div>
                 <div className="sidebar-metric-value">{totalInputTokens}</div>
               </div>
-              <div className="card sidebar-metric-card">
+              <div className="card sidebar-metric-card usage-summary-card">
                 <div className="text-subtle text-xs">输出 Tokens</div>
                 <div className="sidebar-metric-value">{totalOutputTokens}</div>
               </div>
             </div>
 
-            <div className="sidebar-stack-compact">
+            <div className="usage-record-list">
               {usageRecords.map((record) => (
-                <div key={record.id} className="card sidebar-compact-card">
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: "13px", color: "var(--text-primary)" }}>
-                        {record.model}
-                      </div>
-                      <div className="text-subtle text-xs">
-                        {record.providerId}
-                      </div>
+                <div key={record.id} className="usage-record-row">
+                  <div className="usage-record-top">
+                    <div className="usage-record-model" title={record.model}>{record.model}</div>
+                    <div className="usage-record-time">{formatUsageTimestamp(record.createdAt)}</div>
+                  </div>
+                  <div className="usage-record-bottom">
+                    <div className="usage-record-provider" title={providerLabelById.get(record.providerId) ?? record.providerId}>
+                      {providerLabelById.get(record.providerId) ?? record.providerId}
                     </div>
-                    <div className="text-xs text-muted" style={{ textAlign: "right" }}>
-                      <div>In {record.inputTokens}</div>
-                      <div>Out {record.outputTokens}</div>
+                    <div className="usage-record-tokens">
+                      <span className="usage-record-token">In {record.inputTokens}</span>
+                      <span className="usage-record-token">Out {record.outputTokens}</span>
                     </div>
                   </div>
                 </div>
