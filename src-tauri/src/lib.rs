@@ -29,6 +29,9 @@ pub fn run() {
         .menu(|app| desktop_menu::build_app_menu(app))
         .on_menu_event(|app, event| desktop_menu::handle_menu_event(app, event))
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            desktop_menu::install_dock_menu().expect("failed to install Dock menu");
+
             let app_data_dir = app
                 .path()
                 .app_data_dir()

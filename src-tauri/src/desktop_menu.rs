@@ -181,6 +181,49 @@ pub fn launch_workspace_window(root_path: Option<&str>) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(target_os = "macos")]
+pub fn install_dock_menu() -> anyhow::Result<()> {
+    use objc2::runtime::{AnyObject, ProtocolObject};
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::{NSApplication, NSApplicationDelegate};
+
+    let mtm = MainThreadMarker::new()
+        .ok_or_else(|| anyhow::anyhow!("Dock menu must be installed on the main thread"))?;
+    let app = NSApplication::sharedApplication(mtm);
+    let delegate: objc2::rc::Retained<ProtocolObject<dyn NSApplicationDelegate>> =
+        app.delegate()
+            .ok_or_else(|| anyhow::anyhow!("NSApplication delegate is unavailable"))?;
+    let delegate_object: &AnyObject = AsRef::<AnyObject>::as_ref(&delegate);
+    let selector = objc2::sel!(applicationDockMenu:);
+    let dock_menu_imp: unsafe extern "C-unwind" fn(
+        &AnyObject,
+        objc2::runtime::Sel,
+        &NSApplication,
+    ) -> *mut objc2_app_kit::NSMenu = dock_menu_for_application;
+
+    if !delegate_object.class().responds_to(selector) {
+        let added = unsafe {
+            objc2::ffi::class_addMethod(
+                delegate_object.class() as *const _ as *mut _,
+                selector,
+                std::mem::transmute(dock_menu_imp),
+                c"@@:@".as_ptr(),
+            )
+        };
+        anyhow::ensure!(
+            added.as_bool(),
+            "failed to register Dock menu delegate method"
+        );
+    }
+
+    DOCK_MENU.with(|slot| {
+        *slot.borrow_mut() = Some(build_dock_menu()?);
+        Ok::<(), anyhow::Error>(())
+    })?;
+
+    Ok(())
+}
+
 fn emit_menu_action<R: Runtime>(app: &AppHandle<R>, payload: MenuActionPayload) {
     if let Some(window) = focused_window(app).or_else(|| app.get_webview_window("main")) {
         let _ = window.emit(MENU_ACTION_EVENT, payload);
@@ -423,4 +466,35 @@ fn decode_menu_path(encoded: &str) -> Option<String> {
     }
 
     String::from_utf8(bytes).ok()
+}
+
+#[cfg(target_os = "macos")]
+thread_local! {
+    static DOCK_MENU: std::cell::RefCell<Option<muda::Menu>> = std::cell::RefCell::new(None);
+}
+
+#[cfg(target_os = "macos")]
+fn build_dock_menu() -> anyhow::Result<muda::Menu> {
+    let menu = muda::Menu::new();
+    let new_window = muda::MenuItem::with_id(MENU_NEW_WINDOW, "新建窗口", true, None);
+    menu.append(&new_window)?;
+    Ok(menu)
+}
+
+#[cfg(target_os = "macos")]
+unsafe extern "C-unwind" fn dock_menu_for_application(
+    _this: &objc2::runtime::AnyObject,
+    _cmd: objc2::runtime::Sel,
+    _sender: &objc2_app_kit::NSApplication,
+) -> *mut objc2_app_kit::NSMenu {
+    use muda::ContextMenu;
+    use objc2::rc::Retained;
+
+    DOCK_MENU.with(|slot| {
+        let menu = slot.borrow();
+        menu.as_ref()
+            .and_then(|menu| unsafe { Retained::retain(menu.ns_menu().cast()) })
+            .map(Retained::autorelease_return)
+            .unwrap_or(std::ptr::null_mut())
+    })
 }

@@ -4204,6 +4204,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "dirs",
+ "muda",
+ "objc2",
+ "objc2-app-kit",
  "regex",
  "rusqlite",
  "serde",
