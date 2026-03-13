@@ -15,6 +15,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 anyhow = "1"
 dirs = "6"
+portable-pty = "0.9"
 regex = "1"
 rusqlite = { version = "0.31", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }

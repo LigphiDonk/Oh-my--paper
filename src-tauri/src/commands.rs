@@ -8,9 +8,11 @@ use crate::desktop_menu;
 use crate::models::{
     AgentMessage, AgentRunResult, AgentSessionSummary, AssetResource, FigureBriefDraft,
     GeneratedAsset, ProfileConfig, ProjectConfig, ProjectFile, ProviderConfig, SkillManifest,
-    TestResult, UsageRecord, WorkspaceSnapshot,
+    TerminalSessionInfo, TestResult, UsageRecord, WorkspaceSnapshot,
 };
-use crate::services::{agent, compile, figure, profile, project, provider, sidecar, skill, sync};
+use crate::services::{
+    agent, compile, figure, profile, project, provider, sidecar, skill, sync, terminal,
+};
 use crate::state::AppState;
 
 #[tauri::command]
@@ -504,4 +506,46 @@ pub fn rename_file(
     }
     fs::rename(root.join(&old_path), destination).map_err(|err| err.to_string())?;
     Ok(())
+}
+
+#[tauri::command]
+pub fn start_terminal(
+    window: tauri::WebviewWindow,
+    state: State<'_, AppState>,
+    cwd: Option<String>,
+    cols: u16,
+    rows: u16,
+) -> Result<TerminalSessionInfo, String> {
+    terminal::start_terminal(&window, &state, cwd.as_deref(), cols, rows)
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn terminal_write(
+    state: State<'_, AppState>,
+    session_id: String,
+    data: String,
+) -> Result<bool, String> {
+    terminal::write_terminal(&state, &session_id, &data)
+        .map(|_| true)
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn resize_terminal(
+    state: State<'_, AppState>,
+    session_id: String,
+    cols: u16,
+    rows: u16,
+) -> Result<bool, String> {
+    terminal::resize_terminal(&state, &session_id, cols, rows)
+        .map(|_| true)
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn close_terminal(state: State<'_, AppState>, session_id: String) -> Result<bool, String> {
+    terminal::close_terminal(&state, &session_id)
+        .map(|_| true)
+        .map_err(|err| err.to_string())
 }

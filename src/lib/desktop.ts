@@ -21,6 +21,8 @@ import type {
   StreamChunk,
   SyncLocation,
   TestResult,
+  TerminalEvent,
+  TerminalSessionInfo,
   UsageRecord,
   WorkspaceSnapshot,
 } from "../types";
@@ -263,6 +265,28 @@ export const desktop = {
       return Promise.resolve(() => { });
     }
     return listen<StreamChunk>("agent:stream", (event) => {
+      callback(event.payload);
+    });
+  },
+  startTerminal(cwd: string, cols: number, rows: number) {
+    return runOrMock<TerminalSessionInfo>("start_terminal", { cwd, cols, rows }, () =>
+      Promise.reject(new Error("内置终端仅支持桌面版")),
+    );
+  },
+  terminalWrite(sessionId: string, data: string) {
+    return runOrMock("terminal_write", { sessionId, data }, () => Promise.resolve(true));
+  },
+  resizeTerminal(sessionId: string, cols: number, rows: number) {
+    return runOrMock("resize_terminal", { sessionId, cols, rows }, () => Promise.resolve(true));
+  },
+  closeTerminal(sessionId: string) {
+    return runOrMock("close_terminal", { sessionId }, () => Promise.resolve(true));
+  },
+  onTerminalEvent(callback: (event: TerminalEvent) => void): Promise<UnlistenFn> {
+    if (!isTauriRuntime()) {
+      return Promise.resolve(() => { });
+    }
+    return listen<TerminalEvent>("terminal:event", (event) => {
       callback(event.payload);
     });
   },

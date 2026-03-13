@@ -1,4 +1,5 @@
 import {
+  type MouseEvent as ReactMouseEvent,
   startTransition,
   useEffect,
   useEffectEvent,
@@ -13,6 +14,7 @@ import { OutlineTree } from "./components/OutlineTree";
 import { PdfPane, type PreviewPaneState } from "./components/PdfPane";
 import { ProjectTree } from "./components/ProjectTree";
 import { Sidebar } from "./components/Sidebar";
+import { TerminalPanel } from "./components/TerminalPanel";
 import { WelcomeWorkspace } from "./components/WelcomeWorkspace";
 import { WorkspaceMenuBar } from "./components/WorkspaceMenuBar";
 import { desktop, isTauriRuntime } from "./lib/desktop";
@@ -103,6 +105,9 @@ const WINDOW_WORKSPACE_TABS_STORAGE_KEY = "viewerleaf:window-workspaces:v1";
 const AUTO_SAVE_STORAGE_KEY = "viewerleaf:auto-save:v1";
 const MAX_RECENT_WORKSPACES = 10;
 const MAX_OPEN_WORKSPACES = 6;
+const TERMINAL_PANEL_MIN_HEIGHT = 170;
+const TERMINAL_PANEL_MAX_HEIGHT = 440;
+const TERMINAL_PANEL_DEFAULT_HEIGHT = 230;
 
 function workspaceLabelFromRoot(rootPath: string) {
   const normalized = normalizeProjectPath(rootPath).replace(/\/$/, "");
@@ -276,6 +281,8 @@ function App() {
   const [compileEnvironment, setCompileEnvironment] = useState<CompileEnvironmentStatus | null>(null);
   const [isCheckingCompileEnvironment, setIsCheckingCompileEnvironment] = useState(false);
   const [drawerTab, setDrawerTab] = useState<DrawerTab>("ai");
+  const [isTerminalVisible, setIsTerminalVisible] = useState(false);
+  const [terminalPanelHeight, setTerminalPanelHeight] = useState(TERMINAL_PANEL_DEFAULT_HEIGHT);
   const [workspacePaneMode, setWorkspacePaneMode] = useState<WorkspacePaneMode>("files");
   const [cursorLine, setCursorLine] = useState(1);
   const [selectedText, setSelectedText] = useState("");
@@ -309,6 +316,7 @@ function App() {
   const streamToolSeqRef = useRef(0);
   const currentStreamSessionIdRef = useRef("");
   const snapshotRef = useRef<WorkspaceSnapshot | null>(null);
+  const workspaceBodyRef = useRef<HTMLDivElement | null>(null);
 
   const logCompileDebug = useEffectEvent(
     (level: "info" | "warn" | "error", message: string, details?: unknown) => {
@@ -1342,6 +1350,62 @@ function App() {
     return () => window.removeEventListener("keydown", handleKeydown);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- handleInteractiveCompile is useEffectEvent
   }, []);
+
+  const handleToggleTerminal = useEffectEvent(() => {
+    setIsTerminalVisible((current) => !current);
+  });
+
+  const handleTerminalResizeStart = useEffectEvent((event: ReactMouseEvent<HTMLDivElement>) => {
+    const workspaceBody = workspaceBodyRef.current;
+    if (!workspaceBody) {
+      return;
+    }
+
+    event.preventDefault();
+    const rect = workspaceBody.getBoundingClientRect();
+    const maxHeight = Math.min(TERMINAL_PANEL_MAX_HEIGHT, Math.max(TERMINAL_PANEL_MIN_HEIGHT, rect.height - 180));
+
+    function updateHeight(clientY: number) {
+      const nextHeight = rect.bottom - clientY;
+      const clampedHeight = Math.min(maxHeight, Math.max(TERMINAL_PANEL_MIN_HEIGHT, nextHeight));
+      setTerminalPanelHeight(clampedHeight);
+    }
+
+    updateHeight(event.clientY);
+
+    function handlePointerMove(moveEvent: MouseEvent) {
+      updateHeight(moveEvent.clientY);
+    }
+
+    function handlePointerUp() {
+      window.removeEventListener("mousemove", handlePointerMove);
+      window.removeEventListener("mouseup", handlePointerUp);
+    }
+
+    window.addEventListener("mousemove", handlePointerMove);
+    window.addEventListener("mouseup", handlePointerUp);
+  });
+
+  useEffect(() => {
+    function handleTerminalKeydown(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey) || event.shiftKey || event.altKey || event.key.toLowerCase() !== "j") {
+        return;
+      }
+      event.preventDefault();
+      handleToggleTerminal();
+    }
+
+    window.addEventListener("keydown", handleTerminalKeydown);
+    return () => window.removeEventListener("keydown", handleTerminalKeydown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handleToggleTerminal is useEffectEvent
+  }, []);
+
+  useEffect(() => {
+    if (snapshot) {
+      return;
+    }
+    setIsTerminalVisible(false);
+  }, [snapshot]);
 
   const handleSetAutoCompile = useEffectEvent(async (enabled: boolean) => {
     if (!snapshot) {
@@ -2484,6 +2548,14 @@ function App() {
             <div style={{ flex: 1 }}></div>
 
             <button
+              className={`activity-icon hover-spring ${isTerminalVisible ? "is-active" : ""}`}
+              onClick={() => setIsTerminalVisible((current) => !current)}
+              title="终端"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line><rect x="3" y="3" width="18" height="18" rx="2"></rect></svg>
+            </button>
+
+            <button
               className={`activity-icon hover-spring ${drawerTab === "logs" ? "is-active" : ""}`}
               onClick={() => setDrawerTab("logs")}
               title="编译日志"
@@ -2541,164 +2613,184 @@ function App() {
             onDismissPatch={handleDismissPatch}
           />
 
-          <div className="workspace-main">
-            <div className="workspace-left-pane">
-              <div className="workspace-pane-header">
-                <div>
-                  <div className="workspace-pane-title">Project</div>
-                  <div className="workspace-pane-subtitle">
-                    {snapshot.projectConfig.rootPath.split("/").at(-1) || "未命名项目"}
+          <div className="workspace-body" ref={workspaceBodyRef}>
+            <div className="workspace-main">
+              <div className="workspace-left-pane">
+                <div className="workspace-pane-header">
+                  <div>
+                    <div className="workspace-pane-title">Project</div>
+                    <div className="workspace-pane-subtitle">
+                      {snapshot.projectConfig.rootPath.split("/").at(-1) || "未命名项目"}
+                    </div>
+                  </div>
+                  <div className="workspace-pane-actions">
+                    <button className="icon-btn" title="新建文件" type="button" onClick={() => void handleQuickCreateFile()}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+                    </button>
+                    <button className="icon-btn" title="新建文件夹" type="button" onClick={() => void handleQuickCreateFolder()}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7h5l2 2h11v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"></path><path d="M12 12v6"></path><path d="M9 15h6"></path></svg>
+                    </button>
                   </div>
                 </div>
-                <div className="workspace-pane-actions">
-                  <button className="icon-btn" title="新建文件" type="button" onClick={() => void handleQuickCreateFile()}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+                <div className="workspace-pane-segmented">
+                  <button
+                    type="button"
+                    className={`sidebar-segment ${workspacePaneMode === "files" ? "is-active" : ""}`}
+                    onClick={() => setWorkspacePaneMode("files")}
+                  >
+                    Files
                   </button>
-                  <button className="icon-btn" title="新建文件夹" type="button" onClick={() => void handleQuickCreateFolder()}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7h5l2 2h11v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"></path><path d="M12 12v6"></path><path d="M9 15h6"></path></svg>
+                  <button
+                    type="button"
+                    className={`sidebar-segment ${workspacePaneMode === "outline" ? "is-active" : ""}`}
+                    onClick={() => setWorkspacePaneMode("outline")}
+                  >
+                    Outline
                   </button>
                 </div>
+                <div className="workspace-pane-body">
+                  {workspacePaneMode === "files" ? (
+                    <ProjectTree
+                      nodes={snapshot.tree}
+                      activeFile={focusedTreePath}
+                      dirtyPaths={dirtyPathSet}
+                      onOpenNode={handleOpenNode}
+                      onCreateFile={handleCreateFile}
+                      onCreateFolder={handleCreateFolder}
+                      onDeleteFile={handleDeleteFile}
+                      onRenameFile={handleRenameFile}
+                    />
+                  ) : (
+                    outlineNode
+                  )}
+                </div>
               </div>
-              <div className="workspace-pane-segmented">
-                <button
-                  type="button"
-                  className={`sidebar-segment ${workspacePaneMode === "files" ? "is-active" : ""}`}
-                  onClick={() => setWorkspacePaneMode("files")}
-                >
-                  Files
-                </button>
-                <button
-                  type="button"
-                  className={`sidebar-segment ${workspacePaneMode === "outline" ? "is-active" : ""}`}
-                  onClick={() => setWorkspacePaneMode("outline")}
-                >
-                  Outline
-                </button>
-              </div>
-              <div className="workspace-pane-body">
-                {workspacePaneMode === "files" ? (
-                  <ProjectTree
-                    nodes={snapshot.tree}
-                    activeFile={focusedTreePath}
-                    dirtyPaths={dirtyPathSet}
-                    onOpenNode={handleOpenNode}
-                    onCreateFile={handleCreateFile}
-                    onCreateFolder={handleCreateFolder}
-                    onDeleteFile={handleDeleteFile}
-                    onRenameFile={handleRenameFile}
-                  />
-                ) : (
-                  outlineNode
-                )}
-              </div>
-            </div>
 
-            <div className="editor-area">
-              <div className="editor-tabs">
-                {editorTabs.map((tab) => {
-                  const isImageTab = openImageTabSet.has(tab);
-                  const isActive = tab === activeEditorTabPath;
-                  return (
-                    <button
-                      key={tab}
-                      className={`editor-tab ${isActive ? "is-active" : ""}`}
-                      onClick={() => (isImageTab ? openImageFile(tab) : openTextFile(tab))}
-                      type="button"
-                    >
-                      <span style={{ marginRight: 8, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                        {tab.split("/").at(-1)}
-                        {!isImageTab && dirtyPathSet.has(tab) && (
-                          <span className="editor-tab-dirty-dot" aria-hidden="true"></span>
-                        )}
-                      </span>
-                      <span
-                        className="icon-btn"
-                        style={{ width: 16, height: 16 }}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          if (isImageTab) {
-                            closeImageTab(tab);
-                            return;
-                          }
-                          const closed = closeTextTab(openTabs, activeFilePath, tab);
-                          setOpenTabs(closed.openTabs);
-                          setActiveFilePath(closed.activePath);
+              <div className="editor-area">
+                <div className="editor-tabs">
+                  {editorTabs.map((tab) => {
+                    const isImageTab = openImageTabSet.has(tab);
+                    const isActive = tab === activeEditorTabPath;
+                    return (
+                      <button
+                        key={tab}
+                        className={`editor-tab ${isActive ? "is-active" : ""}`}
+                        onClick={() => (isImageTab ? openImageFile(tab) : openTextFile(tab))}
+                        type="button"
+                      >
+                        <span style={{ marginRight: 8, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          {tab.split("/").at(-1)}
+                          {!isImageTab && dirtyPathSet.has(tab) && (
+                            <span className="editor-tab-dirty-dot" aria-hidden="true"></span>
+                          )}
+                        </span>
+                        <span
+                          className="icon-btn"
+                          style={{ width: 16, height: 16 }}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            if (isImageTab) {
+                              closeImageTab(tab);
+                              return;
+                            }
+                            const closed = closeTextTab(openTabs, activeFilePath, tab);
+                            setOpenTabs(closed.openTabs);
+                            setActiveFilePath(closed.activePath);
+                          }}
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="editor-content">
+                  {editorImagePath ? (
+                    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--bg-app)" }}>
+                      <div
+                        style={{
+                          padding: "6px 16px",
+                          borderBottom: "1px solid var(--border-light)",
+                          fontSize: "12px",
+                          color: "var(--text-secondary)",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          background: "var(--bg-app)",
                         }}
                       >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                      </span>
-                    </button>
-                  );
-                })}
+                        <span>图片路径: {editorImagePath}</span>
+                        <span>{editorImageAsset?.mimeType ?? "image"}</span>
+                      </div>
+                      <div
+                        style={{
+                          flex: 1,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          background: "var(--bg-secondary, #1e1e1e)",
+                          overflow: "auto",
+                          padding: 24,
+                        }}
+                      >
+                        {editorImageUrl ? (
+                          <img
+                            src={editorImageUrl}
+                            alt={editorImagePath.split("/").at(-1) ?? ""}
+                            style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 8 }}
+                          />
+                        ) : (
+                          <div style={{ color: "var(--text-secondary)" }}>
+                            {editorImageAsset ? "图片资源不可用" : "正在加载图片…"}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : activeFile ? (
+                    <EditorPane
+                      file={activeFile}
+                      isDirty={dirtyPathSet.has(activeFile.path)}
+                      targetLine={editorJumpTarget?.path === activeFile.path ? editorJumpTarget.line : undefined}
+                      targetNonce={editorJumpTarget?.path === activeFile.path ? editorJumpTarget.nonce : undefined}
+                      onChange={handleEditorChange}
+                      onCursorChange={handleEditorCursorChange}
+                      onSave={handleEditorSave}
+                      onRunAgent={handleEditorRunAgent}
+                      onCompile={handleEditorCompile}
+                      onForwardSync={handleEditorForwardSync}
+                    />
+                  ) : (
+                    <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)" }}>
+                      {loadingFilePath ? "正在加载文件…" : "选择一个文本文件开始编辑"}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="editor-content">
-                {editorImagePath ? (
-                  <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--bg-app)" }}>
-                    <div
-                      style={{
-                        padding: "6px 16px",
-                        borderBottom: "1px solid var(--border-light)",
-                        fontSize: "12px",
-                        color: "var(--text-secondary)",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        background: "var(--bg-app)",
-                      }}
-                    >
-                      <span>图片路径: {editorImagePath}</span>
-                      <span>{editorImageAsset?.mimeType ?? "image"}</span>
-                    </div>
-                    <div
-                      style={{
-                        flex: 1,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        background: "var(--bg-secondary, #1e1e1e)",
-                        overflow: "auto",
-                        padding: 24,
-                      }}
-                    >
-                      {editorImageUrl ? (
-                        <img
-                          src={editorImageUrl}
-                          alt={editorImagePath.split("/").at(-1) ?? ""}
-                          style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 8 }}
-                        />
-                      ) : (
-                        <div style={{ color: "var(--text-secondary)" }}>
-                          {editorImageAsset ? "图片资源不可用" : "正在加载图片…"}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ) : activeFile ? (
-                  <EditorPane
-                    file={activeFile}
-                    isDirty={dirtyPathSet.has(activeFile.path)}
-                    targetLine={editorJumpTarget?.path === activeFile.path ? editorJumpTarget.line : undefined}
-                    targetNonce={editorJumpTarget?.path === activeFile.path ? editorJumpTarget.nonce : undefined}
-                    onChange={handleEditorChange}
-                    onCursorChange={handleEditorCursorChange}
-                    onSave={handleEditorSave}
-                    onRunAgent={handleEditorRunAgent}
-                    onCompile={handleEditorCompile}
-                    onForwardSync={handleEditorForwardSync}
-                  />
+
+              <div className="preview-area">
+                {previewState ? (
+                  <PdfPane preview={previewState} />
                 ) : (
-                  <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)" }}>
-                    {loadingFilePath ? "正在加载文件…" : "选择一个文本文件开始编辑"}
-                  </div>
+                  <div className="pdf-placeholder">暂无预览内容</div>
                 )}
               </div>
             </div>
 
-            <div className="preview-area">
-              {previewState ? (
-                <PdfPane preview={previewState} />
-              ) : (
-                <div className="pdf-placeholder">暂无预览内容</div>
-              )}
+            <div
+              className={`terminal-panel-shell ${isTerminalVisible ? "is-visible" : ""}`}
+              style={{ height: isTerminalVisible ? terminalPanelHeight : 0 }}
+            >
+              <div
+                className="terminal-panel-resize-handle"
+                onMouseDown={handleTerminalResizeStart}
+                role="separator"
+                aria-label="调整终端高度"
+              />
+              <TerminalPanel
+                workspaceRoot={snapshot.projectConfig.rootPath}
+                isVisible={isTerminalVisible}
+                height={terminalPanelHeight}
+                onHide={() => setIsTerminalVisible(false)}
+              />
             </div>
           </div>
         </div>

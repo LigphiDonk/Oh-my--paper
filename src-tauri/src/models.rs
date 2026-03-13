@@ -304,6 +304,29 @@ pub struct UsageInfo {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct TerminalSessionInfo {
+    pub session_id: String,
+    pub cwd: String,
+    pub shell: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum TerminalEvent {
+    #[serde(rename = "output")]
+    Output { session_id: String, data: String },
+    #[serde(rename = "exit")]
+    Exit {
+        session_id: String,
+        exit_code: Option<u32>,
+        signal: Option<String>,
+    },
+    #[serde(rename = "error")]
+    Error { session_id: String, message: String },
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkspaceSnapshot {
     pub project_config: ProjectConfig,
     pub tree: Vec<ProjectNode>,

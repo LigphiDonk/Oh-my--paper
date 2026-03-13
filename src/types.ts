@@ -260,6 +260,17 @@ export interface AppMenuAction {
   rootPath?: string;
 }
 
+export interface TerminalSessionInfo {
+  sessionId: string;
+  cwd: string;
+  shell: string;
+}
+
+export type TerminalEvent =
+  | { type: "output"; sessionId: string; data: string }
+  | { type: "exit"; sessionId: string; exitCode?: number; signal?: string }
+  | { type: "error"; sessionId: string; message: string };
+
 export interface TestResult {
   success: boolean;
   latencyMs: number;

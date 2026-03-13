@@ -719,9 +719,18 @@ button {
   overflow: hidden;
 }
 
-.workspace-main {
+.workspace-body {
   display: flex;
   flex: 1;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--bg-app);
+}
+
+.workspace-main {
+  display: flex;
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   background: var(--bg-app);
@@ -1269,6 +1278,161 @@ button {
   display: flex;
   flex-direction: column;
   min-width: 320px;
+}
+
+.terminal-panel-shell {
+  flex: 0 0 auto;
+  min-height: 0;
+  height: 0;
+  overflow: hidden;
+  border-top: 1px solid transparent;
+  background: var(--bg-surface);
+  transition: height 0.16s ease, border-color 0.16s ease;
+}
+
+.terminal-panel-shell.is-visible {
+  border-top-color: var(--border-light);
+}
+
+.terminal-panel-resize-handle {
+  height: 6px;
+  cursor: row-resize;
+  position: relative;
+  background: linear-gradient(180deg, rgba(16, 163, 127, 0.06), transparent);
+}
+
+.terminal-panel-resize-handle::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 2px;
+  width: 36px;
+  height: 2px;
+  border-radius: 999px;
+  transform: translateX(-50%);
+  background: rgba(100, 110, 126, 0.34);
+}
+
+.terminal-panel {
+  height: calc(100% - 6px);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+}
+
+.terminal-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 38px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border-light);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.terminal-panel-tab {
+  flex: 0 0 auto;
+  padding: 6px 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.terminal-panel-meta {
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.terminal-panel-actions {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.terminal-panel-btn {
+  border: 1px solid var(--border-light);
+  background: var(--bg-app);
+  color: var(--text-secondary);
+  padding: 4px 9px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.terminal-panel-btn:hover:not(:disabled) {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+  border-color: rgba(16, 163, 127, 0.22);
+}
+
+.terminal-panel-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.terminal-panel-body {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  background: #fbfbfc;
+}
+
+.terminal-canvas,
+.terminal-panel-empty {
+  height: 100%;
+}
+
+.terminal-panel-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.terminal-panel-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at top, rgba(16, 163, 127, 0.08), transparent 48%),
+    linear-gradient(180deg, rgba(251, 251, 252, 0.92), rgba(251, 251, 252, 0.84));
+}
+
+.terminal-panel-overlay-label {
+  max-width: min(100%, 720px);
+  padding: 10px 14px;
+  border: 1px solid rgba(16, 163, 127, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: var(--mono);
+  letter-spacing: 0.01em;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+}
+
+.terminal-canvas .xterm {
+  height: 100%;
+  padding: 8px 10px 10px;
+}
+
+.terminal-canvas .xterm-viewport {
+  overflow-y: auto !important;
 }
 
 .preview-header {

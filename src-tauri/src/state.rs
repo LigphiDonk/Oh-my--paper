@@ -1,6 +1,7 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
 use rusqlite::Connection;
 
@@ -10,6 +11,7 @@ pub struct AppState {
     pub db: Mutex<Connection>,
     pub project_config: RwLock<ProjectConfig>,
     pub last_compile: RwLock<CompileResult>,
+    pub terminals: Mutex<HashMap<String, Arc<crate::services::terminal::TerminalSessionHandle>>>,
     pub sidecar_dir: PathBuf,
     pub app_data_dir: PathBuf,
 }

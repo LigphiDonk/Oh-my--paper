@@ -5,6 +5,7 @@ mod models;
 mod services;
 mod state;
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, RwLock};
 
@@ -73,6 +74,7 @@ pub fn run() {
                 db: Mutex::new(conn),
                 project_config: RwLock::new(project_config),
                 last_compile: RwLock::new(last_compile),
+                terminals: Mutex::new(HashMap::new()),
                 sidecar_dir,
                 app_data_dir,
             });
@@ -116,7 +118,11 @@ pub fn run() {
             commands::create_folder,
             commands::delete_file,
             commands::rename_file,
-            commands::read_pdf_binary
+            commands::read_pdf_binary,
+            commands::start_terminal,
+            commands::terminal_write,
+            commands::resize_terminal,
+            commands::close_terminal
         ])
         .run(tauri::generate_context!())
         .expect("failed to start ViewerLeaf");
