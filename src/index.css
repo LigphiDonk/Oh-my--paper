@@ -812,12 +812,20 @@ button {
 
 .workspace-left-pane {
   flex: 0 0 250px;
+  width: 250px;
   min-width: 220px;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border-light);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: width var(--transition-fast), flex-basis var(--transition-fast), min-width var(--transition-fast);
+}
+
+.workspace-left-pane.is-collapsed {
+  flex-basis: 52px;
+  width: 52px;
+  min-width: 52px;
 }
 
 .workspace-pane-header {
@@ -827,6 +835,10 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.workspace-pane-meta {
+  min-width: 0;
 }
 
 .workspace-pane-title {
@@ -847,6 +859,16 @@ button {
 .workspace-pane-actions {
   display: inline-flex;
   gap: 6px;
+  flex: 0 0 auto;
+}
+
+.workspace-left-pane.is-collapsed .workspace-pane-header {
+  padding: 12px 8px;
+  justify-content: center;
+}
+
+.workspace-left-pane.is-collapsed .workspace-pane-meta {
+  display: none;
 }
 
 .workspace-pane-segmented {
@@ -1217,20 +1239,34 @@ button {
 
 .editor-tabs {
   display: flex;
+  align-items: stretch;
   background: var(--bg-sidebar);
   border-bottom: 1px solid var(--border-light);
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-light) transparent;
+  white-space: nowrap;
+}
+
+.editor-tabs::-webkit-scrollbar {
+  height: 8px;
+}
+
+.editor-tabs::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+  border-radius: 999px;
 }
 
 .editor-tab {
-  padding: 8px 16px;
   font-size: 13px;
   color: var(--text-secondary);
   border-right: 1px solid var(--border-light);
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-width: 120px;
+  flex: 0 0 auto;
+  width: clamp(150px, 20vw, 220px);
+  min-width: 0;
   background: var(--bg-sidebar);
   position: relative;
   transition: background var(--transition-fast);
@@ -1238,6 +1274,50 @@ button {
 
 .editor-tab:hover {
   background: var(--bg-surface-hover);
+}
+
+.editor-tab-trigger {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 8px 14px;
+  color: inherit;
+  background: transparent;
+  border: none;
+}
+
+.editor-tab-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-tab-close {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  margin-right: 8px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  background: transparent;
+  border: none;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.editor-tab-close svg {
+  width: 12px;
+  height: 12px;
+}
+
+.editor-tab-close:hover {
+  background: var(--bg-surface-active);
+  color: var(--text-primary);
 }
 
 .editor-tab.is-active {

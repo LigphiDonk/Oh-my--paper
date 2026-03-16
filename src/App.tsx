@@ -1,5 +1,6 @@
 import {
   type MouseEvent as ReactMouseEvent,
+  type WheelEvent as ReactWheelEvent,
   useEffect,
   useMemo,
   useRef,
@@ -284,6 +285,7 @@ function App() {
   const [isTerminalVisible, setIsTerminalVisible] = useState(false);
   const [terminalPanelHeight, setTerminalPanelHeight] = useState(TERMINAL_PANEL_DEFAULT_HEIGHT);
   const [workspacePaneMode, setWorkspacePaneMode] = useState<WorkspacePaneMode>("files");
+  const [isWorkspacePaneCollapsed, setIsWorkspacePaneCollapsed] = useState(false);
   const [cursorLine, setCursorLine] = useState(1);
   const [selectedText, setSelectedText] = useState("");
   const [selectedBrief, setSelectedBrief] = useState<FigureBriefDraft | null>(null);
@@ -495,6 +497,28 @@ function App() {
 
   const closeImageTab = useEffectEvent((path: string) => {
     closeImageTabBase(path);
+  });
+
+  const closeEditorTab = useEffectEvent((path: string, isImageTab: boolean) => {
+    if (isImageTab) {
+      closeImageTab(path);
+      return;
+    }
+    const closed = closeTextTab(openTabs, activeFilePath, path);
+    setOpenTabs(closed.openTabs);
+    setActiveFilePath(closed.activePath);
+  });
+
+  const handleEditorTabsWheel = useEffectEvent((event: ReactWheelEvent<HTMLDivElement>) => {
+    const element = event.currentTarget;
+    if (element.scrollWidth <= element.clientWidth) {
+      return;
+    }
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) {
+      return;
+    }
+    element.scrollLeft += event.deltaY;
+    event.preventDefault();
   });
 
   const compilePipeline = useCompilePipeline({
@@ -2324,92 +2348,114 @@ function App() {
 
           <div className="workspace-body" ref={workspaceBodyRef}>
             <div className="workspace-main">
-              <div className="workspace-left-pane">
+              <div className={`workspace-left-pane ${isWorkspacePaneCollapsed ? "is-collapsed" : ""}`}>
                 <div className="workspace-pane-header">
-                  <div>
+                  <div className="workspace-pane-meta">
                     <div className="workspace-pane-title">Project</div>
                     <div className="workspace-pane-subtitle">
                       {snapshot.projectConfig.rootPath.split("/").at(-1) || "未命名项目"}
                     </div>
                   </div>
                   <div className="workspace-pane-actions">
-                    <button className="icon-btn" title="新建文件" type="button" onClick={() => void handleQuickCreateFile()}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
-                    </button>
-                    <button className="icon-btn" title="新建文件夹" type="button" onClick={() => void handleQuickCreateFolder()}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7h5l2 2h11v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"></path><path d="M12 12v6"></path><path d="M9 15h6"></path></svg>
+                    {!isWorkspacePaneCollapsed && (
+                      <>
+                        <button className="icon-btn" title="新建文件" type="button" onClick={() => void handleQuickCreateFile()}>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+                        </button>
+                        <button className="icon-btn" title="新建文件夹" type="button" onClick={() => void handleQuickCreateFolder()}>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7h5l2 2h11v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"></path><path d="M12 12v6"></path><path d="M9 15h6"></path></svg>
+                        </button>
+                      </>
+                    )}
+                    <button
+                      className="icon-btn"
+                      title={isWorkspacePaneCollapsed ? "展开 Project 面板" : "折叠 Project 面板"}
+                      type="button"
+                      onClick={() => setIsWorkspacePaneCollapsed((current) => !current)}
+                    >
+                      {isWorkspacePaneCollapsed ? (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"></path></svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"></path></svg>
+                      )}
                     </button>
                   </div>
                 </div>
-                <div className="workspace-pane-segmented">
-                  <button
-                    type="button"
-                    className={`sidebar-segment ${workspacePaneMode === "files" ? "is-active" : ""}`}
-                    onClick={() => setWorkspacePaneMode("files")}
-                  >
-                    Files
-                  </button>
-                  <button
-                    type="button"
-                    className={`sidebar-segment ${workspacePaneMode === "outline" ? "is-active" : ""}`}
-                    onClick={() => setWorkspacePaneMode("outline")}
-                  >
-                    Outline
-                  </button>
-                </div>
-                <div className="workspace-pane-body">
-                  {workspacePaneMode === "files" ? (
-                    <ProjectTree
-                      nodes={snapshot.tree}
-                      activeFile={focusedTreePath}
-                      dirtyPaths={dirtyPathSet}
-                      onOpenNode={handleOpenNode}
-                      onCreateFile={handleCreateFile}
-                      onCreateFolder={handleCreateFolder}
-                      onDeleteFile={handleDeleteFile}
-                      onRenameFile={handleRenameFile}
-                    />
-                  ) : (
-                    outlineNode
-                  )}
-                </div>
+                {!isWorkspacePaneCollapsed && (
+                  <>
+                    <div className="workspace-pane-segmented">
+                      <button
+                        type="button"
+                        className={`sidebar-segment ${workspacePaneMode === "files" ? "is-active" : ""}`}
+                        onClick={() => setWorkspacePaneMode("files")}
+                      >
+                        Files
+                      </button>
+                      <button
+                        type="button"
+                        className={`sidebar-segment ${workspacePaneMode === "outline" ? "is-active" : ""}`}
+                        onClick={() => setWorkspacePaneMode("outline")}
+                      >
+                        Outline
+                      </button>
+                    </div>
+                    <div className="workspace-pane-body">
+                      {workspacePaneMode === "files" ? (
+                        <ProjectTree
+                          nodes={snapshot.tree}
+                          activeFile={focusedTreePath}
+                          dirtyPaths={dirtyPathSet}
+                          onOpenNode={handleOpenNode}
+                          onCreateFile={handleCreateFile}
+                          onCreateFolder={handleCreateFolder}
+                          onDeleteFile={handleDeleteFile}
+                          onRenameFile={handleRenameFile}
+                        />
+                      ) : (
+                        outlineNode
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="editor-area">
-                <div className="editor-tabs">
+                <div className="editor-tabs" onWheel={handleEditorTabsWheel}>
                   {editorTabs.map((tab) => {
                     const isImageTab = openImageTabSet.has(tab);
                     const isActive = tab === activeEditorTabPath;
+                    const tabLabel = tab.split("/").at(-1) ?? tab;
                     return (
-                      <button
+                      <div
                         key={tab}
                         className={`editor-tab ${isActive ? "is-active" : ""}`}
-                        onClick={() => (isImageTab ? openImageFile(tab) : openTextFile(tab))}
-                        type="button"
+                        data-active={isActive ? "true" : "false"}
+                        title={tab}
                       >
-                        <span style={{ marginRight: 8, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                          {tab.split("/").at(-1)}
+                        <button
+                          className="editor-tab-trigger"
+                          onClick={() => (isImageTab ? openImageFile(tab) : openTextFile(tab))}
+                          type="button"
+                          title={tab}
+                        >
+                          <span className="editor-tab-label">{tabLabel}</span>
                           {!isImageTab && dirtyPathSet.has(tab) && (
                             <span className="editor-tab-dirty-dot" aria-hidden="true"></span>
                           )}
-                        </span>
-                        <span
-                          className="icon-btn"
-                          style={{ width: 16, height: 16 }}
+                        </button>
+                        <button
+                          className="editor-tab-close"
+                          type="button"
+                          aria-label={`关闭 ${tabLabel}`}
+                          title={`关闭 ${tabLabel}`}
                           onClick={(event) => {
                             event.stopPropagation();
-                            if (isImageTab) {
-                              closeImageTab(tab);
-                              return;
-                            }
-                            const closed = closeTextTab(openTabs, activeFilePath, tab);
-                            setOpenTabs(closed.openTabs);
-                            setActiveFilePath(closed.activePath);
+                            closeEditorTab(tab, isImageTab);
                           }}
                         >
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                        </span>
-                      </button>
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
