@@ -1,3 +1,5 @@
+import type { CloudProjectRole } from "../../types";
+
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -5,6 +7,7 @@ export interface ProjectReference {
   projectId: string;
   httpBaseUrl?: string;
   wsBaseUrl?: string;
+  role?: CloudProjectRole;
 }
 
 function deriveWsBaseUrl(httpBaseUrl: string) {
@@ -13,8 +16,17 @@ function deriveWsBaseUrl(httpBaseUrl: string) {
   return url.toString().replace(/\/$/, "");
 }
 
-export function generateShareLink(projectId: string, httpBaseUrl: string): string {
-  return new URL(`/join/${projectId}`, httpBaseUrl).toString();
+function parseRole(value: string | null | undefined): CloudProjectRole | undefined {
+  if (value === "viewer" || value === "commenter" || value === "editor" || value === "owner") {
+    return value;
+  }
+  return undefined;
+}
+
+export function generateShareLink(projectId: string, httpBaseUrl: string, role: CloudProjectRole = "viewer"): string {
+  const url = new URL(`/join/${projectId}`, httpBaseUrl);
+  url.searchParams.set("role", role);
+  return url.toString();
 }
 
 export function parseShareLink(link: string): ProjectReference | null {
@@ -30,6 +42,7 @@ export function parseShareLink(link: string): ProjectReference | null {
       projectId,
       httpBaseUrl,
       wsBaseUrl: deriveWsBaseUrl(httpBaseUrl),
+      role: parseRole(url.searchParams.get("role")),
     };
   } catch {
     return null;

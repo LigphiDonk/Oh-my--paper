@@ -14,6 +14,7 @@ pub struct AppState {
     pub terminals: Mutex<HashMap<String, Arc<crate::services::terminal::TerminalSessionHandle>>>,
     pub sidecar_dir: PathBuf,
     pub app_data_dir: PathBuf,
+    pub active_sidecar: Mutex<Option<u32>>,
 }
 
 pub fn default_compile_result(project_root: &Path, main_tex: &str) -> CompileResult {

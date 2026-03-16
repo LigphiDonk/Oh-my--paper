@@ -112,7 +112,8 @@ function EditorPaneInner({
   const [lineCount, setLineCount] = useState(() => file.content.split("\n").length);
   const [commentPopover, setCommentPopover] = useState<CommentPopoverState | null>(null);
   const isCollaborative = Boolean(yText && awareness);
-  const canAddComment = Boolean(collabStatus?.enabled && onAddComment);
+  const canAddComment = Boolean(collabStatus?.enabled && collabStatus.canComment && onAddComment);
+  const isReadOnly = Boolean(collabStatus?.enabled && !collabStatus.canEditText);
 
   const onChangeRef = useRef(onChange);
   const onCursorChangeRef = useRef(onCursorChange);
@@ -277,6 +278,8 @@ function EditorPaneInner({
     return [
       latex(),
       EditorView.lineWrapping,
+      EditorState.readOnly.of(isReadOnly),
+      EditorView.editable.of(!isReadOnly),
       lineNumbers(),
       highlightActiveLine(),
       highlightActiveLineGutter(),
@@ -291,7 +294,7 @@ function EditorPaneInner({
         ? [yCollab(yText, awareness, { undoManager: new Y.UndoManager(yText) })]
         : []),
     ];
-  }, [awareness, isCollaborative, yText]);
+  }, [awareness, isCollaborative, isReadOnly, yText]);
 
   const view = useMemo(() => {
     let nextView: EditorView;
@@ -490,7 +493,7 @@ function EditorPaneInner({
         <div className="editor-pane-toolbar-actions">
           <span className="editor-pane-toolbar-info">
             {file.language} · 共 {lineCount} 行
-            {collabStatus?.enabled && " · 手动云同步"}
+            {collabStatus?.enabled && ` · ${isReadOnly ? "正文只读" : "手动云同步"}`}
           </span>
           <button
             className="btn-secondary"
@@ -498,7 +501,7 @@ function EditorPaneInner({
             onMouseDown={(event) => event.preventDefault()}
             onClick={handleAddCommentClick}
             disabled={!canAddComment}
-            title={canAddComment ? "为当前选择添加批注（Cmd+Shift+M）" : "连接云协作后可用"}
+            title={canAddComment ? "为当前选择添加批注（Cmd+Shift+M）" : "当前权限不能添加批注"}
           >
             添加批注
           </button>
@@ -608,6 +611,9 @@ function areEditorPanePropsEqual(previous: EditorPaneProps, next: EditorPaneProp
     previous.collabStatus?.pendingLocalChanges === next.collabStatus?.pendingLocalChanges &&
     previous.collabStatus?.pendingRemoteChanges === next.collabStatus?.pendingRemoteChanges &&
     previous.collabStatus?.hasConflict === next.collabStatus?.hasConflict &&
+    previous.collabStatus?.canEditText === next.collabStatus?.canEditText &&
+    previous.collabStatus?.canComment === next.collabStatus?.canComment &&
+    previous.collabStatus?.role === next.collabStatus?.role &&
     previous.collabStatus?.connectionError === next.collabStatus?.connectionError &&
     previous.collabStatus?.lastSyncAt === next.collabStatus?.lastSyncAt &&
     previous.collabStatus?.members.length === next.collabStatus?.members.length

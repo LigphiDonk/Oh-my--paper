@@ -72,6 +72,7 @@ pub fn run() {
                 terminals: Mutex::new(HashMap::new()),
                 sidecar_dir,
                 app_data_dir,
+                active_sidecar: Mutex::new(None),
             });
             Ok(())
         })

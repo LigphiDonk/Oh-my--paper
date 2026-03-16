@@ -10,7 +10,6 @@ async function runLegacyAgent(request) {
   const { provider: providerConfig, systemPrompt, tools: toolIds, context } = request;
   const provider = loadProvider(providerConfig);
   const discoveredToolIds = new Set();
-  let hasExecutedWorkspaceTool = false;
   const toolCtx = {
     projectRoot: context.projectRoot,
     activeFilePath: context.activeFilePath,
@@ -35,21 +34,18 @@ async function runLegacyAgent(request) {
     content: buildUserMessage(context, request.userMessage),
   });
 
-  const maxToolRounds = 10;
+  const maxToolRounds = 25;
   let round = 0;
 
   while (round < maxToolRounds) {
     round += 1;
-    const resolved = hasExecutedWorkspaceTool
-      ? { tools: [], toolIds: [] }
-      : resolveActiveTools({
+    const resolved = resolveActiveTools({
         requestedToolIds: toolIds,
         userMessage: request.userMessage,
         context,
         discoveredToolIds: [...discoveredToolIds],
       });
     const { tools, toolIds: activeToolIds } = resolved;
-    const streamTextLive = tools.length === 0;
     let hasToolCalls = false;
     let textAccum = "";
     const pendingToolCalls = [];
@@ -58,9 +54,7 @@ async function runLegacyAgent(request) {
       for await (const chunk of provider.chat({ messages, tools })) {
         if (chunk.type === "text") {
           textAccum += chunk.text;
-          if (streamTextLive) {
-            emit({ type: "text_delta", content: chunk.text });
-          }
+          emit({ type: "text_delta", content: chunk.text });
         } else if (chunk.type === "tool_call") {
           hasToolCalls = true;
           pendingToolCalls.push(chunk);
@@ -76,9 +70,6 @@ async function runLegacyAgent(request) {
     }
 
     if (!hasToolCalls) {
-      if (textAccum && !streamTextLive) {
-        emit({ type: "text_delta", content: textAccum });
-      }
       break;
     }
 
@@ -121,9 +112,6 @@ async function runLegacyAgent(request) {
           for (const toolId of result.metadata.discoveredToolIds) {
             discoveredToolIds.add(toolId);
           }
-        }
-        if (call.name !== "tool_search") {
-          hasExecutedWorkspaceTool = true;
         }
         emit({ type: "tool_call_result", toolId: call.name, output: result.output, status: "completed" });
 

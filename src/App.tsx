@@ -12,13 +12,17 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { EditorPane } from "./components/EditorPane";
 import { OutlineTree } from "./components/OutlineTree";
 import { PdfPane, type PreviewPaneState } from "./components/PdfPane";
-import { ProjectTree } from "./components/ProjectTree";
+import { ProjectSidebar } from "./components/ProjectSidebar";
 import { Sidebar } from "./components/Sidebar";
+import { SyncSidebar } from "./components/SyncSidebar";
 import { TerminalPanel } from "./components/TerminalPanel";
+import { WorkspaceSyncBar } from "./components/WorkspaceSyncBar";
 import { WelcomeWorkspace } from "./components/WelcomeWorkspace";
 import { WorkspaceMenuBar } from "./components/WorkspaceMenuBar";
 import { CollabLoginModal } from "./components/CollabLoginModal";
 import { CollabProjectModal } from "./components/CollabProjectModal";
+import { CreateEntryModal } from "./components/CreateEntryModal";
+import { ShareLinkModal } from "./components/ShareLinkModal";
 import { createLocalAdapter } from "./lib/adapters";
 import {
   createCloudProject,
@@ -65,6 +69,7 @@ import { useWorkspaceFiles } from "./hooks/useWorkspaceFiles";
 import type {
   AppMenuAction,
   AppMenuState,
+  CloudProjectRole,
   CloudProjectSummary,
   DrawerTab,
   FigureBriefDraft,
@@ -98,6 +103,10 @@ type CollabNotice = {
   tone: "success" | "error";
   text: string;
 };
+type CreateEntryModalState = {
+  kind: "file" | "folder";
+  parentDir: string;
+};
 type CollabProjectModalState =
   | { mode: "create"; defaultValue: string }
   | { mode: "link"; defaultValue: string };
@@ -109,6 +118,13 @@ function normalizeProjectPath(path: string) {
 
 function shellQuote(value: string) {
   return `'${value.replaceAll("'", "'\"'\"'")}'`;
+}
+
+function normalizeCloudRole(role: string | null | undefined): CloudProjectRole | null {
+  if (role === "owner" || role === "editor" || role === "commenter" || role === "viewer") {
+    return role;
+  }
+  return null;
 }
 
 function isSamePathOrChild(path: string, target: string) {
@@ -296,13 +312,13 @@ function App() {
   const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(() =>
     readStoredBoolean(AUTO_SAVE_STORAGE_KEY, false),
   );
-  const [drawerTab, setDrawerTab] = useState<DrawerTab>("ai");
+  const [drawerTab, setDrawerTab] = useState<DrawerTab>("project");
   const [isTerminalVisible, setIsTerminalVisible] = useState(false);
   const [terminalPanelHeight, setTerminalPanelHeight] = useState(TERMINAL_PANEL_DEFAULT_HEIGHT);
   const [terminalCommandRequest, setTerminalCommandRequest] = useState<{ id: number; command: string } | null>(null);
   const terminalCommandCounterRef = useRef(0);
   const [workspacePaneMode, setWorkspacePaneMode] = useState<WorkspacePaneMode>("files");
-  const [isWorkspacePaneVisible, setIsWorkspacePaneVisible] = useState(true);
+  const [previewPaneWidth, setPreviewPaneWidth] = useState(42);
   const [cursorLine, setCursorLine] = useState(1);
   const [selectedText, setSelectedText] = useState("");
   const [selectedBrief, setSelectedBrief] = useState<FigureBriefDraft | null>(null);
@@ -313,6 +329,7 @@ function App() {
   const [runtimeDebugLogLines, setRuntimeDebugLogLines] = useState<string[]>([]);
   const [collabDebugLogLines, setCollabDebugLogLines] = useState<string[]>([]);
   const workspaceBodyRef = useRef<HTMLDivElement | null>(null);
+  const editorPreviewSplitRef = useRef<HTMLDivElement | null>(null);
 
   const { file: fileAdapter, project: projectAdapter, compile: compileAdapter } = useMemo(
     () => createLocalAdapter(),
@@ -374,10 +391,13 @@ function App() {
     conflictCount: 0,
   });
   const [collabProjectModal, setCollabProjectModal] = useState<CollabProjectModalState | null>(null);
+  const [createEntryModal, setCreateEntryModal] = useState<CreateEntryModalState | null>(null);
+  const [shareLinkModalOpen, setShareLinkModalOpen] = useState(false);
   const [availableCloudProjects, setAvailableCloudProjects] = useState<CloudProjectSummary[]>([]);
   const [isLoadingCloudProjects, setIsLoadingCloudProjects] = useState(false);
   const [pendingCloudProjectReference, setPendingCloudProjectReference] = useState<string | null>(null);
   const [authorizedCollabProjectId, setAuthorizedCollabProjectId] = useState<string | null>(null);
+  const [authorizedCollabProjectRole, setAuthorizedCollabProjectRole] = useState<CloudProjectRole | null>(null);
 
   const collabAuthSession = useMemo(
     () => readCollabAuthSession(),
@@ -411,11 +431,13 @@ function App() {
   useEffect(() => {
     if (!activeCollabProjectId || !collabAuthSession) {
       setAuthorizedCollabProjectId(null);
+      setAuthorizedCollabProjectRole(null);
       return;
     }
 
     let cancelled = false;
     setAuthorizedCollabProjectId(null);
+    setAuthorizedCollabProjectRole(null);
     appendCollabDebugLog("[collab.http] joining cloud project", {
       projectId: activeCollabProjectId,
       httpBaseUrl: resolveCollabBaseUrls().httpBaseUrl,
@@ -424,12 +446,14 @@ function App() {
     });
 
     void joinCloudProject(collabAuthSession.token, activeCollabProjectId)
-      .then(() => {
+      .then((result) => {
         if (!cancelled) {
           appendCollabDebugLog("[collab.http] join succeeded", {
             projectId: activeCollabProjectId,
+            role: result.role,
           });
           setAuthorizedCollabProjectId(activeCollabProjectId);
+          setAuthorizedCollabProjectRole(normalizeCloudRole(result.role));
         }
       })
       .catch((error) => {
@@ -442,6 +466,7 @@ function App() {
           message,
         });
         setAuthorizedCollabProjectId(null);
+        setAuthorizedCollabProjectRole(null);
         setCollabNotice({
           tone: "error",
           text: `当前身份无法访问该云项目：${message}`,
@@ -457,6 +482,8 @@ function App() {
   useEffect(() => {
     setLastManualCollabSyncAt("");
     setCollabSyncError("");
+    setShareLinkModalOpen(false);
+    setAuthorizedCollabProjectRole(null);
     setCollabWorkspaceSyncSummary({
       byPath: {},
       pendingPushCount: 0,
@@ -724,12 +751,17 @@ function App() {
     manager: collabManager,
   });
 
+  const currentCollabRole =
+    activeCollabProjectId && activeCollabProjectId === authorizedCollabProjectId
+      ? authorizedCollabProjectRole
+      : null;
   const collabSyncInProgress =
     collabBusyAction === "sync-project" || collabBusyAction === "pull-project";
   const currentCollabStatus = useMemo(
     () => ({
       enabled: Boolean(snapshot?.collab?.cloudProjectId),
       mode: "manual" as const,
+      role: currentCollabRole,
       connected: false,
       synced:
         collabWorkspaceSyncSummary.pendingPushCount === 0 &&
@@ -743,6 +775,12 @@ function App() {
       pendingRemoteChanges:
         collabWorkspaceSyncSummary.pendingPullCount > 0 || collabWorkspaceSyncSummary.conflictCount > 0,
       hasConflict: collabWorkspaceSyncSummary.conflictCount > 0,
+      canEditText: currentCollabRole === "owner" || currentCollabRole === "editor",
+      canComment:
+        currentCollabRole === "owner" ||
+        currentCollabRole === "editor" ||
+        currentCollabRole === "commenter",
+      canShare: currentCollabRole === "owner" || currentCollabRole === "editor",
       lastSyncAt: lastManualCollabSyncAt,
       connectionError: collabSyncError || activeCollaborativeDoc.connectionError,
       members: [],
@@ -754,6 +792,7 @@ function App() {
       collabWorkspaceSyncSummary.conflictCount,
       collabWorkspaceSyncSummary.pendingPullCount,
       collabWorkspaceSyncSummary.pendingPushCount,
+      currentCollabRole,
       lastManualCollabSyncAt,
       snapshot?.collab?.cloudProjectId,
     ],
@@ -822,11 +861,24 @@ function App() {
   const workspaceTargetDir = activeFilePath.includes("/")
     ? activeFilePath.slice(0, activeFilePath.lastIndexOf("/"))
     : "";
+  const syncChangeEntries = useMemo(
+    () =>
+      Object.entries(collabWorkspaceSyncSummary.byPath)
+        .filter(([, state]) => state !== "synced")
+        .sort(([leftPath, leftState], [rightPath, rightState]) =>
+          leftState === rightState ? leftPath.localeCompare(rightPath) : leftState.localeCompare(rightState),
+        )
+        .map(([path, state]) => ({ path, state })),
+    [collabWorkspaceSyncSummary.byPath],
+  );
   const activeWorkspaceRoot = snapshot?.projectConfig.rootPath ?? "";
   const isMacOverlayWindow =
     typeof window !== "undefined" &&
     isTauriRuntime() &&
     /mac/i.test(window.navigator.userAgent);
+  const toggleDrawerTab = useEffectEvent((tab: DrawerTab) => {
+    setDrawerTab(tab);
+  });
 
   useEffect(() => {
     writeStoredWorkspaceEntries(RECENT_WORKSPACE_STORAGE_KEY, recentWorkspaces);
@@ -1180,6 +1232,36 @@ function App() {
       }
     },
   );
+
+  const handlePreviewResizeStart = useEffectEvent((event: ReactMouseEvent<HTMLDivElement>) => {
+    const container = editorPreviewSplitRef.current;
+    if (!container) {
+      return;
+    }
+
+    event.preventDefault();
+    const bounds = container.getBoundingClientRect();
+
+    const updateWidth = (clientX: number) => {
+      const nextWidth = ((bounds.right - clientX) / bounds.width) * 100;
+      setPreviewPaneWidth(Math.min(68, Math.max(28, nextWidth)));
+    };
+
+    updateWidth(event.clientX);
+
+    const handlePointerMove = (moveEvent: MouseEvent) => {
+      moveEvent.preventDefault();
+      updateWidth(moveEvent.clientX);
+    };
+
+    const handlePointerUp = () => {
+      window.removeEventListener("mousemove", handlePointerMove);
+      window.removeEventListener("mouseup", handlePointerUp);
+    };
+
+    window.addEventListener("mousemove", handlePointerMove);
+    window.addEventListener("mouseup", handlePointerUp);
+  });
 
   const handleTerminalResizeStart = useEffectEvent((event: ReactMouseEvent<HTMLDivElement>) => {
     const workspaceBody = workspaceBodyRef.current;
@@ -1661,19 +1743,34 @@ function App() {
   }
 
   async function handleQuickCreateFile() {
-    const fileName = window.prompt("输入新文件名", "new-section.tex");
-    if (!fileName?.trim()) {
-      return;
-    }
-    await handleCreateFile(workspaceTargetDir, fileName.trim());
+    setCreateEntryModal({
+      kind: "file",
+      parentDir: workspaceTargetDir,
+    });
   }
 
   async function handleQuickCreateFolder() {
-    const folderName = window.prompt("输入新文件夹名", "new-folder");
-    if (!folderName?.trim()) {
+    setCreateEntryModal({
+      kind: "folder",
+      parentDir: workspaceTargetDir,
+    });
+  }
+
+  async function handleCreateEntrySubmit(name: string) {
+    if (!createEntryModal || !name.trim()) {
       return;
     }
-    await handleCreateFolder(workspaceTargetDir, folderName.trim());
+    try {
+      if (createEntryModal.kind === "file") {
+        await handleCreateFile(createEntryModal.parentDir, name.trim());
+      } else {
+        await handleCreateFolder(createEntryModal.parentDir, name.trim());
+      }
+      setCreateEntryModal(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      window.alert(`创建失败:\n${message}`);
+    }
   }
 
   async function pickDirectory() {
@@ -1899,7 +1996,7 @@ function App() {
     setCollabNotice(null);
 
     try {
-      await joinCloudProject(collabAuthSession.token, cloudProjectId);
+      await joinCloudProject(collabAuthSession.token, cloudProjectId, resolvedProject.role);
 
       const collab: WorkspaceCollabMetadata = {
         mode: "cloud",
@@ -1944,7 +2041,7 @@ function App() {
     setCollabNotice(null);
 
     try {
-      await joinCloudProject(session.token, resolvedProject.projectId);
+      await joinCloudProject(session.token, resolvedProject.projectId, resolvedProject.role);
       const project = await getCloudProject(session.token, resolvedProject.projectId);
       const parentDir = await pickDirectory();
       if (!parentDir || isStreaming) {
@@ -2053,13 +2150,22 @@ function App() {
     }
   }
 
-  function handleCopyShareLink() {
+  function handleOpenShareLinkModal() {
+    const projectId = snapshot?.collab?.cloudProjectId;
+    if (!projectId || !currentCollabStatus.canShare) return;
+    const { httpBaseUrl } = resolveCollabBaseUrls();
+    if (!httpBaseUrl) return;
+    setShareLinkModalOpen(true);
+  }
+
+  function handleCopyShareLink(role: CloudProjectRole) {
     const projectId = snapshot?.collab?.cloudProjectId;
     if (!projectId) return;
     const { httpBaseUrl } = resolveCollabBaseUrls();
     if (!httpBaseUrl) return;
-    const link = generateShareLink(projectId, httpBaseUrl);
+    const link = generateShareLink(projectId, httpBaseUrl, role);
     navigator.clipboard.writeText(link).then(() => {
+      setShareLinkModalOpen(false);
       window.alert(`分享链接已复制:\n${link}`);
     });
   }
@@ -2105,6 +2211,13 @@ function App() {
 
   async function handleSyncCloudWorkspace() {
     if (!snapshot || !snapshot.collab?.cloudProjectId || !collabManager) {
+      return;
+    }
+    if (!currentCollabStatus.canComment) {
+      setCollabNotice({
+        tone: "error",
+        text: "当前权限不能推送到云端。",
+      });
       return;
     }
 
@@ -2213,7 +2326,7 @@ function App() {
     selectedText: string,
     commentText?: string,
   ) => {
-    if (!commentStore || !collabAuthSession || !activeFile) return;
+    if (!commentStore || !collabAuthSession || !activeFile || !currentCollabStatus.canComment) return;
     const text =
       typeof commentText === "string"
         ? commentText.trim()
@@ -2231,11 +2344,12 @@ function App() {
   });
 
   const handleResolveComment = useEffectEvent((id: string) => {
+    if (!currentCollabStatus.canComment) return;
     commentStore?.resolveComment(id);
   });
 
   const handleReplyComment = useEffectEvent((id: string, text: string) => {
-    if (!commentStore || !collabAuthSession) return;
+    if (!commentStore || !collabAuthSession || !currentCollabStatus.canComment) return;
     commentStore.addReply(id, {
       userId: collabAuthSession.userId,
       userName: collabAuthSession.name,
@@ -2246,6 +2360,7 @@ function App() {
   });
 
   const handleDeleteComment = useEffectEvent((id: string) => {
+    if (!currentCollabStatus.canComment) return;
     commentStore?.deleteComment(id);
   });
 
@@ -2591,17 +2706,29 @@ function App() {
       <div className="workspace-container">
           <div className="activity-bar">
             <button
-              className={`activity-icon hover-spring ${isWorkspacePaneVisible ? "is-active" : ""}`}
-              onClick={() => setIsWorkspacePaneVisible((current) => !current)}
-              title={isWorkspacePaneVisible ? "隐藏 Project 面板" : "显示 Project 面板"}
+              className={`activity-icon hover-spring ${drawerTab === "project" ? "is-active" : ""}`}
+              onClick={() => toggleDrawerTab("project")}
+              title="Project"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 7h5l2 2h11v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"></path>
               </svg>
             </button>
             <button
+              className={`activity-icon hover-spring ${drawerTab === "sync" ? "is-active" : ""}`}
+              onClick={() => toggleDrawerTab("sync")}
+              title="源码管理"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 6v12"></path>
+                <path d="M6 8h8a3 3 0 0 0 0-6"></path>
+                <path d="M18 18V6"></path>
+                <path d="M18 16h-8a3 3 0 0 0 0 6"></path>
+              </svg>
+            </button>
+            <button
               className={`activity-icon hover-spring ${drawerTab === "latex" ? "is-active" : ""}`}
-              onClick={() => setDrawerTab("latex")}
+              onClick={() => toggleDrawerTab("latex")}
               title="LaTeX 编译配置"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 4h10l4 4v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"></path><path d="M14 4v4h4"></path><path d="M8 12h8"></path><path d="M8 16h6"></path></svg>
@@ -2609,42 +2736,42 @@ function App() {
             </button>
             <button
               className={`activity-icon hover-spring ${drawerTab === "ai" ? "is-active" : ""}`}
-              onClick={() => setDrawerTab("ai")}
+              onClick={() => toggleDrawerTab("ai")}
               title="AI 智能体助手"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"></rect><circle cx="12" cy="5" r="2"></circle><path d="M12 7v4"></path><line x1="8" y1="16" x2="8" y2="16"></line><line x1="16" y1="16" x2="16" y2="16"></line></svg>
             </button>
             <button
               className={`activity-icon hover-spring ${drawerTab === "figures" ? "is-active" : ""}`}
-              onClick={() => setDrawerTab("figures")}
+              onClick={() => toggleDrawerTab("figures")}
               title="图表工作区 (Figures)"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
             </button>
             <button
               className={`activity-icon hover-spring ${drawerTab === "skills" ? "is-active" : ""}`}
-              onClick={() => setDrawerTab("skills")}
+              onClick={() => toggleDrawerTab("skills")}
               title="应用与技能 (App Store)"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
             </button>
             <button
               className={`activity-icon hover-spring ${drawerTab === "providers" ? "is-active" : ""}`}
-              onClick={() => setDrawerTab("providers")}
+              onClick={() => toggleDrawerTab("providers")}
               title="API 配置区 (Providers)"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
             </button>
             <button
               className={`activity-icon hover-spring ${drawerTab === "usage" ? "is-active" : ""}`}
-              onClick={() => setDrawerTab("usage")}
+              onClick={() => toggleDrawerTab("usage")}
               title="模型用量 (Usage)"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"></path><path d="M7 14l4-4 3 3 5-7"></path></svg>
             </button>
             <button
               className={`activity-icon hover-spring ${drawerTab === "collab" ? "is-active" : ""}`}
-              onClick={() => setDrawerTab("collab")}
+              onClick={() => toggleDrawerTab("collab")}
               title="云协作与审阅"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -2659,7 +2786,7 @@ function App() {
 
             <button
               className={`activity-icon hover-spring ${drawerTab === "logs" ? "is-active" : ""}`}
-              onClick={() => setDrawerTab("logs")}
+              onClick={() => toggleDrawerTab("logs")}
               title="编译日志"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
@@ -2667,139 +2794,132 @@ function App() {
             </button>
           </div>
 
-          <Sidebar
-            tab={drawerTab}
-            messages={messages}
-            sessions={agentSessions}
-            activeSessionId={activeSessionId}
-            onSelectSession={(sessionId) => void handleSelectSession(sessionId)}
-            onNewSession={() => void handleNewSession()}
-            onRunAgent={handleRunAgent}
-            pendingPatchSummary={pendingPatch?.summary}
-            onApplyPatch={handleApplyPatch}
-            compileLog={mergedCompileLog}
-            compileStatus={snapshot.compileResult.status}
-            projectConfig={snapshot.projectConfig}
-            compileEnvironment={compileEnvironment}
-            isCheckingCompileEnvironment={isCheckingCompileEnvironment}
-            onRefreshCompileEnvironment={() => void refreshCompileEnvironment()}
-            onSetCompileEngine={(engine) => void handleSetCompileEngine(engine)}
-            onSetAutoCompile={(enabled) => void handleSetAutoCompile(enabled)}
-            diagnosticsCount={snapshot.compileResult.diagnostics.length}
-            briefs={snapshot.figureBriefs}
-            assets={snapshot.assets}
-            selectedBriefId={selectedBrief?.id}
-            selectedAssetId={selectedAsset?.id}
-            onCreateBrief={handleCreateBrief}
-            onRunFigureSkill={handleRunFigureSkill}
-            onGenerateFigure={handleGenerateFigure}
-            onInsertFigure={handleInsertFigure}
-            onSelectBrief={(briefId: string) => setSelectedBrief(snapshot.figureBriefs.find((brief) => brief.id === briefId) ?? null)}
-            onSelectAsset={(assetId: string) => setSelectedAsset(snapshot.assets.find((asset) => asset.id === assetId) ?? null)}
-            providers={snapshot.providers}
-            activeProviderId={activeProfile?.providerId || snapshot.providers.find((p) => p.isEnabled)?.id}
-            skills={snapshot.skills}
-            usageRecords={usageRecords}
-            onAddProvider={handleAddProvider}
-            onUpdateProvider={handleUpdateProvider}
-            onDeleteProvider={handleDeleteProvider}
-            onTestProvider={handleTestProvider}
-            onActivateProvider={(id) => void handleActivateProvider(id)}
-            onToggleSkill={handleToggleSkill}
-            streamThinkingText={streamThinkingText}
-            streamText={streamText}
-            streamToolCalls={streamToolCalls}
-            streamError={streamError}
-            isStreaming={isStreaming}
-            onSendMessage={handleSendMessage}
-            onDismissPatch={handleDismissPatch}
-            collabAuthSession={collabAuthSession}
-            collabConfig={collabConfigState}
-            cloudCollab={snapshot.collab ?? null}
-            collabBusyAction={collabBusyAction}
-            collabNotice={collabNotice}
-            collabStatus={currentCollabStatus}
-            activeFilePath={activeFilePath}
-            onOpenLoginModal={() => {
-              setCollabLoginMode("edit");
-              setLoginModalOpen(true);
-            }}
-            onLogout={handleCollabLogout}
-            onSaveCollabConfig={handleSaveCollabConfig}
-            onCreateCloudProject={() => void handleCreateCloudProject()}
-            onLinkCloudProject={() => void handleLinkCloudProject()}
-            onUnlinkCloudProject={() => void handleUnlinkCloudProject()}
-            onSyncCloudProject={() => void handleSyncCloudWorkspace()}
-            onPullCloudProject={() => void handlePullCloudWorkspace()}
-            onCopyShareLink={handleCopyShareLink}
-            onWorkerLogin={() => handleWorkerTerminalAction("login")}
-            onWorkerDeploy={() => handleWorkerTerminalAction("deploy")}
-            onWorkerLoginAndDeploy={() => handleWorkerTerminalAction("login-deploy")}
-            comments={activeDocComments}
-            onResolveComment={handleResolveComment}
-            onReplyComment={handleReplyComment}
-            onDeleteComment={handleDeleteComment}
-            onJumpToCommentLine={handleJumpToCommentLine}
-          />
+          {drawerTab === "project" ? (
+            <ProjectSidebar
+              projectName={snapshot.projectConfig.rootPath.split("/").at(-1) || "未命名项目"}
+              mode={workspacePaneMode}
+              nodes={snapshot.tree}
+              activeFile={focusedTreePath}
+              dirtyPaths={dirtyPathSet}
+              collabSyncStates={collabWorkspaceSyncSummary.byPath}
+              outlineContent={outlineNode}
+              onModeChange={setWorkspacePaneMode}
+              onOpenNode={handleOpenNode}
+              onCreateFile={handleCreateFile}
+              onCreateFolder={handleCreateFolder}
+              onDeleteFile={handleDeleteFile}
+              onRenameFile={handleRenameFile}
+              onRequestCreateFile={() => void handleQuickCreateFile()}
+              onRequestCreateFolder={() => void handleQuickCreateFolder()}
+            />
+          ) : drawerTab === "sync" ? (
+            <SyncSidebar
+              projectId={snapshot.collab?.cloudProjectId ?? null}
+              role={currentCollabStatus.role}
+              collabStatus={currentCollabStatus}
+              busyAction={collabBusyAction}
+              changes={syncChangeEntries}
+              onPush={() => void handleSyncCloudWorkspace()}
+              onPull={() => void handlePullCloudWorkspace()}
+              onOpenShareModal={handleOpenShareLinkModal}
+              onCreateProject={() => void handleCreateCloudProject()}
+              onLinkProject={() => void handleLinkCloudProject()}
+              onOpenCollabSettings={() => toggleDrawerTab("collab")}
+            />
+          ) : (
+            <Sidebar
+              tab={drawerTab}
+              messages={messages}
+              sessions={agentSessions}
+              activeSessionId={activeSessionId}
+              onSelectSession={(sessionId) => void handleSelectSession(sessionId)}
+              onNewSession={() => void handleNewSession()}
+              onRunAgent={handleRunAgent}
+              pendingPatchSummary={pendingPatch?.summary}
+              onApplyPatch={handleApplyPatch}
+              compileLog={mergedCompileLog}
+              compileStatus={snapshot.compileResult.status}
+              projectConfig={snapshot.projectConfig}
+              compileEnvironment={compileEnvironment}
+              isCheckingCompileEnvironment={isCheckingCompileEnvironment}
+              onRefreshCompileEnvironment={() => void refreshCompileEnvironment()}
+              onSetCompileEngine={(engine) => void handleSetCompileEngine(engine)}
+              onSetAutoCompile={(enabled) => void handleSetAutoCompile(enabled)}
+              diagnosticsCount={snapshot.compileResult.diagnostics.length}
+              briefs={snapshot.figureBriefs}
+              assets={snapshot.assets}
+              selectedBriefId={selectedBrief?.id}
+              selectedAssetId={selectedAsset?.id}
+              onCreateBrief={handleCreateBrief}
+              onRunFigureSkill={handleRunFigureSkill}
+              onGenerateFigure={handleGenerateFigure}
+              onInsertFigure={handleInsertFigure}
+              onSelectBrief={(briefId: string) => setSelectedBrief(snapshot.figureBriefs.find((brief) => brief.id === briefId) ?? null)}
+              onSelectAsset={(assetId: string) => setSelectedAsset(snapshot.assets.find((asset) => asset.id === assetId) ?? null)}
+              providers={snapshot.providers}
+              activeProviderId={activeProfile?.providerId || snapshot.providers.find((p) => p.isEnabled)?.id}
+              skills={snapshot.skills}
+              usageRecords={usageRecords}
+              onAddProvider={handleAddProvider}
+              onUpdateProvider={handleUpdateProvider}
+              onDeleteProvider={handleDeleteProvider}
+              onTestProvider={handleTestProvider}
+              onActivateProvider={(id) => void handleActivateProvider(id)}
+              onToggleSkill={handleToggleSkill}
+              streamThinkingText={streamThinkingText}
+              streamText={streamText}
+              streamToolCalls={streamToolCalls}
+              streamError={streamError}
+              isStreaming={isStreaming}
+              onSendMessage={handleSendMessage}
+              onDismissPatch={handleDismissPatch}
+              collabAuthSession={collabAuthSession}
+              collabConfig={collabConfigState}
+              cloudCollab={snapshot.collab ?? null}
+              collabBusyAction={collabBusyAction}
+              collabNotice={collabNotice}
+              collabStatus={currentCollabStatus}
+              activeFilePath={activeFilePath}
+              onOpenLoginModal={() => {
+                setCollabLoginMode("edit");
+                setLoginModalOpen(true);
+              }}
+              onLogout={handleCollabLogout}
+              onSaveCollabConfig={handleSaveCollabConfig}
+              onCreateCloudProject={() => void handleCreateCloudProject()}
+              onLinkCloudProject={() => void handleLinkCloudProject()}
+              onUnlinkCloudProject={() => void handleUnlinkCloudProject()}
+              onCopyShareLink={handleOpenShareLinkModal}
+              onWorkerLogin={() => handleWorkerTerminalAction("login")}
+              onWorkerDeploy={() => handleWorkerTerminalAction("deploy")}
+              onWorkerLoginAndDeploy={() => handleWorkerTerminalAction("login-deploy")}
+              comments={activeDocComments}
+              onResolveComment={handleResolveComment}
+              onReplyComment={handleReplyComment}
+              onDeleteComment={handleDeleteComment}
+              onJumpToCommentLine={handleJumpToCommentLine}
+            />
+          )}
 
           <div className="workspace-body" ref={workspaceBodyRef}>
             <div className="workspace-main">
-              {isWorkspacePaneVisible && (
-                <div className="workspace-left-pane">
-                <div className="workspace-pane-header">
-                  <div className="workspace-pane-meta">
-                    <div className="workspace-pane-title">Project</div>
-                    <div className="workspace-pane-subtitle">
-                      {snapshot.projectConfig.rootPath.split("/").at(-1) || "未命名项目"}
-                    </div>
-                  </div>
-                  <div className="workspace-pane-actions">
-                    <button className="icon-btn" title="新建文件" type="button" onClick={() => void handleQuickCreateFile()}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
-                    </button>
-                    <button className="icon-btn" title="新建文件夹" type="button" onClick={() => void handleQuickCreateFolder()}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7h5l2 2h11v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"></path><path d="M12 12v6"></path><path d="M9 15h6"></path></svg>
-                    </button>
-                  </div>
-                </div>
-                <div className="workspace-pane-segmented">
-                  <button
-                    type="button"
-                    className={`sidebar-segment ${workspacePaneMode === "files" ? "is-active" : ""}`}
-                    onClick={() => setWorkspacePaneMode("files")}
-                  >
-                    Files
-                  </button>
-                  <button
-                    type="button"
-                    className={`sidebar-segment ${workspacePaneMode === "outline" ? "is-active" : ""}`}
-                    onClick={() => setWorkspacePaneMode("outline")}
-                  >
-                    Outline
-                  </button>
-                </div>
-                <div className="workspace-pane-body">
-                  {workspacePaneMode === "files" ? (
-                    <ProjectTree
-                      nodes={snapshot.tree}
-                      activeFile={focusedTreePath}
-                      dirtyPaths={dirtyPathSet}
-                      collabSyncStates={collabWorkspaceSyncSummary.byPath}
-                      onOpenNode={handleOpenNode}
-                      onCreateFile={handleCreateFile}
-                      onCreateFolder={handleCreateFolder}
-                      onDeleteFile={handleDeleteFile}
-                      onRenameFile={handleRenameFile}
-                    />
-                  ) : (
-                    outlineNode
-                  )}
-                </div>
-              </div>
-              )}
+              <WorkspaceSyncBar
+                projectId={snapshot.collab?.cloudProjectId ?? null}
+                role={currentCollabStatus.role}
+                collabStatus={currentCollabStatus}
+                pendingPushCount={collabWorkspaceSyncSummary.pendingPushCount}
+                pendingPullCount={collabWorkspaceSyncSummary.pendingPullCount}
+                conflictCount={collabWorkspaceSyncSummary.conflictCount}
+                onPush={() => void handleSyncCloudWorkspace()}
+                onPull={() => void handlePullCloudWorkspace()}
+                onOpenShareModal={handleOpenShareLinkModal}
+                onCreateProject={() => void handleCreateCloudProject()}
+                onLinkProject={() => void handleLinkCloudProject()}
+              />
 
-              <div className="editor-area">
-                <div className="editor-tabs" onWheel={handleEditorTabsWheel}>
+              <div className="workspace-main-content" ref={editorPreviewSplitRef}>
+                <div className="editor-area">
+                  <div className="editor-tabs" onWheel={handleEditorTabsWheel}>
                   {editorTabs.map((tab) => {
                     const isImageTab = openImageTabSet.has(tab);
                     const isActive = tab === activeEditorTabPath;
@@ -2837,93 +2957,101 @@ function App() {
                       </div>
                     );
                   })}
+                  </div>
+                  <div className="editor-content">
+                    {editorImagePath ? (
+                      <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--bg-app)" }}>
+                        <div
+                          style={{
+                            padding: "6px 16px",
+                            borderBottom: "1px solid var(--border-light)",
+                            fontSize: "12px",
+                            color: "var(--text-secondary)",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            background: "var(--bg-app)",
+                          }}
+                        >
+                          <span>图片路径: {editorImagePath}</span>
+                          <span>{editorImageAsset?.mimeType ?? "image"}</span>
+                        </div>
+                        <div
+                          style={{
+                            flex: 1,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            background: "var(--bg-secondary, #1e1e1e)",
+                            overflow: "auto",
+                            padding: 24,
+                          }}
+                        >
+                          {editorImageUrl ? (
+                            <img
+                              src={editorImageUrl}
+                              alt={editorImagePath.split("/").at(-1) ?? ""}
+                              style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 8 }}
+                            />
+                          ) : (
+                            <div style={{ color: "var(--text-secondary)" }}>
+                              {editorImageAsset ? "图片资源不可用" : "正在加载图片…"}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : activeFile ? (
+                      <EditorPane
+                        file={activeFile}
+                        isDirty={dirtyPathSet.has(activeFile.path)}
+                        targetLine={editorJumpTarget?.path === activeFile.path ? editorJumpTarget.line : undefined}
+                        targetNonce={editorJumpTarget?.path === activeFile.path ? editorJumpTarget.nonce : undefined}
+                        onChange={handleEditorChange}
+                        onCursorChange={handleEditorCursorChange}
+                        onSave={handleEditorSave}
+                        onRunAgent={handleEditorRunAgent}
+                        onCompile={handleEditorCompile}
+                        onForwardSync={handleEditorForwardSync}
+                        yText={activeCollaborativeDoc.yText}
+                        awareness={activeCollaborativeDoc.awareness}
+                        collabStatus={currentCollabStatus}
+                        comments={activeDocComments}
+                        onAddComment={handleAddComment}
+                      />
+                    ) : !hasProject ? (
+                      <WelcomeWorkspace
+                        embedded
+                        recentWorkspaces={recentWorkspaces}
+                        onOpenProject={() => void handleOpenExistingProject()}
+                        onCreateProject={() => void handleCreateNewProject()}
+                        onLinkCloudProject={handleLinkCloudProjectFromWelcome}
+                        onOpenRecentWorkspace={(rootPath) => void activateWorkspace(rootPath)}
+                      />
+                    ) : (
+                      <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)" }}>
+                        {loadingFilePath
+                          ? "正在加载文件…"
+                          : activeFileLoadError
+                            ? `文件加载失败：${activeFileLoadError}`
+                            : "选择一个文本文件开始编辑"}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="editor-content">
-                  {editorImagePath ? (
-                    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--bg-app)" }}>
-                      <div
-                        style={{
-                          padding: "6px 16px",
-                          borderBottom: "1px solid var(--border-light)",
-                          fontSize: "12px",
-                          color: "var(--text-secondary)",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          background: "var(--bg-app)",
-                        }}
-                      >
-                        <span>图片路径: {editorImagePath}</span>
-                        <span>{editorImageAsset?.mimeType ?? "image"}</span>
-                      </div>
-                      <div
-                        style={{
-                          flex: 1,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          background: "var(--bg-secondary, #1e1e1e)",
-                          overflow: "auto",
-                          padding: 24,
-                        }}
-                      >
-                        {editorImageUrl ? (
-                          <img
-                            src={editorImageUrl}
-                            alt={editorImagePath.split("/").at(-1) ?? ""}
-                            style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 8 }}
-                          />
-                        ) : (
-                          <div style={{ color: "var(--text-secondary)" }}>
-                            {editorImageAsset ? "图片资源不可用" : "正在加载图片…"}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ) : activeFile ? (
-                    <EditorPane
-                      file={activeFile}
-                      isDirty={dirtyPathSet.has(activeFile.path)}
-                      targetLine={editorJumpTarget?.path === activeFile.path ? editorJumpTarget.line : undefined}
-                      targetNonce={editorJumpTarget?.path === activeFile.path ? editorJumpTarget.nonce : undefined}
-                      onChange={handleEditorChange}
-                      onCursorChange={handleEditorCursorChange}
-                      onSave={handleEditorSave}
-                      onRunAgent={handleEditorRunAgent}
-                      onCompile={handleEditorCompile}
-                      onForwardSync={handleEditorForwardSync}
-                      yText={activeCollaborativeDoc.yText}
-                      awareness={activeCollaborativeDoc.awareness}
-                      collabStatus={currentCollabStatus}
-                      comments={activeDocComments}
-                      onAddComment={handleAddComment}
-                    />
-                  ) : !hasProject ? (
-                    <WelcomeWorkspace
-                      embedded
-                      recentWorkspaces={recentWorkspaces}
-                      onOpenProject={() => void handleOpenExistingProject()}
-                      onCreateProject={() => void handleCreateNewProject()}
-                      onLinkCloudProject={handleLinkCloudProjectFromWelcome}
-                      onOpenRecentWorkspace={(rootPath) => void activateWorkspace(rootPath)}
-                    />
+
+                <div
+                  className="workspace-main-resize-handle"
+                  onMouseDown={handlePreviewResizeStart}
+                  role="separator"
+                  aria-label="调整编辑区和预览区宽度"
+                />
+
+                <div className="preview-area" style={{ flexBasis: `${previewPaneWidth}%`, width: `${previewPaneWidth}%` }}>
+                  {previewState ? (
+                    <PdfPane preview={previewState} />
                   ) : (
-                    <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)" }}>
-                      {loadingFilePath
-                        ? "正在加载文件…"
-                        : activeFileLoadError
-                          ? `文件加载失败：${activeFileLoadError}`
-                          : "选择一个文本文件开始编辑"}
-                    </div>
+                    <div className="pdf-placeholder">暂无预览内容</div>
                   )}
                 </div>
-              </div>
-
-              <div className="preview-area">
-                {previewState ? (
-                  <PdfPane preview={previewState} />
-                ) : (
-                  <div className="pdf-placeholder">暂无预览内容</div>
-                )}
               </div>
             </div>
 
@@ -2958,6 +3086,24 @@ function App() {
             setLoginModalOpen(false);
             setPendingCloudProjectReference(null);
           }}
+        />
+      )}
+
+      {createEntryModal && (
+        <CreateEntryModal
+          kind={createEntryModal.kind}
+          parentDir={createEntryModal.parentDir}
+          onClose={() => setCreateEntryModal(null)}
+          onSubmit={(name) => void handleCreateEntrySubmit(name)}
+        />
+      )}
+
+      {shareLinkModalOpen && snapshot?.collab?.cloudProjectId && resolveCollabBaseUrls().httpBaseUrl && (
+        <ShareLinkModal
+          projectId={snapshot.collab.cloudProjectId}
+          httpBaseUrl={resolveCollabBaseUrls().httpBaseUrl}
+          onClose={() => setShareLinkModalOpen(false)}
+          onCopy={handleCopyShareLink}
         />
       )}
 

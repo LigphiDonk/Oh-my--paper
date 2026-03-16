@@ -5,11 +5,21 @@ const FRAME_SYNC_RESPONSE = 1;
 const FRAME_DOCUMENT_UPDATE = 2;
 interface ConnectionMeta {
   userId: string;
-  role: "owner" | "editor" | "viewer";
+  role: "owner" | "editor" | "commenter" | "viewer";
   clientId: number;
   name: string;
   color: string;
   openFile?: string;
+}
+
+function cloneDoc(doc: Y.Doc) {
+  const next = new Y.Doc();
+  Y.applyUpdate(next, Y.encodeStateAsUpdate(doc));
+  return next;
+}
+
+function contentValue(doc: Y.Doc) {
+  return doc.getText("content").toString();
 }
 
 function encodeFrame(type: number, payload?: Uint8Array) {
@@ -71,6 +81,23 @@ export class DocumentRoom implements DurableObject {
 
     if (url.pathname.endsWith("/snapshot") && request.method === "POST") {
       const payload = new Uint8Array(await request.arrayBuffer());
+      const role = (request.headers.get("x-viewerleaf-role") as ConnectionMeta["role"] | null) ?? "editor";
+      if (role === "viewer") {
+        return new Response(JSON.stringify({ error: "read_only" }), {
+          status: 403,
+          headers: {
+            "content-type": "application/json",
+          },
+        });
+      }
+      if (role === "commenter" && !this.canApplyCommentOnlyUpdate(payload)) {
+        return new Response(JSON.stringify({ error: "comment_only" }), {
+          status: 403,
+          headers: {
+            "content-type": "application/json",
+          },
+        });
+      }
       if (payload.byteLength > 0) {
         Y.applyUpdate(this.yDoc, payload, this);
         await this.flushState();
@@ -124,6 +151,10 @@ export class DocumentRoom implements DurableObject {
       case FRAME_DOCUMENT_UPDATE: {
         if (meta.role === "viewer") {
           ws.send(JSON.stringify({ type: "error", message: "read_only" }));
+          return;
+        }
+        if (meta.role === "commenter" && !this.canApplyCommentOnlyUpdate(payload)) {
+          ws.send(JSON.stringify({ type: "error", message: "comment_only" }));
           return;
         }
 
@@ -235,5 +266,12 @@ export class DocumentRoom implements DurableObject {
     });
 
     return this.flushPromise;
+  }
+
+  private canApplyCommentOnlyUpdate(payload: Uint8Array) {
+    const before = contentValue(this.yDoc);
+    const nextDoc = cloneDoc(this.yDoc);
+    Y.applyUpdate(nextDoc, payload);
+    return contentValue(nextDoc) === before;
   }
 }

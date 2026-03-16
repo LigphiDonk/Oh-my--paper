@@ -179,6 +179,16 @@ pub fn run_agent(
     let mut child = sidecar::spawn_sidecar(state, "agent", &payload)
         .with_context(|| "failed to spawn agent sidecar".to_string())?;
 
+    // Store sidecar PID for cancellation support
+    {
+        let pid = child.id();
+        let mut active = state
+            .active_sidecar
+            .lock()
+            .expect("active_sidecar lock poisoned");
+        *active = Some(pid);
+    }
+
     let stdout = child.stdout.take().context("sidecar stdout unavailable")?;
     let reader = std::io::BufReader::new(stdout);
     let mut full_response = String::new();

@@ -104,11 +104,19 @@ export async function uploadDocumentSnapshot(token: string, projectId: string, p
   return payload.latestVersion;
 }
 
-export async function joinCloudProject(token: string, projectId: string) {
+export async function joinCloudProject(
+  token: string,
+  projectId: string,
+  role?: CloudProjectSummary["role"],
+) {
   const { httpBaseUrl } = resolveCollabBaseUrls();
   const response = await fetch(`${httpBaseUrl}/api/projects/${projectId}/join`, {
     method: "POST",
-    headers: authHeaders(token),
+    headers: {
+      ...authHeaders(token),
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(role ? { role } : {}),
   });
-  return parseJson<{ ok: boolean; role: string }>(response);
+  return parseJson<{ ok: boolean; role: CloudProjectSummary["role"] }>(response);
 }

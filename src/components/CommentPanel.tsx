@@ -5,6 +5,7 @@ interface CommentPanelProps {
   comments: ReviewComment[];
   activeFilePath: string;
   collabEnabled: boolean;
+  canComment: boolean;
   currentUserId: string;
   onResolve: (id: string) => void;
   onReply: (id: string, text: string) => void;
@@ -33,6 +34,7 @@ export function CommentPanel({
   comments,
   activeFilePath,
   collabEnabled,
+  canComment,
   currentUserId,
   onResolve,
   onReply,
@@ -77,7 +79,9 @@ export function CommentPanel({
 
       {unresolved.length === 0 && resolved.length === 0 && (
         <div className="sidebar-empty-state">
-          暂无批注 · 选中代码后点击编辑器右上角“添加批注”，或按 Cmd+Shift+M
+          {canComment
+            ? "暂无批注 · 选中代码后点击编辑器右上角“添加批注”，或按 Cmd+Shift+M"
+            : "当前权限为只读，不能创建或修改批注"}
         </div>
       )}
 
@@ -112,7 +116,7 @@ export function CommentPanel({
             </div>
           ))}
 
-          {replyingTo === comment.id && (
+          {canComment && replyingTo === comment.id && (
             <div className="comment-reply-form">
               <input
                 className="sidebar-input"
@@ -134,22 +138,24 @@ export function CommentPanel({
             </div>
           )}
 
-          <div className="comment-actions">
-            <button type="button" onClick={() => {
-              setReplyingTo(replyingTo === comment.id ? null : comment.id);
-              setReplyText("");
-            }}>
-              回复
-            </button>
-            <button type="button" onClick={() => onResolve(comment.id)}>
-              标记已解决
-            </button>
-            {comment.userId === currentUserId && (
-              <button type="button" onClick={() => onDelete(comment.id)}>
-                删除
+          {canComment && (
+            <div className="comment-actions">
+              <button type="button" onClick={() => {
+                setReplyingTo(replyingTo === comment.id ? null : comment.id);
+                setReplyText("");
+              }}>
+                回复
               </button>
-            )}
-          </div>
+              <button type="button" onClick={() => onResolve(comment.id)}>
+                标记已解决
+              </button>
+              {comment.userId === currentUserId && (
+                <button type="button" onClick={() => onDelete(comment.id)}>
+                  删除
+                </button>
+              )}
+            </div>
+          )}
         </div>
       ))}
 
@@ -180,11 +186,13 @@ export function CommentPanel({
                 L{comment.lineStart}{comment.lineEnd !== comment.lineStart ? `–L${comment.lineEnd}` : ""}
               </button>
               <div className="comment-text">{comment.text}</div>
-              <div className="comment-actions">
-                <button type="button" onClick={() => onResolve(comment.id)}>
-                  重新打开
-                </button>
-              </div>
+              {canComment && (
+                <div className="comment-actions">
+                  <button type="button" onClick={() => onResolve(comment.id)}>
+                    重新打开
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </>

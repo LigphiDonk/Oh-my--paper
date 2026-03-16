@@ -4,7 +4,17 @@ export type CompileStatus = "idle" | "running" | "success" | "failed" | "cancele
 export type AgentProfileId = string;
 export type FigureBriefStatus = "draft" | "ready" | "generated";
 export type AssetKind = "figure" | "table" | "diagram";
-export type DrawerTab = "latex" | "ai" | "logs" | "figures" | "skills" | "providers" | "usage" | "collab";
+export type DrawerTab =
+  | "project"
+  | "sync"
+  | "latex"
+  | "ai"
+  | "logs"
+  | "figures"
+  | "skills"
+  | "providers"
+  | "usage"
+  | "collab";
 export type WorkspacePaneMode = "files" | "outline";
 export type ProjectFileType =
   | "latex"
@@ -233,7 +243,7 @@ export interface UsageRecord {
   createdAt: string;
 }
 
-export type CloudProjectRole = "owner" | "editor" | "viewer";
+export type CloudProjectRole = "owner" | "editor" | "commenter" | "viewer";
 
 export interface CloudProjectSummary {
   id: string;
@@ -273,12 +283,16 @@ export type CollabFileSyncState = "synced" | "pending-push" | "pending-pull" | "
 export interface CollabStatus {
   enabled: boolean;
   mode: "manual" | "realtime";
+  role: CloudProjectRole | null;
   connected: boolean;
   synced: boolean;
   syncInProgress: boolean;
   pendingLocalChanges: boolean;
   pendingRemoteChanges: boolean;
   hasConflict: boolean;
+  canEditText: boolean;
+  canComment: boolean;
+  canShare: boolean;
   lastSyncAt: string;
   connectionError: string;
   members: CollabMember[];

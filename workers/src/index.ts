@@ -3,7 +3,7 @@ import { DocumentRoom } from "./document-room";
 
 export { DocumentRoom };
 
-type ProjectRole = "owner" | "editor" | "viewer";
+type ProjectRole = "owner" | "editor" | "commenter" | "viewer";
 
 interface Env {
   DOCUMENT_ROOM: DurableObjectNamespace;
@@ -42,10 +42,40 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#39;");
 }
 
-function renderJoinPage(projectId: string, projectName: string | null, shareLink: string) {
+function roleLabel(role: ProjectRole | null | undefined) {
+  if (role === "owner") return "所有者";
+  if (role === "editor") return "可编辑";
+  if (role === "commenter") return "可批注";
+  if (role === "viewer") return "只读";
+  return "未指定";
+}
+
+function parseProjectRole(value: unknown): ProjectRole | null {
+  if (value === "owner" || value === "editor" || value === "commenter" || value === "viewer") {
+    return value;
+  }
+  return null;
+}
+
+function rolePriority(role: ProjectRole) {
+  if (role === "owner") return 3;
+  if (role === "editor") return 2;
+  if (role === "commenter") return 1;
+  return 0;
+}
+
+function chooseProjectRole(current: ProjectRole | null, requested: ProjectRole) {
+  if (!current) {
+    return requested;
+  }
+  return rolePriority(current) >= rolePriority(requested) ? current : requested;
+}
+
+function renderJoinPage(projectId: string, projectName: string | null, shareLink: string, invitedRole: ProjectRole) {
   const safeProjectId = escapeHtml(projectId);
   const safeProjectName = escapeHtml(projectName?.trim() || "ViewerLeaf Cloud Project");
   const safeShareLink = escapeHtml(shareLink);
+  const safeRole = escapeHtml(roleLabel(invitedRole));
 
   return `<!doctype html>
 <html lang="zh-CN">
@@ -201,6 +231,11 @@ function renderJoinPage(projectId: string, projectName: string | null, shareLink
         </div>
 
         <div class="section">
+          <span class="label">分享权限</span>
+          <input class="value" value="${safeRole}" readonly />
+        </div>
+
+        <div class="section">
           <span class="label">如何加入</span>
           <ol>
             <li>打开 ViewerLeaf 桌面应用，并登录同一个协作服务器。</li>
@@ -352,15 +387,16 @@ export default {
       const publicJoinMatch = url.pathname.match(/^\/join\/([^/]+)$/);
       if (publicJoinMatch && request.method === "GET") {
         const projectId = publicJoinMatch[1];
+        const invitedRole = parseProjectRole(url.searchParams.get("role")) ?? "viewer";
         const project = await env.DB.prepare(
           `SELECT name FROM projects WHERE id = ?1 LIMIT 1`,
         )
           .bind(projectId)
           .first<{ name: string }>();
         if (!project) {
-          return html(renderJoinPage(projectId, null, url.toString()), { status: 404 });
+          return html(renderJoinPage(projectId, null, url.toString(), invitedRole), { status: 404 });
         }
-        return html(renderJoinPage(projectId, project.name, url.toString()));
+        return html(renderJoinPage(projectId, project.name, url.toString(), invitedRole));
       }
 
       const user = await verifyRequestAuth(request, env);
@@ -482,6 +518,7 @@ export default {
           method: "POST",
           headers: {
             "content-type": "application/octet-stream",
+            "x-viewerleaf-role": role,
           },
           body: payload,
         });
@@ -531,6 +568,9 @@ export default {
       const joinMatch = url.pathname.match(/^\/api\/projects\/([^/]+)\/join$/);
       if (joinMatch && request.method === "POST") {
         const projectId = joinMatch[1];
+        const body = await request.json<unknown>().catch(() => null);
+        const requestedRole =
+          parseProjectRole(isRecord(body) ? body.role : undefined) ?? parseProjectRole(url.searchParams.get("role"));
         const project = await env.DB.prepare(
           `SELECT id FROM projects WHERE id = ?1 LIMIT 1`,
         )
@@ -539,19 +579,29 @@ export default {
         if (!project) {
           return json({ error: "not_found", message: "Project not found." }, { status: 404 });
         }
-        await env.DB.prepare(
-          `INSERT INTO project_members (project_id, user_id, role)
-           VALUES (?1, ?2, 'editor')
-           ON CONFLICT(project_id, user_id) DO NOTHING`,
-        )
-          .bind(projectId, user.id)
-          .run();
-        const row = await env.DB.prepare(
+        const existing = await env.DB.prepare(
           `SELECT role FROM project_members WHERE project_id = ?1 AND user_id = ?2 LIMIT 1`,
         )
           .bind(projectId, user.id)
           .first<{ role: ProjectRole }>();
-        return json({ ok: true, role: row?.role ?? "editor" });
+        const nextRole = chooseProjectRole(existing?.role ?? null, requestedRole ?? existing?.role ?? "editor");
+        if (existing) {
+          await env.DB.prepare(
+            `UPDATE project_members
+             SET role = ?3
+             WHERE project_id = ?1 AND user_id = ?2`,
+          )
+            .bind(projectId, user.id, nextRole)
+            .run();
+        } else {
+          await env.DB.prepare(
+            `INSERT INTO project_members (project_id, user_id, role)
+             VALUES (?1, ?2, ?3)`,
+          )
+            .bind(projectId, user.id, nextRole)
+            .run();
+        }
+        return json({ ok: true, role: nextRole });
       }
 
       const membersMatch = url.pathname.match(/^\/api\/projects\/([^/]+)\/members$/);

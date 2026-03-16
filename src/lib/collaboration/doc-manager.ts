@@ -594,6 +594,16 @@ export class CollabDocManager {
           await this.setSyncedVersion(path, latestVersion);
           await this.setPathPendingSync(path, false);
           this.upsertRemoteDocumentVersion(path, latestVersion);
+          doc.synced = true;
+          doc.connectionError = "";
+          await doc.flushLocalMirror();
+          await this.persistState(path, doc.yDoc);
+          for (const listener of doc.subscribers) {
+            listener();
+          }
+          for (const listener of this.listeners) {
+            listener({ kind: "connection", path });
+          }
         }
         if (mode === "pull") {
           const remoteDoc = remoteDocuments.get(path);

@@ -92,8 +92,6 @@ interface SidebarProps {
   onCreateCloudProject: () => void;
   onLinkCloudProject: () => void;
   onUnlinkCloudProject: () => void;
-  onSyncCloudProject: () => void;
-  onPullCloudProject: () => void;
   onCopyShareLink: () => void;
   onWorkerLogin: () => Promise<void> | void;
   onWorkerDeploy: () => Promise<void> | void;
@@ -208,8 +206,6 @@ export function Sidebar({
   onCreateCloudProject,
   onLinkCloudProject,
   onUnlinkCloudProject,
-  onSyncCloudProject,
-  onPullCloudProject,
   onCopyShareLink,
   onWorkerLogin,
   onWorkerDeploy,
@@ -877,24 +873,16 @@ curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh`}</pre>
                       {collabStatus.connectionError}
                     </div>
                   )}
-                  <button
-                    className="btn-primary"
-                    style={{ width: "100%", marginTop: 8 }}
-                    onClick={onSyncCloudProject}
-                    disabled={collabBusyAction === "sync-project" || collabBusyAction === "pull-project"}
-                  >
-                    {collabBusyAction === "sync-project" ? "推送中..." : "推送待同步文件"}
-                  </button>
+                  <div className="text-subtle text-xs">
+                    推送和拉取入口已经移到顶部同步栏，以及左侧“源码管理”工具栏。
+                  </div>
                   <button
                     className="btn-secondary"
-                    style={{ width: "100%" }}
-                    onClick={onPullCloudProject}
-                    disabled={collabBusyAction === "sync-project" || collabBusyAction === "pull-project"}
+                    style={{ width: "100%", marginTop: 8 }}
+                    onClick={onCopyShareLink}
+                    disabled={!collabStatus.canShare}
                   >
-                    {collabBusyAction === "pull-project" ? "拉取中..." : "拉取待更新文件"}
-                  </button>
-                  <button className="btn-secondary" style={{ width: "100%", marginTop: 8 }} onClick={onCopyShareLink}>
-                    复制分享链接
+                    创建分享链接
                   </button>
                   <button
                     className="btn-secondary"
@@ -948,6 +936,7 @@ curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh`}</pre>
               comments={comments}
               activeFilePath={activeFilePath}
               collabEnabled={cloudCollab?.mode === "cloud"}
+              canComment={collabStatus.canComment}
               currentUserId={collabAuthSession?.userId ?? ""}
               onResolve={onResolveComment}
               onReply={onReplyComment}
