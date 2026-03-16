@@ -27,12 +27,13 @@ export const writeTool = {
   },
   async execute(args, ctx) {
     const filePath = resolveUserPath(ctx.projectRoot, args.filePath);
+    let oldContent = null;
     if (pathExists(filePath)) {
       const stats = statSync(filePath);
       if (stats.isDirectory()) {
         throw new Error(`Cannot write to directory: ${args.filePath}`);
       }
-      readTextFile(filePath);
+      oldContent = readTextFile(filePath);
     }
 
     writeTextFile(filePath, String(args.content ?? ""));
@@ -48,6 +49,7 @@ export const writeTool = {
           type: "file_changed",
           filePath: relativePath,
           content: String(args.content ?? ""),
+          oldContent,
         },
       ],
     };

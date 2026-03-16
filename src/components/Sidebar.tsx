@@ -71,6 +71,9 @@ interface SidebarProps {
   isStreaming?: boolean;
   onSendMessage: (text: string) => void;
   onDismissPatch: () => void;
+  onCancelAgent?: () => void;
+  pendingPatchDiff?: import("../types").DiffLine[];
+  projectTree?: import("../types").ProjectNode[];
   // Collab props
   collabAuthSession: CollabAuthSession | null;
   collabConfig: CollabConfig | null;
@@ -193,6 +196,9 @@ export function Sidebar({
   isStreaming,
   onSendMessage,
   onDismissPatch,
+  onCancelAgent,
+  pendingPatchDiff,
+  projectTree,
   collabAuthSession,
   collabConfig: collabConfigProp,
   cloudCollab,
@@ -432,7 +438,9 @@ curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh`}</pre>
               onNewSession={onNewSession}
               onRunAgent={onRunAgent}
               onSendMessage={onSendMessage}
+              onCancelAgent={onCancelAgent}
               pendingPatchSummary={pendingPatchSummary}
+              pendingPatchDiff={pendingPatchDiff}
               onApplyPatch={onApplyPatch}
               onDismissPatch={onDismissPatch}
               streamThinkingText={streamThinkingText}
@@ -443,6 +451,7 @@ curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh`}</pre>
               skills={skills}
               onToggleSkill={onToggleSkill}
               usageRecords={usageRecords}
+              projectTree={projectTree}
             />
           </div>
         </>

@@ -102,6 +102,7 @@ export const editTool = {
           type: "file_changed",
           filePath: relativePath,
           content: nextContent,
+          oldContent: currentContent,
         },
       ],
     };

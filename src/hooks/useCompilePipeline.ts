@@ -44,6 +44,7 @@ interface UseCompilePipelineParams {
   snapshot: WorkspaceSnapshot | null;
   activeFilePath: string;
   cursorLine: number;
+  cursorColumn: number;
   dirtyPaths: string[];
   drawerTab: DrawerTab;
   compileAdapter: CompileAdapter;
@@ -66,7 +67,7 @@ export interface CompilePipelineState {
   compilePreviewPath: string;
   logCompileDebug: (level: "info" | "warn" | "error", message: string, details?: unknown) => void;
   refreshCompileEnvironment: () => Promise<Awaited<ReturnType<CompileAdapter["getCompileEnvironment"]>> | null>;
-  performForwardSync: (filePath: string, line: number) => Promise<void>;
+  performForwardSync: (filePath: string, line: number, column: number) => Promise<void>;
   runCompile: (filePath: string) => Promise<Awaited<ReturnType<CompileAdapter["compileProject"]>>>;
   handleManualCompile: () => Promise<void>;
   handleInteractiveCompile: () => Promise<void>;
@@ -79,6 +80,7 @@ export function useCompilePipeline({
   snapshot,
   activeFilePath,
   cursorLine,
+  cursorColumn,
   dirtyPaths,
   drawerTab,
   compileAdapter,
@@ -184,12 +186,12 @@ export function useCompilePipeline({
     }
   }, [compileAdapter]);
 
-  const performForwardSync = useCallback(async (filePath: string, line: number) => {
+  const performForwardSync = useCallback(async (filePath: string, line: number, column: number) => {
     if (snapshotRef.current?.compileResult.status !== "success") {
       return;
     }
     try {
-      const location = await compileAdapter.forwardSearch(filePath, line);
+      const location = await compileAdapter.forwardSearch(filePath, line, column);
       setHighlightedPage(location.page);
       setSyncHighlights(location.highlights ?? []);
     } catch (error) {
@@ -337,10 +339,10 @@ export function useCompilePipeline({
       return;
     }
     const timer = window.setTimeout(() => {
-      void performForwardSync(activeFilePath, cursorLine);
+      void performForwardSync(activeFilePath, cursorLine, cursorColumn);
     }, 420);
     return () => window.clearTimeout(timer);
-  }, [activeFilePath, cursorLine, performForwardSync, snapshot?.compileResult.status, snapshot?.projectConfig.forwardSync]);
+  }, [activeFilePath, cursorColumn, cursorLine, performForwardSync, snapshot?.compileResult.status, snapshot?.projectConfig.forwardSync]);
 
   useEffect(() => {
     const currentCompilePdfKey = snapshot?.compileResult.pdfPath

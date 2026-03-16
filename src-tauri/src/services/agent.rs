@@ -286,6 +286,15 @@ pub fn run_agent(
         );
     }
 
+    // Clear sidecar PID
+    {
+        let mut active = state
+            .active_sidecar
+            .lock()
+            .expect("active_sidecar lock poisoned");
+        *active = None;
+    }
+
     let _ = app_handle.emit("agent:stream", &StreamChunk::Done { usage });
 
     Ok(AgentRunResult {
@@ -299,6 +308,30 @@ pub fn apply_agent_patch(root_path: &str, file_path: &str, content: &str) -> Res
     let absolute = Path::new(root_path).join(file_path);
     std::fs::write(absolute, content).context("failed to apply agent patch")?;
     Ok(())
+}
+
+pub fn cancel_agent(state: &AppState) -> Result<bool> {
+    let mut active = state
+        .active_sidecar
+        .lock()
+        .expect("active_sidecar lock poisoned");
+    if let Some(pid) = active.take() {
+        #[cfg(unix)]
+        {
+            let _ = std::process::Command::new("kill")
+                .arg(pid.to_string())
+                .output();
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = std::process::Command::new("taskkill")
+                .args(["/PID", &pid.to_string(), "/F"])
+                .output();
+        }
+        Ok(true)
+    } else {
+        Ok(false)
+    }
 }
 
 pub fn get_agent_messages(state: &AppState, session_id: Option<&str>) -> Result<Vec<AgentMessage>> {

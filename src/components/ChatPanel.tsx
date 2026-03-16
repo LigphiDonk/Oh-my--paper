@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 
 import type {
   AgentMessage,
   AgentSessionSummary,
+  DiffLine,
+  ProjectNode,
   SkillManifest,
   StreamToolCall,
   UsageRecord,
@@ -91,6 +93,8 @@ function summarizeToolCall(call: ToolCallBlock) {
     case "apply_text_patch":
     case "insert_at_line":
       return `${prefix}修改文件${target ? ` · ${target}` : ""}`;
+    case "bash":
+      return `${prefix}执行命令${target ? ` · ${target}` : ""}`;
     default:
       return `${prefix}调用 ${call.toolId}${target ? ` · ${target}` : ""}`;
   }
@@ -228,9 +232,13 @@ function AssistantMessage({ msg, streaming }: {
 }
 
 /* ─── Patch card ──────────────────────────────────────── */
-function PatchCard({ summary, onApply, onDismiss }: {
-  summary: string; onApply: () => void; onDismiss: () => void;
+function PatchCard({ summary, diff, onApply, onDismiss }: {
+  summary: string; diff?: DiffLine[]; onApply: () => void; onDismiss: () => void;
 }) {
+  const [showDiff, setShowDiff] = useState(false);
+  const additions = diff?.filter(l => l.type === "add").length ?? 0;
+  const deletions = diff?.filter(l => l.type === "remove").length ?? 0;
+
   return (
     <div className="ag-patch-card">
       <div className="ag-patch-card-header">
@@ -238,11 +246,40 @@ function PatchCard({ summary, onApply, onDismiss }: {
           <path d="M2 2h8l4 4v8H2z"/><path d="M10 2v4h4"/>
         </svg>
         <span className="ag-patch-filename">Patch</span>
+        {diff && diff.length > 0 && (
+          <span className="ag-diff-stats">
+            <span className="ag-diff-add">+{additions}</span>
+            <span className="ag-diff-del">-{deletions}</span>
+          </span>
+        )}
         <div style={{ flex: 1 }} />
+        {diff && diff.length > 0 && (
+          <button className="ag-patch-diff-btn" type="button" onClick={() => setShowDiff(v => !v)}>
+            {showDiff ? "Hide diff" : "Show diff"}
+          </button>
+        )}
         <button className="ag-patch-open-btn" type="button" onClick={onDismiss}>Dismiss</button>
         <button className="ag-patch-apply-btn" type="button" onClick={onApply}>Apply</button>
       </div>
       <div className="ag-patch-summary">{summary}</div>
+      {showDiff && diff && (
+        <div className="ag-diff-view">
+          {diff.map((line, i) => (
+            <div key={i} className={`ag-diff-line ag-diff-line--${line.type}`}>
+              <span className="ag-diff-gutter">
+                {line.type === "remove" ? line.oldLine ?? "" : ""}
+              </span>
+              <span className="ag-diff-gutter">
+                {line.type === "add" ? line.newLine ?? "" : line.type === "equal" ? line.newLine ?? "" : ""}
+              </span>
+              <span className="ag-diff-marker">
+                {line.type === "add" ? "+" : line.type === "remove" ? "-" : " "}
+              </span>
+              <span className="ag-diff-content">{line.content}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -334,6 +371,37 @@ function BottomBar({
   );
 }
 
+/* ─── Flatten project tree for @ mentions ─────────────── */
+function flattenTree(nodes: ProjectNode[], prefix = ""): string[] {
+  const result: string[] = [];
+  for (const node of nodes) {
+    const path = prefix ? `${prefix}/${node.name}` : node.name;
+    if (node.kind === "file") {
+      result.push(path);
+    }
+    if (node.children) {
+      result.push(...flattenTree(node.children, path));
+    }
+  }
+  return result;
+}
+
+/* ─── Slash commands ──────────────────────────────────── */
+interface SlashCommand {
+  name: string;
+  description: string;
+  action: "send" | "callback";
+}
+
+const SLASH_COMMANDS: SlashCommand[] = [
+  { name: "/compile", description: "编译 LaTeX 项目", action: "send" },
+  { name: "/clear", description: "清空当前对话", action: "callback" },
+  { name: "/new", description: "新建对话", action: "callback" },
+  { name: "/help", description: "显示可用命令", action: "callback" },
+  { name: "/bash", description: "执行 shell 命令", action: "send" },
+  { name: "/files", description: "列出项目文件", action: "send" },
+];
+
 /* ─── Main ChatPanel ──────────────────────────────────── */
 export interface ChatPanelProps {
   messages: AgentMessage[];
@@ -343,7 +411,9 @@ export interface ChatPanelProps {
   onNewSession: () => void;
   onRunAgent: () => void;
   onSendMessage: (text: string) => void;
+  onCancelAgent?: () => void;
   pendingPatchSummary?: string;
+  pendingPatchDiff?: DiffLine[];
   onApplyPatch: () => void;
   onDismissPatch: () => void;
   streamThinkingText?: string;
@@ -354,21 +424,43 @@ export interface ChatPanelProps {
   skills: SkillManifest[];
   onToggleSkill: (skill: SkillManifest) => Promise<void>;
   usageRecords: UsageRecord[];
+  projectTree?: ProjectNode[];
 }
 
 export function ChatPanel({
   messages, sessions, activeSessionId, onSelectSession, onNewSession,
-  onRunAgent, onSendMessage,
-  pendingPatchSummary, onApplyPatch, onDismissPatch,
+  onRunAgent, onSendMessage, onCancelAgent,
+  pendingPatchSummary, pendingPatchDiff, onApplyPatch, onDismissPatch,
   streamThinkingText,
   streamText, streamToolCalls, streamError, isStreaming,
   skills, onToggleSkill,
-  usageRecords,
+  usageRecords, projectTree,
 }: ChatPanelProps) {
   const [inputText, setInputText] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const normalizedStreamToolCalls = (streamToolCalls ?? []).map(toToolCallBlock);
+
+  // @ file mention state
+  const [showAtMenu, setShowAtMenu] = useState(false);
+  const [atFilter, setAtFilter] = useState("");
+  const [atIndex, setAtIndex] = useState(0);
+  const flatFiles = useMemo(() => flattenTree(projectTree ?? []), [projectTree]);
+  const filteredFiles = useMemo(() => {
+    if (!atFilter) return flatFiles.slice(0, 12);
+    const lower = atFilter.toLowerCase();
+    return flatFiles.filter(f => f.toLowerCase().includes(lower)).slice(0, 12);
+  }, [flatFiles, atFilter]);
+
+  // / slash command state
+  const [showSlashMenu, setShowSlashMenu] = useState(false);
+  const [slashFilter, setSlashFilter] = useState("");
+  const [slashIndex, setSlashIndex] = useState(0);
+  const filteredCommands = useMemo(() => {
+    if (!slashFilter) return SLASH_COMMANDS;
+    const lower = slashFilter.toLowerCase();
+    return SLASH_COMMANDS.filter(c => c.name.toLowerCase().includes(lower));
+  }, [slashFilter]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: isStreaming ? "auto" : "smooth" });
@@ -385,12 +477,96 @@ export function ChatPanel({
     const text = inputText.trim();
     if (!text || isStreaming) return;
     setInputText("");
+    setShowAtMenu(false);
+    setShowSlashMenu(false);
+    // Handle / commands
+    const slashMatch = text.match(/^\/(\w+)\s*(.*)?$/);
+    if (slashMatch) {
+      const cmd = SLASH_COMMANDS.find(c => c.name === `/${slashMatch[1]}`);
+      if (cmd) {
+        if (cmd.action === "callback") {
+          if (cmd.name === "/clear" || cmd.name === "/new") { onNewSession(); return; }
+          if (cmd.name === "/help") {
+            onSendMessage("Show me the available commands and what you can do.");
+            return;
+          }
+        }
+        if (cmd.name === "/compile") { onSendMessage("Compile the LaTeX project now."); return; }
+        if (cmd.name === "/bash") { onSendMessage(`Run this shell command: ${slashMatch[2] || "ls"}`); return; }
+        if (cmd.name === "/files") { onSendMessage("List all project files."); return; }
+      }
+    }
     onSendMessage(text);
-  }, [inputText, isStreaming, onSendMessage]);
+  }, [inputText, isStreaming, onSendMessage, onNewSession]);
+
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setInputText(val);
+
+    // @ mention detection
+    const cursorPos = e.target.selectionStart;
+    const textBefore = val.slice(0, cursorPos);
+    const atMatch = textBefore.match(/@([^\s@]*)$/);
+    if (atMatch) {
+      setShowAtMenu(true);
+      setAtFilter(atMatch[1]);
+      setAtIndex(0);
+      setShowSlashMenu(false);
+    } else {
+      setShowAtMenu(false);
+    }
+
+    // / command detection (only at start of input)
+    const slashMatch = val.match(/^\/([^\s]*)$/);
+    if (slashMatch && !showAtMenu) {
+      setShowSlashMenu(true);
+      setSlashFilter(slashMatch[1]);
+      setSlashIndex(0);
+    } else if (!val.startsWith("/")) {
+      setShowSlashMenu(false);
+    }
+  }, [showAtMenu]);
+
+  const insertAtMention = useCallback((filePath: string) => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const cursorPos = ta.selectionStart;
+    const textBefore = inputText.slice(0, cursorPos);
+    const atStart = textBefore.lastIndexOf("@");
+    if (atStart === -1) return;
+    const newText = inputText.slice(0, atStart) + `@${filePath} ` + inputText.slice(cursorPos);
+    setInputText(newText);
+    setShowAtMenu(false);
+    ta.focus();
+  }, [inputText]);
+
+  const insertSlashCommand = useCallback((cmd: SlashCommand) => {
+    if (cmd.name === "/bash") {
+      setInputText(`${cmd.name} `);
+    } else {
+      setInputText(cmd.name);
+    }
+    setShowSlashMenu(false);
+    textareaRef.current?.focus();
+  }, []);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // @ menu navigation
+    if (showAtMenu && filteredFiles.length > 0) {
+      if (e.key === "ArrowDown") { e.preventDefault(); setAtIndex(i => Math.min(i + 1, filteredFiles.length - 1)); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); setAtIndex(i => Math.max(i - 1, 0)); return; }
+      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); insertAtMention(filteredFiles[atIndex]); return; }
+      if (e.key === "Escape") { e.preventDefault(); setShowAtMenu(false); return; }
+    }
+    // / menu navigation
+    if (showSlashMenu && filteredCommands.length > 0) {
+      if (e.key === "ArrowDown") { e.preventDefault(); setSlashIndex(i => Math.min(i + 1, filteredCommands.length - 1)); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); setSlashIndex(i => Math.max(i - 1, 0)); return; }
+      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); insertSlashCommand(filteredCommands[slashIndex]); return; }
+      if (e.key === "Escape") { e.preventDefault(); setShowSlashMenu(false); return; }
+    }
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
-  }, [handleSend]);
+  }, [handleSend, showAtMenu, filteredFiles, atIndex, insertAtMention, showSlashMenu, filteredCommands, slashIndex, insertSlashCommand]);
 
   return (
     <div className="ag-panel">
@@ -448,6 +624,7 @@ export function ChatPanel({
         {pendingPatchSummary && (
           <PatchCard
             summary={pendingPatchSummary}
+            diff={pendingPatchDiff}
             onApply={onApplyPatch}
             onDismiss={onDismissPatch}
           />
@@ -458,31 +635,73 @@ export function ChatPanel({
 
       {/* Input box */}
       <div className="ag-input-wrap">
+        {/* @ file mention dropdown */}
+        {showAtMenu && filteredFiles.length > 0 && (
+          <div className="ag-autocomplete-menu">
+            {filteredFiles.map((file, i) => (
+              <button
+                key={file}
+                type="button"
+                className={`ag-autocomplete-item${i === atIndex ? " ag-autocomplete-item--active" : ""}`}
+                onMouseDown={(e) => { e.preventDefault(); insertAtMention(file); }}
+              >
+                <span className="ag-autocomplete-icon">📄</span>
+                <span className="ag-autocomplete-path">{file}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {/* / slash command dropdown */}
+        {showSlashMenu && filteredCommands.length > 0 && (
+          <div className="ag-autocomplete-menu">
+            {filteredCommands.map((cmd, i) => (
+              <button
+                key={cmd.name}
+                type="button"
+                className={`ag-autocomplete-item${i === slashIndex ? " ag-autocomplete-item--active" : ""}`}
+                onMouseDown={(e) => { e.preventDefault(); insertSlashCommand(cmd); }}
+              >
+                <span className="ag-autocomplete-icon">/</span>
+                <span className="ag-autocomplete-path">{cmd.name}</span>
+                <span className="ag-autocomplete-desc">{cmd.description}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <textarea
           ref={textareaRef}
           className="ag-input"
           value={inputText}
-          onChange={e => setInputText(e.target.value)}
+          onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          placeholder={isStreaming ? "AI 正在回复…" : "Ask anything, @ to mention, / for workflow…"}
+          placeholder={isStreaming ? "AI 正在回复…" : "Ask anything, @ to mention, / for commands…"}
           disabled={isStreaming}
           rows={1}
         />
-        <button
-          className="ag-send-btn"
-          type="button"
-          onClick={handleSend}
-          disabled={isStreaming || !inputText.trim()}
-          aria-label="发送"
-        >
-          {isStreaming
-            ? <span className="ag-send-spinner" />
-            : (
-              <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15">
-                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-              </svg>
-            )}
-        </button>
+        {isStreaming ? (
+          <button
+            className="ag-send-btn ag-cancel-btn"
+            type="button"
+            onClick={onCancelAgent}
+            aria-label="取消"
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15">
+              <rect x="6" y="6" width="12" height="12" rx="2"/>
+            </svg>
+          </button>
+        ) : (
+          <button
+            className="ag-send-btn"
+            type="button"
+            onClick={handleSend}
+            disabled={!inputText.trim()}
+            aria-label="发送"
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Bottom toolbar */}

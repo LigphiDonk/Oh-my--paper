@@ -93,6 +93,18 @@ function toAnthropicMessages(messages) {
   return output;
 }
 
+function resolveMaxTokens(model) {
+  const m = String(model || "").toLowerCase();
+  if (/claude-4|claude-opus-4|claude-sonnet-4/.test(m)) return 16384;
+  if (/claude-3[.-]5|claude-3\.5/.test(m)) return 8192;
+  return 4096;
+}
+
+function isThinkingCapable(model) {
+  const m = String(model || "").toLowerCase();
+  return /claude-4|claude-opus-4|claude-sonnet-4|claude-3[.-]5-sonnet|claude-3[.-]7/.test(m);
+}
+
 export function createAnthropicProvider(config) {
   const client = new Anthropic({
     apiKey: config.apiKey,
@@ -123,34 +135,62 @@ export function createAnthropicProvider(config) {
         input_schema: tool.parameters,
       }));
 
-      const stream = client.messages.stream({
+      const thinkingEnabled = isThinkingCapable(config.model);
+      const streamParams = {
         model: config.model,
-        max_tokens: 4096,
+        max_tokens: resolveMaxTokens(config.model),
         system,
         messages: toAnthropicMessages(messages),
         tools: anthropicTools.length > 0 ? anthropicTools : undefined,
-      });
-
-      for await (const event of stream) {
-        if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-          yield { type: "text", text: event.delta.text };
-        } else if (event.type === "message_delta" && event.usage) {
-          totalOutputTokens += event.usage.output_tokens || 0;
-        }
+      };
+      if (thinkingEnabled) {
+        streamParams.thinking = { type: "enabled", budget_tokens: 4096 };
       }
 
-      const finalMessage = await stream.finalMessage();
-      totalInputTokens += finalMessage.usage?.input_tokens || 0;
-      totalOutputTokens = finalMessage.usage?.output_tokens || totalOutputTokens;
+      const stream = client.messages.stream(streamParams);
 
-      for (const block of finalMessage.content) {
-        if (block.type === "tool_use") {
+      let currentToolBlock = null;
+      let inThinking = false;
+
+      for await (const event of stream) {
+        if (event.type === "message_start" && event.message?.usage) {
+          totalInputTokens += event.message.usage.input_tokens || 0;
+        } else if (event.type === "content_block_start" && event.content_block?.type === "thinking") {
+          inThinking = true;
+          yield { type: "thinking_start" };
+        } else if (event.type === "content_block_start" && event.content_block?.type === "tool_use") {
+          currentToolBlock = {
+            id: event.content_block.id,
+            name: event.content_block.name,
+            inputJson: "",
+          };
+        } else if (event.type === "content_block_delta") {
+          if (event.delta?.type === "thinking_delta") {
+            yield { type: "thinking", text: event.delta.thinking };
+          } else if (event.delta?.type === "text_delta") {
+            yield { type: "text", text: event.delta.text };
+          } else if (event.delta?.type === "input_json_delta" && currentToolBlock) {
+            currentToolBlock.inputJson += event.delta.partial_json;
+          }
+        } else if (event.type === "content_block_stop" && inThinking) {
+          inThinking = false;
+          yield { type: "thinking_end" };
+        } else if (event.type === "content_block_stop" && currentToolBlock) {
+          let parsedArgs = {};
+          try {
+            parsedArgs = JSON.parse(currentToolBlock.inputJson || "{}");
+          } catch {
+            parsedArgs = {};
+          }
           yield {
             type: "tool_call",
-            id: block.id,
-            name: block.name,
-            args: block.input,
+            id: currentToolBlock.id,
+            name: currentToolBlock.name,
+            args: parsedArgs,
           };
+          currentToolBlock = null;
+        } else if (event.type === "message_delta" && event.usage) {
+          totalOutputTokens += event.usage.output_tokens || 0;
         }
       }
     },

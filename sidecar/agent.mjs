@@ -1,5 +1,7 @@
 import { loadProvider } from "./providers/index.mjs";
 import { resolveActiveTools } from "./tools/registry.mjs";
+import { trimHistory } from "./utils/context.mjs";
+import { computeDiff, diffStats } from "./utils/diff.mjs";
 import { emit } from "./utils/ndjson.mjs";
 
 export async function runAgent(request) {
@@ -39,6 +41,11 @@ async function runLegacyAgent(request) {
 
   while (round < maxToolRounds) {
     round += 1;
+    if (round > 1) {
+      const trimmed = trimHistory(messages, providerConfig.model || "");
+      messages.length = 0;
+      messages.push(...trimmed);
+    }
     const resolved = resolveActiveTools({
         requestedToolIds: toolIds,
         userMessage: request.userMessage,
@@ -55,6 +62,12 @@ async function runLegacyAgent(request) {
         if (chunk.type === "text") {
           textAccum += chunk.text;
           emit({ type: "text_delta", content: chunk.text });
+        } else if (chunk.type === "thinking") {
+          emit({ type: "thinking_delta", content: chunk.text });
+        } else if (chunk.type === "thinking_start") {
+          emit({ type: "thinking_clear" });
+        } else if (chunk.type === "thinking_end") {
+          emit({ type: "thinking_commit" });
         } else if (chunk.type === "tool_call") {
           hasToolCalls = true;
           pendingToolCalls.push(chunk);
@@ -91,15 +104,27 @@ async function runLegacyAgent(request) {
     }
     messages.push(assistantMessage);
 
+    // Separate read-only and write tools for parallel vs sequential execution
+    const WRITE_TOOL_IDS = new Set(["edit", "write", "apply_patch", "apply_text_patch", "insert_at_line", "bash"]);
+    const readCalls = [];
+    const writeCalls = [];
     for (const call of pendingToolCalls) {
-      emit({ type: "tool_call_start", toolId: call.name, args: call.args });
+      if (WRITE_TOOL_IDS.has(call.name)) {
+        writeCalls.push(call);
+      } else {
+        readCalls.push(call);
+      }
+    }
 
+    // Helper to execute a single tool call
+    const executeSingle = async (call) => {
+      emit({ type: "tool_call_start", toolId: call.name, args: call.args });
       const tool = tools.find((item) => item.id === call.name);
       if (!tool) {
         const errMsg = `Unknown tool: ${call.name}. Active tools: ${activeToolIds.join(", ")}`;
         emit({ type: "tool_call_result", toolId: call.name, output: errMsg, status: "error" });
         messages.push({ role: "tool", tool_call_id: call.id, content: errMsg });
-        continue;
+        return;
       }
 
       try {
@@ -118,12 +143,16 @@ async function runLegacyAgent(request) {
         if (result.sideEffects) {
           for (const effect of result.sideEffects) {
             if (effect.type === "file_changed") {
+              const diff = effect.oldContent != null
+                ? computeDiff(effect.oldContent, effect.content)
+                : undefined;
               emit({
                 type: "patch",
                 filePath: effect.filePath,
                 startLine: 0,
                 endLine: 0,
                 newContent: effect.content,
+                diff,
               });
             }
           }
@@ -135,6 +164,16 @@ async function runLegacyAgent(request) {
         emit({ type: "tool_call_result", toolId: call.name, output: errMsg, status: "error" });
         messages.push({ role: "tool", tool_call_id: call.id, content: errMsg });
       }
+    };
+
+    // Execute read-only tools in parallel
+    if (readCalls.length > 0) {
+      await Promise.allSettled(readCalls.map(executeSingle));
+    }
+
+    // Execute write tools sequentially
+    for (const call of writeCalls) {
+      await executeSingle(call);
     }
   }
 

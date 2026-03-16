@@ -30,7 +30,7 @@ export interface ProjectAdapter extends FileAdapter {
 export interface CompileAdapter {
   compileProject(filePath: string): Promise<CompileResult>;
   getCompileEnvironment(): Promise<CompileEnvironmentStatus>;
-  forwardSearch(filePath: string, line: number): Promise<SyncLocation>;
+  forwardSearch(filePath: string, line: number, column?: number): Promise<SyncLocation>;
   reverseSearch(page: number, h?: number, v?: number): Promise<SyncLocation>;
 }
 
@@ -49,4 +49,3 @@ export interface CloudProjectAdapter {
   listProjects(): Promise<Array<{ id: string; name: string }>>;
   listProjectMembers(projectId: string): Promise<CollabMember[]>;
 }
-

@@ -7,7 +7,12 @@ use crate::models::{SyncHighlight, SyncLocation};
 use crate::services::enriched_path;
 use crate::state::AppState;
 
-pub fn forward_search(state: &AppState, file_path: &str, line: usize) -> Result<SyncLocation> {
+pub fn forward_search(
+    state: &AppState,
+    file_path: &str,
+    line: usize,
+    column: usize,
+) -> Result<SyncLocation> {
     let config = state
         .project_config
         .read()
@@ -24,7 +29,7 @@ pub fn forward_search(state: &AppState, file_path: &str, line: usize) -> Result<
         .args([
             "view",
             "-i",
-            &format!("{line}:1:{}", file_absolute.to_string_lossy()),
+            &format!("{line}:{}:{}", column.max(1), file_absolute.to_string_lossy()),
             "-o",
             &pdf_path.to_string_lossy(),
         ])
@@ -68,7 +73,7 @@ pub fn forward_search(state: &AppState, file_path: &str, line: usize) -> Result<
     Ok(SyncLocation {
         file_path: file_path.into(),
         line,
-        column: 1,
+        column: column.max(1),
         page,
         highlights: vec![SyncHighlight {
             page,

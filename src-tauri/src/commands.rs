@@ -152,8 +152,9 @@ pub fn forward_search(
     state: State<'_, AppState>,
     file_path: String,
     line: usize,
+    column: Option<usize>,
 ) -> Result<crate::models::SyncLocation, String> {
-    sync::forward_search(&state, &file_path, line).map_err(|err| err.to_string())
+    sync::forward_search(&state, &file_path, line, column.unwrap_or(1)).map_err(|err| err.to_string())
 }
 
 #[tauri::command]
@@ -598,4 +599,9 @@ pub fn prepare_worker_deploy_dir(
     worker::prepare_worker_deploy_dir(&state, &template_dir)
         .map(|path| path.to_string_lossy().to_string())
         .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn cancel_agent(state: State<'_, AppState>) -> Result<bool, String> {
+    agent::cancel_agent(&state).map_err(|err| err.to_string())
 }

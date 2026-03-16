@@ -205,6 +205,13 @@ export interface StreamToolCall {
   status: "running" | "completed" | "error";
 }
 
+export interface DiffLine {
+  type: "add" | "remove" | "equal";
+  content: string;
+  oldLine?: number;
+  newLine?: number;
+}
+
 export type StreamChunk =
   | { type: "thinking_delta"; content: string }
   | { type: "thinking_clear" }
@@ -212,7 +219,7 @@ export type StreamChunk =
   | { type: "text_delta"; content: string }
   | { type: "tool_call_start"; toolId: string; args: Record<string, unknown> }
   | { type: "tool_call_result"; toolId: string; output: string; status?: "completed" | "error" }
-  | { type: "patch"; filePath: string; startLine: number; endLine: number; newContent: string }
+  | { type: "patch"; filePath: string; startLine: number; endLine: number; newContent: string; diff?: DiffLine[] }
   | { type: "error"; message: string }
   | { type: "done"; usage: { inputTokens: number; outputTokens: number; model: string } };
 

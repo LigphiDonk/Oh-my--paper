@@ -7,6 +7,7 @@ import type {
   AgentProfile,
   AgentProfileId,
   AgentSessionSummary,
+  DiffLine,
   ProjectFile,
   StreamToolCall,
   UsageRecord,
@@ -52,7 +53,7 @@ export interface AgentChatState {
   streamText: string;
   streamToolCalls: StreamToolCall[];
   streamError: string;
-  pendingPatch: { filePath: string; content: string; summary: string } | null;
+  pendingPatch: { filePath: string; content: string; summary: string; diff?: DiffLine[] } | null;
   setActiveProfileId: (profileId: AgentProfileId) => void;
   handleRunAgent: () => Promise<void>;
   handleSendMessage: (text: string) => Promise<void>;
@@ -60,6 +61,7 @@ export interface AgentChatState {
   handleSelectSession: (sessionId: string) => Promise<void>;
   handleApplyPatch: () => Promise<void>;
   handleDismissPatch: () => void;
+  handleCancelAgent: () => Promise<void>;
   resetForSnapshot: () => void;
 }
 
@@ -82,7 +84,7 @@ export function useAgentChat({
   const [streamText, setStreamText] = useState("");
   const [streamToolCalls, setStreamToolCalls] = useState<StreamToolCall[]>([]);
   const [streamError, setStreamError] = useState("");
-  const [pendingPatch, setPendingPatch] = useState<{ filePath: string; content: string; summary: string } | null>(
+  const [pendingPatch, setPendingPatch] = useState<{ filePath: string; content: string; summary: string; diff?: DiffLine[] } | null>(
     null,
   );
 
@@ -338,6 +340,7 @@ export function useAgentChat({
             filePath: chunk.filePath,
             content: chunk.newContent,
             summary: `Patch from agent for ${chunk.filePath}`,
+            diff: chunk.diff,
           });
           break;
         case "error":
@@ -408,6 +411,20 @@ export function useAgentChat({
     setPendingPatch(null);
   });
 
+  const handleCancelAgent = useEffectEvent(async () => {
+    if (!isStreaming) {
+      return;
+    }
+    try {
+      await desktop.cancelAgent();
+    } catch (error) {
+      console.warn("failed to cancel agent", error);
+    }
+    flushStreamBuffer();
+    clearThinkingText();
+    setIsStreaming(false);
+  });
+
   const handleSendMessage = useEffectEvent(async (text: string) => {
     if (isStreaming) {
       return;
@@ -461,6 +478,7 @@ export function useAgentChat({
             filePath: chunk.filePath,
             content: chunk.newContent,
             summary: `Patch from agent for ${chunk.filePath}`,
+            diff: chunk.diff,
           });
           break;
         case "error":
@@ -538,6 +556,7 @@ export function useAgentChat({
     handleSelectSession,
     handleApplyPatch,
     handleDismissPatch,
+    handleCancelAgent,
     resetForSnapshot,
   };
 }

@@ -58,12 +58,11 @@ export class LocalDesktopAdapter implements ProjectAdapter, CompileAdapter {
     return desktop.getCompileEnvironment();
   }
 
-  forwardSearch(filePath: string, line: number) {
-    return desktop.forwardSearch(filePath, line);
+  forwardSearch(filePath: string, line: number, column?: number) {
+    return desktop.forwardSearch(filePath, line, column);
   }
 
   reverseSearch(page: number, h?: number, v?: number) {
     return desktop.reverseSearch(page, h, v);
   }
 }
-

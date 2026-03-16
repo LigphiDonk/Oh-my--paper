@@ -782,17 +782,17 @@ export const mockRuntime = {
     };
   },
 
-  async forwardSearch(filePath: string, line: number): Promise<SyncLocation> {
+  async forwardSearch(filePath: string, line: number, column = 1): Promise<SyncLocation> {
     const page = Math.max(1, Math.ceil(line / 20));
     return {
       filePath,
       line,
-      column: 1,
+      column,
       page,
       highlights: [
         {
           page,
-          h: 72,
+          h: 72 + Math.max(0, column - 1) * 3.6,
           v: 720 - ((line - 1) % 20) * 24,
           width: 280,
           height: 14,

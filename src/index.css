@@ -2746,6 +2746,75 @@ button {
   line-height: 1.55;
 }
 
+/* ─── Diff view ────────────────────────────────────────── */
+.ag-diff-stats {
+  display: inline-flex;
+  gap: 6px;
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  margin-left: 6px;
+}
+.ag-diff-add { color: #4caf50; }
+.ag-diff-del { color: #ef5350; }
+.ag-patch-diff-btn {
+  padding: 2px 8px;
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  margin-right: 4px;
+}
+.ag-patch-diff-btn:hover {
+  background: var(--bg-surface-active);
+}
+.ag-diff-view {
+  max-height: 300px;
+  overflow: auto;
+  font-family: var(--font-mono, monospace);
+  font-size: 11.5px;
+  line-height: 1.5;
+  border-top: 1px solid var(--border-light);
+  scrollbar-width: thin;
+}
+.ag-diff-line {
+  display: flex;
+  white-space: pre;
+  padding: 0 8px;
+}
+.ag-diff-line--add {
+  background: rgba(76, 175, 80, 0.12);
+}
+.ag-diff-line--remove {
+  background: rgba(239, 83, 80, 0.12);
+}
+.ag-diff-line--equal {
+  background: transparent;
+}
+.ag-diff-gutter {
+  width: 36px;
+  flex-shrink: 0;
+  text-align: right;
+  padding-right: 6px;
+  color: var(--text-tertiary);
+  user-select: none;
+  font-size: 10px;
+}
+.ag-diff-marker {
+  width: 14px;
+  flex-shrink: 0;
+  text-align: center;
+  color: var(--text-tertiary);
+  user-select: none;
+}
+.ag-diff-line--add .ag-diff-marker { color: #4caf50; }
+.ag-diff-line--remove .ag-diff-marker { color: #ef5350; }
+.ag-diff-content {
+  flex: 1;
+  overflow: hidden;
+}
+
 /* ─── Input box ─────────────────────────────────────────── */
 .ag-input-wrap {
   display: flex;
@@ -2815,6 +2884,77 @@ button {
   animation: ag-spin 0.7s linear infinite;
 }
 @keyframes ag-spin { to { transform: rotate(360deg); } }
+
+/* ─── Cancel button ────────────────────────────────────── */
+.ag-cancel-btn {
+  background: #e53935 !important;
+  cursor: pointer !important;
+}
+.ag-cancel-btn:hover {
+  background: #c62828 !important;
+  transform: scale(1.06);
+}
+
+/* ─── Autocomplete menu (@ mentions, / commands) ──────── */
+.ag-input-wrap {
+  position: relative;
+}
+.ag-autocomplete-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  margin-bottom: 4px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: 50;
+  padding: 4px;
+  scrollbar-width: thin;
+}
+.ag-autocomplete-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.1s;
+}
+.ag-autocomplete-item:hover,
+.ag-autocomplete-item--active {
+  background: var(--bg-surface-active);
+}
+.ag-autocomplete-icon {
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+  font-size: 11px;
+  opacity: 0.7;
+}
+.ag-autocomplete-path {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+}
+.ag-autocomplete-desc {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
 
 /* ─── Bottom toolbar ────────────────────────────────────── */
 .ag-bottom-bar {

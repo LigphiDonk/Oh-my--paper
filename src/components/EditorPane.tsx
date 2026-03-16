@@ -25,7 +25,7 @@ interface EditorPaneProps {
   targetLine?: number;
   targetNonce?: number;
   onChange: (value: string) => void;
-  onCursorChange: (line: number, selectedText: string) => void;
+  onCursorChange: (line: number, column: number, selectedText: string) => void;
   onSave?: (content: string) => void;
   onRunAgent?: () => void;
   onCompile?: () => void;
@@ -322,9 +322,11 @@ function EditorPaneInner({
 
         if (selectionChanged) {
           const main = nextView.state.selection.main;
-          const line = nextView.state.doc.lineAt(main.head).number;
+          const lineInfo = nextView.state.doc.lineAt(main.head);
+          const line = lineInfo.number;
+          const column = (main.head - lineInfo.from) + 1;
           const selectedText = nextView.state.sliceDoc(main.from, main.to);
-          onCursorChangeRef.current(line, selectedText);
+          onCursorChangeRef.current(line, column, selectedText);
           syncSelectionCommentTriggerRef.current(nextView);
         }
       },
@@ -336,9 +338,11 @@ function EditorPaneInner({
   useEffect(() => {
     setLineCount(view.state.doc.lines);
     const main = view.state.selection.main;
-    const line = view.state.doc.lineAt(main.head).number;
+    const lineInfo = view.state.doc.lineAt(main.head);
+    const line = lineInfo.number;
+    const column = (main.head - lineInfo.from) + 1;
     const selectedText = view.state.sliceDoc(main.from, main.to);
-    onCursorChangeRef.current(line, selectedText);
+    onCursorChangeRef.current(line, column, selectedText);
     syncSelectionCommentTrigger(view);
   }, [view]);
 

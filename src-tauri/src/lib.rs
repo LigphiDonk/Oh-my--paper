@@ -119,7 +119,8 @@ pub fn run() {
             commands::terminal_write,
             commands::resize_terminal,
             commands::close_terminal,
-            commands::prepare_worker_deploy_dir
+            commands::prepare_worker_deploy_dir,
+            commands::cancel_agent
         ])
         .run(tauri::generate_context!())
         .expect("failed to start ViewerLeaf");

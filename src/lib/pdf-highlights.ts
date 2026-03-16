@@ -30,10 +30,15 @@ export function renderSyncHighlights(
       continue;
     }
 
+    const pageBounds = pageElement.getBoundingClientRect();
+    const canvasBounds = canvas.getBoundingClientRect();
+    const canvasOffsetLeft = canvasBounds.left - pageBounds.left;
+    const canvasOffsetTop = canvasBounds.top - pageBounds.top;
     const scaleX = canvas.clientWidth / sizePt.width;
     const scaleY = canvas.clientHeight / sizePt.height;
-    const left = highlight.h * scaleX;
-    const top = (sizePt.height - highlight.v) * scaleY;
+    const left = canvasOffsetLeft + (highlight.h * scaleX);
+    const topPt = Math.max(0, sizePt.height - highlight.v - highlight.height);
+    const top = canvasOffsetTop + (topPt * scaleY);
     const width = Math.max(highlight.width * scaleX, 20);
     const height = Math.max(highlight.height * scaleY, 8);
 

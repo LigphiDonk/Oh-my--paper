@@ -182,9 +182,9 @@ export const desktop = {
       mockRuntime.getCompileEnvironment(),
     );
   },
-  forwardSearch(filePath: string, line: number) {
-    return runOrMock<SyncLocation>("forward_search", { filePath, line }, () =>
-      mockRuntime.forwardSearch(filePath, line),
+  forwardSearch(filePath: string, line: number, column?: number) {
+    return runOrMock<SyncLocation>("forward_search", { filePath, line, column }, () =>
+      mockRuntime.forwardSearch(filePath, line, column),
     );
   },
   reverseSearch(page: number, h?: number, v?: number) {
@@ -203,6 +203,9 @@ export const desktop = {
   },
   applyAgentPatch(filePath: string, content: string) {
     return runOrMock("apply_agent_patch", { filePath, content }, () => mockRuntime.applyAgentPatch(filePath, content));
+  },
+  cancelAgent() {
+    return runOrMock("cancel_agent", {}, () => Promise.resolve(true));
   },
   getAgentMessages(sessionId?: string) {
     return runOrMock<AgentMessage[]>("get_agent_messages", { sessionId }, () => mockRuntime.getAgentMessages(sessionId));

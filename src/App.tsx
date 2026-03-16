@@ -338,6 +338,7 @@ function App() {
   const [workspacePaneMode, setWorkspacePaneMode] = useState<WorkspacePaneMode>("files");
   const [previewPaneWidth, setPreviewPaneWidth] = useState(42);
   const [cursorLine, setCursorLine] = useState(1);
+  const [cursorColumn, setCursorColumn] = useState(1);
   const [selectedText, setSelectedText] = useState("");
   const [selectedBrief, setSelectedBrief] = useState<FigureBriefDraft | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<GeneratedAsset | null>(null);
@@ -690,6 +691,7 @@ function App() {
     snapshot,
     activeFilePath,
     cursorLine,
+    cursorColumn,
     dirtyPaths,
     drawerTab,
     compileAdapter,
@@ -1124,8 +1126,9 @@ function App() {
     handleFileChange(activeFile.path, content);
   });
 
-  const handleEditorCursorChange = useEffectEvent((line: number, selection: string) => {
+  const handleEditorCursorChange = useEffectEvent((line: number, column: number, selection: string) => {
     setCursorLine(line);
+    setCursorColumn(column);
     setSelectedText(selection);
   });
 
@@ -1414,7 +1417,7 @@ function App() {
     if (!activeFile) {
       return;
     }
-    void compilePipeline.performForwardSync(activeFile.path, cursorLine);
+    void compilePipeline.performForwardSync(activeFile.path, cursorLine, cursorColumn);
   });
 
   const handleRunAgent = useEffectEvent(async () => {
