@@ -34,8 +34,23 @@ interface EditorPaneProps {
   awareness?: Awareness | null;
   collabStatus?: CollabStatus | null;
   comments?: ReviewComment[];
-  onAddComment?: (lineStart: number, lineEnd: number, selectedText: string) => void;
+  onAddComment?: (
+    lineStart: number,
+    lineEnd: number,
+    selectedText: string,
+    commentText?: string,
+  ) => void;
 }
+
+type CommentPopoverState = {
+  mode: "trigger" | "composer";
+  lineStart: number;
+  lineEnd: number;
+  selectedText: string;
+  draftText: string;
+  anchorLeft: number;
+  anchorTop: number;
+};
 
 function wrapSelection(view: EditorView, before: string, after: string) {
   const { from, to } = view.state.selection.main;
@@ -90,8 +105,14 @@ function EditorPaneInner({
 }: EditorPaneProps) {
   const activePathRef = useRef(file.path);
   const applyingExternalChangeRef = useRef(false);
+  const editorSurfaceRef = useRef<HTMLDivElement | null>(null);
+  const commentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const openCommentComposerRef = useRef<(view: EditorView, allowCollapsedSelection?: boolean) => void>(() => {});
+  const syncSelectionCommentTriggerRef = useRef<(view: EditorView) => void>(() => {});
   const [lineCount, setLineCount] = useState(() => file.content.split("\n").length);
+  const [commentPopover, setCommentPopover] = useState<CommentPopoverState | null>(null);
   const isCollaborative = Boolean(yText && awareness);
+  const canAddComment = Boolean(collabStatus?.enabled && onAddComment);
 
   const onChangeRef = useRef(onChange);
   const onCursorChangeRef = useRef(onCursorChange);
@@ -110,6 +131,84 @@ function EditorPaneInner({
     onForwardSyncRef.current = onForwardSync;
     onAddCommentRef.current = onAddComment;
   }, [onChange, onCursorChange, onSave, onRunAgent, onCompile, onForwardSync, onAddComment]);
+
+  function buildCommentPopoverState(
+    nextView: EditorView,
+    mode: CommentPopoverState["mode"],
+    allowCollapsedSelection = false,
+    draftText = "",
+  ) {
+    if (!canAddComment) {
+      return null;
+    }
+
+    const selection = nextView.state.selection.main;
+    const hasSelection = selection.from !== selection.to;
+    if (!allowCollapsedSelection && !hasSelection) {
+      return null;
+    }
+
+    const root = editorSurfaceRef.current;
+    if (!root) {
+      return null;
+    }
+
+    const from = Math.min(selection.from, selection.to);
+    const to = Math.max(selection.from, selection.to);
+    const anchorPos = hasSelection ? to : selection.head;
+    const startCoords = nextView.coordsAtPos(from);
+    const endCoords = nextView.coordsAtPos(anchorPos);
+    const rootRect = root.getBoundingClientRect();
+
+    if (!startCoords || !endCoords) {
+      return null;
+    }
+
+    const composerWidth = 320;
+    const composerHeight = 188;
+    const left = Math.min(
+      Math.max(16, endCoords.right - rootRect.left + 14),
+      Math.max(16, rootRect.width - composerWidth - 16),
+    );
+    const centerY = ((startCoords.top + endCoords.bottom) / 2) - rootRect.top;
+    const top = Math.min(
+      Math.max(16, centerY - 18),
+      Math.max(16, rootRect.height - composerHeight - 16),
+    );
+
+    return {
+      mode,
+      lineStart: nextView.state.doc.lineAt(from).number,
+      lineEnd: nextView.state.doc.lineAt(anchorPos).number,
+      selectedText: nextView.state.sliceDoc(from, to),
+      draftText,
+      anchorLeft: left,
+      anchorTop: top,
+    } satisfies CommentPopoverState;
+  }
+
+  function syncSelectionCommentTrigger(nextView: EditorView) {
+    setCommentPopover((current) => {
+      if (current?.mode === "composer") {
+        return current;
+      }
+      return buildCommentPopoverState(nextView, "trigger");
+    });
+  }
+
+  function openCommentComposer(nextView: EditorView, allowCollapsedSelection = false) {
+    setCommentPopover((current) =>
+      buildCommentPopoverState(
+        nextView,
+        "composer",
+        allowCollapsedSelection,
+        current?.mode === "composer" ? current.draftText : "",
+      ),
+    );
+  }
+
+  openCommentComposerRef.current = openCommentComposer;
+  syncSelectionCommentTriggerRef.current = syncSelectionCommentTrigger;
 
   const extensions = useMemo(() => {
     const customKeymap = keymap.of([
@@ -169,11 +268,7 @@ function EditorPaneInner({
       {
         key: "Mod-Shift-m",
         run: (view) => {
-          const { from, to } = view.state.selection.main;
-          const lineStart = view.state.doc.lineAt(from).number;
-          const lineEnd = view.state.doc.lineAt(to).number;
-          const selectedText = view.state.sliceDoc(from, to);
-          onAddCommentRef.current?.(lineStart, lineEnd, selectedText);
+          openCommentComposerRef.current(view, true);
           return true;
         },
       },
@@ -226,6 +321,7 @@ function EditorPaneInner({
           const line = nextView.state.doc.lineAt(main.head).number;
           const selectedText = nextView.state.sliceDoc(main.from, main.to);
           onCursorChangeRef.current(line, selectedText);
+          syncSelectionCommentTriggerRef.current(nextView);
         }
       },
     });
@@ -239,6 +335,7 @@ function EditorPaneInner({
     const line = view.state.doc.lineAt(main.head).number;
     const selectedText = view.state.sliceDoc(main.from, main.to);
     onCursorChangeRef.current(line, selectedText);
+    syncSelectionCommentTrigger(view);
   }, [view]);
 
   useEffect(() => {
@@ -274,6 +371,10 @@ function EditorPaneInner({
   }, [file.content, file.path, isCollaborative, view]);
 
   useEffect(() => {
+    setCommentPopover(null);
+  }, [file.path]);
+
+  useEffect(() => {
     if (!targetLine) {
       return;
     }
@@ -296,31 +397,75 @@ function EditorPaneInner({
     view.dispatch({ effects: setCommentMarkers.of(markers) });
   }, [comments, file.path, view]);
 
-  const canAddComment = Boolean(collabStatus?.enabled && onAddComment);
+  useEffect(() => {
+    if (!canAddComment) {
+      setCommentPopover(null);
+      return;
+    }
+    syncSelectionCommentTrigger(view);
+  }, [canAddComment, view]);
+
+  useEffect(() => {
+    if (commentPopover?.mode !== "composer") {
+      return;
+    }
+    commentTextareaRef.current?.focus();
+    commentTextareaRef.current?.setSelectionRange(
+      commentTextareaRef.current.value.length,
+      commentTextareaRef.current.value.length,
+    );
+  }, [commentPopover]);
+
+  useEffect(() => {
+    if (!commentPopover) {
+      return;
+    }
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+      if (target.closest("[data-comment-overlay='true']") || target.closest(".cm-editor")) {
+        return;
+      }
+      setCommentPopover(null);
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [commentPopover]);
 
   function handleAddCommentClick() {
-    const { from, to } = view.state.selection.main;
-    const lineStart = view.state.doc.lineAt(from).number;
-    const lineEnd = view.state.doc.lineAt(to).number;
-    const selectedText = view.state.sliceDoc(from, to);
-    onAddCommentRef.current?.(lineStart, lineEnd, selectedText);
+    openCommentComposer(view, true);
+  }
+
+  function handleSubmitComment() {
+    if (commentPopover?.mode !== "composer") {
+      return;
+    }
+    const text = commentPopover.draftText.trim();
+    if (!text) {
+      return;
+    }
+    onAddCommentRef.current?.(
+      commentPopover.lineStart,
+      commentPopover.lineEnd,
+      commentPopover.selectedText,
+      text,
+    );
+    setCommentPopover(null);
     view.focus();
   }
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+    <div className="editor-pane-shell">
       <div
-        style={{
-          padding: "6px 16px",
-          borderBottom: "1px solid var(--border-light)",
-          fontSize: "12px",
-          color: "var(--text-secondary)",
-          display: "flex",
-          justifyContent: "space-between",
-          background: "var(--bg-app)",
-        }}
+        className="editor-pane-toolbar"
       >
-        <span>
+        <span className="editor-pane-toolbar-meta">
           源码路径: {file.path}
           {isDirty && <span style={{ color: "var(--danger)", marginLeft: 8 }}>● 未保存</span>}
           {collabStatus?.enabled && (
@@ -329,8 +474,8 @@ function EditorPaneInner({
             </span>
           )}
         </span>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span>
+        <div className="editor-pane-toolbar-actions">
+          <span className="editor-pane-toolbar-info">
             {file.language} · 共 {lineCount} 行
             {collabStatus?.enabled && ` · ${collabStatus.members.length + 1} 人`}
           </span>
@@ -346,8 +491,81 @@ function EditorPaneInner({
           </button>
         </div>
       </div>
-      <div style={{ flex: 1, overflow: "hidden" }}>
+      <div className="editor-pane-surface" ref={editorSurfaceRef}>
         <CodeMirrorView view={view} />
+        {commentPopover?.mode === "trigger" && (
+          <button
+            type="button"
+            className="editor-comment-trigger"
+            data-comment-overlay="true"
+            style={{
+              left: `${commentPopover.anchorLeft}px`,
+              top: `${commentPopover.anchorTop}px`,
+            }}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => openCommentComposer(view)}
+          >
+            <span>Comment</span>
+            <span className="editor-comment-trigger-shortcut">⌘⇧M</span>
+          </button>
+        )}
+        {commentPopover?.mode === "composer" && (
+          <div
+            className="editor-comment-popover"
+            data-comment-overlay="true"
+            style={{
+              left: `${commentPopover.anchorLeft}px`,
+              top: `${commentPopover.anchorTop}px`,
+            }}
+          >
+            <textarea
+              ref={commentTextareaRef}
+              className="editor-comment-input"
+              value={commentPopover.draftText}
+              onChange={(event) => {
+                const nextText = event.target.value;
+                setCommentPopover((current) =>
+                  current?.mode === "composer"
+                    ? { ...current, draftText: nextText }
+                    : current,
+                );
+              }}
+              placeholder="Leave a comment"
+              rows={3}
+              onKeyDown={(event) => {
+                if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                  event.preventDefault();
+                  handleSubmitComment();
+                }
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setCommentPopover(null);
+                  view.focus();
+                }
+              }}
+            />
+            <div className="editor-comment-popover-actions">
+              <button
+                type="button"
+                className="editor-comment-cancel"
+                onClick={() => {
+                  setCommentPopover(null);
+                  view.focus();
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="editor-comment-submit"
+                disabled={!commentPopover.draftText.trim()}
+                onClick={handleSubmitComment}
+              >
+                Add Comment
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

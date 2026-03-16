@@ -1834,10 +1834,18 @@ function App() {
     });
   }
 
-  const handleAddComment = useEffectEvent((lineStart: number, lineEnd: number, selectedText: string) => {
+  const handleAddComment = useEffectEvent((
+    lineStart: number,
+    lineEnd: number,
+    selectedText: string,
+    commentText?: string,
+  ) => {
     if (!commentStore || !collabAuthSession || !activeFile) return;
-    const text = window.prompt("输入批注内容：", selectedText ? `关于 "${selectedText.slice(0, 30)}…"` : "");
-    if (!text?.trim()) return;
+    const text =
+      typeof commentText === "string"
+        ? commentText.trim()
+        : window.prompt("输入批注内容：", selectedText ? `关于 "${selectedText.slice(0, 30)}…"` : "")?.trim();
+    if (!text) return;
     commentStore.addComment({
       userId: collabAuthSession.userId,
       userName: collabAuthSession.name,
