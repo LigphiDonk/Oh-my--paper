@@ -1536,7 +1536,7 @@ button {
   height: calc(100% - 6px);
   display: flex;
   flex-direction: column;
-  background: var(--bg-surface);
+  background: #0b1120;
 }
 
 .terminal-panel-header {
@@ -1545,8 +1545,8 @@ button {
   gap: 12px;
   min-height: 38px;
   padding: 0 12px;
-  border-bottom: 1px solid var(--border-light);
-  background: rgba(255, 255, 255, 0.82);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.96);
 }
 
 .terminal-panel-tab {
@@ -1556,14 +1556,14 @@ button {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--text-primary);
+  color: #f8fafc;
 }
 
 .terminal-panel-meta {
   min-width: 0;
   flex: 1 1 auto;
   font-size: 12px;
-  color: var(--text-secondary);
+  color: #94a3b8;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1577,9 +1577,9 @@ button {
 }
 
 .terminal-panel-btn {
-  border: 1px solid var(--border-light);
-  background: var(--bg-app);
-  color: var(--text-secondary);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(30, 41, 59, 0.92);
+  color: #cbd5e1;
   padding: 4px 9px;
   border-radius: var(--radius-sm);
   font-size: 11px;
@@ -1588,9 +1588,9 @@ button {
 }
 
 .terminal-panel-btn:hover:not(:disabled) {
-  background: var(--bg-surface-hover);
-  color: var(--text-primary);
-  border-color: rgba(16, 163, 127, 0.22);
+  background: rgba(51, 65, 85, 0.96);
+  color: #f8fafc;
+  border-color: rgba(52, 211, 153, 0.24);
 }
 
 .terminal-panel-btn:disabled {
@@ -1602,12 +1602,13 @@ button {
   flex: 1;
   min-height: 0;
   position: relative;
-  background: #fbfbfc;
+  background: #0f172a;
 }
 
 .terminal-canvas,
 .terminal-panel-empty {
   height: 100%;
+  width: 100%;
 }
 
 .terminal-panel-empty {
@@ -1627,31 +1628,33 @@ button {
   padding: 18px;
   pointer-events: none;
   background:
-    radial-gradient(circle at top, rgba(16, 163, 127, 0.08), transparent 48%),
-    linear-gradient(180deg, rgba(251, 251, 252, 0.92), rgba(251, 251, 252, 0.84));
+    radial-gradient(circle at top, rgba(52, 211, 153, 0.14), transparent 48%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(15, 23, 42, 0.58));
 }
 
 .terminal-panel-overlay-label {
   max-width: min(100%, 720px);
   padding: 10px 14px;
-  border: 1px solid rgba(16, 163, 127, 0.16);
+  border: 1px solid rgba(52, 211, 153, 0.18);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.88);
-  color: var(--text-secondary);
+  background: rgba(15, 23, 42, 0.86);
+  color: #cbd5e1;
   font-size: 12px;
   font-family: var(--mono);
   letter-spacing: 0.01em;
   text-align: center;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 16px 40px rgba(2, 6, 23, 0.3);
 }
 
 .terminal-canvas .xterm {
   height: 100%;
-  padding: 8px 10px 10px;
+  padding: 10px 12px 12px;
+  background: #0f172a;
 }
 
 .terminal-canvas .xterm-viewport {
   overflow-y: auto !important;
+  background: #0f172a;
 }
 
 .preview-header {

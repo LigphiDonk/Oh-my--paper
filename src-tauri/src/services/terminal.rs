@@ -2,6 +2,7 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
@@ -180,22 +181,32 @@ fn spawn_exit_thread(
     let window_label = window.label().to_string();
 
     thread::spawn(move || {
-        let wait_result = {
-            let mut child = match session.child.lock() {
-                Ok(child) => child,
-                Err(_) => {
-                    emit_terminal_event(
-                        &app_handle,
-                        &window_label,
-                        TerminalEvent::Error {
-                            session_id: session_id.clone(),
-                            message: "terminal child lock poisoned".into(),
-                        },
-                    );
-                    return;
-                }
+        let wait_result = loop {
+            let poll_result = {
+                let mut child = match session.child.lock() {
+                    Ok(child) => child,
+                    Err(_) => {
+                        emit_terminal_event(
+                            &app_handle,
+                            &window_label,
+                            TerminalEvent::Error {
+                                session_id: session_id.clone(),
+                                message: "terminal child lock poisoned".into(),
+                            },
+                        );
+                        return;
+                    }
+                };
+                child.try_wait()
             };
-            child.wait()
+
+            match poll_result {
+                Ok(Some(status)) => break Ok(status),
+                Ok(None) => {
+                    thread::sleep(Duration::from_millis(40));
+                }
+                Err(error) => break Err(error),
+            }
         };
 
         match wait_result {

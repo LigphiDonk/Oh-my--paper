@@ -260,7 +260,7 @@ pub struct AgentContext {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum StreamChunk {
     #[serde(rename = "thinking_delta")]
     ThinkingDelta { content: String },
@@ -311,7 +311,7 @@ pub struct TerminalSessionInfo {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum TerminalEvent {
     #[serde(rename = "output")]
     Output { session_id: String, data: String },

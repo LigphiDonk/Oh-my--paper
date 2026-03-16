@@ -33,6 +33,54 @@ export function isTauriRuntime() {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
+function readString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function readNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function normalizeTerminalEvent(payload: unknown): TerminalEvent | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const event = payload as Record<string, unknown>;
+  const type = readString(event.type);
+  const sessionId = readString(event.sessionId) ?? readString(event.session_id);
+  if (!type || !sessionId) {
+    return null;
+  }
+
+  if (type === "output") {
+    return {
+      type: "output",
+      sessionId,
+      data: readString(event.data) ?? "",
+    };
+  }
+
+  if (type === "exit") {
+    return {
+      type: "exit",
+      sessionId,
+      exitCode: readNumber(event.exitCode ?? event.exit_code),
+      signal: readString(event.signal),
+    };
+  }
+
+  if (type === "error") {
+    return {
+      type: "error",
+      sessionId,
+      message: readString(event.message) ?? "terminal error",
+    };
+  }
+
+  return null;
+}
+
 async function runOrMock<T>(command: string, args: Record<string, unknown>, fallback: () => Promise<T>) {
   if (isTauriRuntime()) {
     return invoke<T>(command, args);
@@ -287,7 +335,10 @@ export const desktop = {
       return Promise.resolve(() => { });
     }
     return listen<TerminalEvent>("terminal:event", (event) => {
-      callback(event.payload);
+      const normalized = normalizeTerminalEvent(event.payload);
+      if (normalized) {
+        callback(normalized);
+      }
     });
   },
   onAppMenuAction(callback: (action: AppMenuAction) => void): Promise<UnlistenFn> {

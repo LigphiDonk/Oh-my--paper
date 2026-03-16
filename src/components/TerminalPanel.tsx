@@ -29,11 +29,26 @@ function safelyDisposeListener(listener?: (() => void | Promise<void>) | null) {
   }
 }
 
+function stripTerminalEscapeSequences(value: string) {
+  return value
+    .replace(/\u001b\][^\u0007]*(?:\u0007|\u001b\\)/g, "")
+    .replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, "")
+    .replace(/\u001b./g, "");
+}
+
+function hasReadableTerminalOutput(value: string) {
+  return stripTerminalEscapeSequences(value).replace(/[\r\n]/g, "").trim().length > 1;
+}
+
 export function TerminalPanel({ workspaceRoot, isVisible, height, onHide }: TerminalPanelProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const sessionIdRef = useRef("");
+  const pendingEventsRef = useRef<Map<string, TerminalEvent[]>>(new Map());
+  const startupPromptKickTimerRef = useRef<number | null>(null);
+  const startupPromptKickCountRef = useRef(0);
+  const hasSeenReadableOutputRef = useRef(false);
   const workspaceRootRef = useRef(workspaceRoot);
   const [sessionInfo, setSessionInfo] = useState<TerminalSessionInfo | null>(null);
   const [statusText, setStatusText] = useState("");
@@ -54,6 +69,32 @@ export function TerminalPanel({ workspaceRoot, isVisible, height, onHide }: Term
     }
   };
 
+  const clearStartupPromptKick = () => {
+    if (startupPromptKickTimerRef.current !== null) {
+      window.clearTimeout(startupPromptKickTimerRef.current);
+      startupPromptKickTimerRef.current = null;
+    }
+    startupPromptKickCountRef.current = 0;
+  };
+
+  const scheduleStartupPromptKick = (sessionId: string) => {
+    if (startupPromptKickTimerRef.current !== null) {
+      window.clearTimeout(startupPromptKickTimerRef.current);
+      startupPromptKickTimerRef.current = null;
+    }
+    startupPromptKickTimerRef.current = window.setTimeout(() => {
+      startupPromptKickTimerRef.current = null;
+      if (sessionIdRef.current !== sessionId || hasSeenReadableOutputRef.current) {
+        return;
+      }
+      startupPromptKickCountRef.current += 1;
+      void desktop.terminalWrite(sessionId, "\r");
+      if (startupPromptKickCountRef.current < 3) {
+        scheduleStartupPromptKick(sessionId);
+      }
+    }, 500);
+  };
+
   const resetTerminal = (message = "") => {
     const terminal = terminalRef.current;
     if (!terminal) {
@@ -69,11 +110,14 @@ export function TerminalPanel({ workspaceRoot, isVisible, height, onHide }: Term
   const closeSession = async () => {
     const sessionId = sessionIdRef.current;
     setIsStarting(false);
+    hasSeenReadableOutputRef.current = false;
+    clearStartupPromptKick();
     if (!sessionId) {
       return;
     }
 
     sessionIdRef.current = "";
+    pendingEventsRef.current.delete(sessionId);
     setSessionInfo(null);
 
     try {
@@ -97,6 +141,8 @@ export function TerminalPanel({ workspaceRoot, isVisible, height, onHide }: Term
     fitTerminal();
     setIsStarting(true);
     setStatusText("正在启动终端…");
+    hasSeenReadableOutputRef.current = false;
+    clearStartupPromptKick();
 
     try {
       const terminal = terminalRef.current;
@@ -108,6 +154,13 @@ export function TerminalPanel({ workspaceRoot, isVisible, height, onHide }: Term
       sessionIdRef.current = info.sessionId;
       setSessionInfo(info);
       setStatusText(`${info.shell} · ${info.cwd}`);
+      setIsStarting(false);
+      const pendingEvents = pendingEventsRef.current.get(info.sessionId) ?? [];
+      pendingEventsRef.current.delete(info.sessionId);
+      for (const event of pendingEvents) {
+        handleTerminalEvent(event);
+      }
+      scheduleStartupPromptKick(info.sessionId);
       terminal.focus();
     } catch (error) {
       setIsStarting(false);
@@ -118,6 +171,12 @@ export function TerminalPanel({ workspaceRoot, isVisible, height, onHide }: Term
   };
 
   const handleTerminalEvent = (event: TerminalEvent) => {
+    if (!sessionIdRef.current) {
+      const buffered = pendingEventsRef.current.get(event.sessionId) ?? [];
+      pendingEventsRef.current.set(event.sessionId, [...buffered, event].slice(-24));
+      return;
+    }
+
     if (event.sessionId !== sessionIdRef.current) {
       return;
     }
@@ -129,6 +188,10 @@ export function TerminalPanel({ workspaceRoot, isVisible, height, onHide }: Term
 
     if (event.type === "output") {
       setIsStarting(false);
+      if (hasReadableTerminalOutput(event.data)) {
+        hasSeenReadableOutputRef.current = true;
+        clearStartupPromptKick();
+      }
       terminal.write(event.data);
       return;
     }
@@ -136,6 +199,8 @@ export function TerminalPanel({ workspaceRoot, isVisible, height, onHide }: Term
     if (event.type === "exit") {
       setIsStarting(false);
       sessionIdRef.current = "";
+      pendingEventsRef.current.delete(event.sessionId);
+      clearStartupPromptKick();
       setSessionInfo(null);
       const suffix = event.signal
         ? `signal ${event.signal}`
@@ -148,6 +213,7 @@ export function TerminalPanel({ workspaceRoot, isVisible, height, onHide }: Term
     }
 
     setIsStarting(false);
+    clearStartupPromptKick();
     setStatusText(event.message);
     terminal.writeln(`\r\n[终端错误] ${event.message}`);
   };
@@ -162,33 +228,35 @@ export function TerminalPanel({ workspaceRoot, isVisible, height, onHide }: Term
       allowProposedApi: false,
       convertEol: false,
       cursorBlink: true,
+      cursorStyle: "bar",
+      cursorWidth: 2,
       fontFamily:
         '"SF Mono", "Monaco", "Cascadia Code", "Menlo", "Consolas", monospace',
       fontSize: 12.5,
       lineHeight: 1.35,
       scrollback: 4000,
       theme: {
-        background: "#fbfbfc",
-        foreground: "#1f2328",
-        cursor: "#10a37f",
-        cursorAccent: "#ffffff",
-        selectionBackground: "rgba(16, 163, 127, 0.18)",
-        black: "#24292f",
-        red: "#cf222e",
-        green: "#116329",
-        yellow: "#9a6700",
-        blue: "#0969da",
-        magenta: "#8250df",
-        cyan: "#1b7c83",
-        white: "#f6f8fa",
-        brightBlack: "#656d76",
-        brightRed: "#ff7b72",
-        brightGreen: "#3fb950",
-        brightYellow: "#d29922",
-        brightBlue: "#58a6ff",
-        brightMagenta: "#bc8cff",
-        brightCyan: "#39c5cf",
-        brightWhite: "#ffffff",
+        background: "#0f172a",
+        foreground: "#e5e7eb",
+        cursor: "#34d399",
+        cursorAccent: "#0f172a",
+        selectionBackground: "rgba(52, 211, 153, 0.22)",
+        black: "#0f172a",
+        red: "#f87171",
+        green: "#4ade80",
+        yellow: "#fbbf24",
+        blue: "#60a5fa",
+        magenta: "#c084fc",
+        cyan: "#22d3ee",
+        white: "#cbd5e1",
+        brightBlack: "#64748b",
+        brightRed: "#fca5a5",
+        brightGreen: "#86efac",
+        brightYellow: "#fcd34d",
+        brightBlue: "#93c5fd",
+        brightMagenta: "#d8b4fe",
+        brightCyan: "#67e8f9",
+        brightWhite: "#f8fafc",
       },
     });
     const fitAddon = new FitAddon();
@@ -224,6 +292,7 @@ export function TerminalPanel({ workspaceRoot, isVisible, height, onHide }: Term
       observer.disconnect();
       inputDisposable.dispose();
       resizeDisposable.dispose();
+      clearStartupPromptKick();
       void closeSession();
       terminal.dispose();
       terminalRef.current = null;
@@ -303,6 +372,7 @@ export function TerminalPanel({ workspaceRoot, isVisible, height, onHide }: Term
   };
 
   const showOverlay = isDesktop && isVisible && (!isListenerReady || isStarting);
+  const shouldShowStartupOverlay = showOverlay && !sessionInfo;
   const overlayText = !isListenerReady
     ? "正在连接终端事件…"
     : statusText || sessionInfo?.cwd || workspaceRoot || "正在启动终端…";
@@ -333,7 +403,7 @@ export function TerminalPanel({ workspaceRoot, isVisible, height, onHide }: Term
         {isDesktop ? (
           <>
             <div ref={hostRef} className="terminal-canvas" />
-            {showOverlay ? (
+            {shouldShowStartupOverlay ? (
               <div className="terminal-panel-overlay" aria-hidden="true">
                 <div className="terminal-panel-overlay-label">{overlayText}</div>
               </div>
