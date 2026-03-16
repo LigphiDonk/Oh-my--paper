@@ -29,26 +29,13 @@ function safelyDisposeListener(listener?: (() => void | Promise<void>) | null) {
   }
 }
 
-function stripTerminalEscapeSequences(value: string) {
-  return value
-    .replace(/\u001b\][^\u0007]*(?:\u0007|\u001b\\)/g, "")
-    .replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, "")
-    .replace(/\u001b./g, "");
-}
-
-function hasReadableTerminalOutput(value: string) {
-  return stripTerminalEscapeSequences(value).replace(/[\r\n]/g, "").trim().length > 1;
-}
-
 export function TerminalPanel({ workspaceRoot, isVisible, height, onHide }: TerminalPanelProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const sessionIdRef = useRef("");
+  const isSessionStartingRef = useRef(false);
   const pendingEventsRef = useRef<Map<string, TerminalEvent[]>>(new Map());
-  const startupPromptKickTimerRef = useRef<number | null>(null);
-  const startupPromptKickCountRef = useRef(0);
-  const hasSeenReadableOutputRef = useRef(false);
   const workspaceRootRef = useRef(workspaceRoot);
   const [sessionInfo, setSessionInfo] = useState<TerminalSessionInfo | null>(null);
   const [statusText, setStatusText] = useState("");
@@ -69,32 +56,6 @@ export function TerminalPanel({ workspaceRoot, isVisible, height, onHide }: Term
     }
   };
 
-  const clearStartupPromptKick = () => {
-    if (startupPromptKickTimerRef.current !== null) {
-      window.clearTimeout(startupPromptKickTimerRef.current);
-      startupPromptKickTimerRef.current = null;
-    }
-    startupPromptKickCountRef.current = 0;
-  };
-
-  const scheduleStartupPromptKick = (sessionId: string) => {
-    if (startupPromptKickTimerRef.current !== null) {
-      window.clearTimeout(startupPromptKickTimerRef.current);
-      startupPromptKickTimerRef.current = null;
-    }
-    startupPromptKickTimerRef.current = window.setTimeout(() => {
-      startupPromptKickTimerRef.current = null;
-      if (sessionIdRef.current !== sessionId || hasSeenReadableOutputRef.current) {
-        return;
-      }
-      startupPromptKickCountRef.current += 1;
-      void desktop.terminalWrite(sessionId, "\r");
-      if (startupPromptKickCountRef.current < 3) {
-        scheduleStartupPromptKick(sessionId);
-      }
-    }, 500);
-  };
-
   const resetTerminal = (message = "") => {
     const terminal = terminalRef.current;
     if (!terminal) {
@@ -109,9 +70,8 @@ export function TerminalPanel({ workspaceRoot, isVisible, height, onHide }: Term
 
   const closeSession = async () => {
     const sessionId = sessionIdRef.current;
+    isSessionStartingRef.current = false;
     setIsStarting(false);
-    hasSeenReadableOutputRef.current = false;
-    clearStartupPromptKick();
     if (!sessionId) {
       return;
     }
@@ -133,16 +93,16 @@ export function TerminalPanel({ workspaceRoot, isVisible, height, onHide }: Term
       !isListenerReady ||
       !workspaceRoot.trim() ||
       sessionIdRef.current ||
+      isSessionStartingRef.current ||
       !terminalRef.current
     ) {
       return;
     }
 
+    isSessionStartingRef.current = true;
     fitTerminal();
     setIsStarting(true);
     setStatusText("正在启动终端…");
-    hasSeenReadableOutputRef.current = false;
-    clearStartupPromptKick();
 
     try {
       const terminal = terminalRef.current;
@@ -155,14 +115,15 @@ export function TerminalPanel({ workspaceRoot, isVisible, height, onHide }: Term
       setSessionInfo(info);
       setStatusText(`${info.shell} · ${info.cwd}`);
       setIsStarting(false);
+      isSessionStartingRef.current = false;
       const pendingEvents = pendingEventsRef.current.get(info.sessionId) ?? [];
       pendingEventsRef.current.delete(info.sessionId);
       for (const event of pendingEvents) {
         handleTerminalEvent(event);
       }
-      scheduleStartupPromptKick(info.sessionId);
       terminal.focus();
     } catch (error) {
+      isSessionStartingRef.current = false;
       setIsStarting(false);
       const message = error instanceof Error ? error.message : String(error);
       setStatusText(message);
@@ -188,19 +149,15 @@ export function TerminalPanel({ workspaceRoot, isVisible, height, onHide }: Term
 
     if (event.type === "output") {
       setIsStarting(false);
-      if (hasReadableTerminalOutput(event.data)) {
-        hasSeenReadableOutputRef.current = true;
-        clearStartupPromptKick();
-      }
       terminal.write(event.data);
       return;
     }
 
     if (event.type === "exit") {
       setIsStarting(false);
+      isSessionStartingRef.current = false;
       sessionIdRef.current = "";
       pendingEventsRef.current.delete(event.sessionId);
-      clearStartupPromptKick();
       setSessionInfo(null);
       const suffix = event.signal
         ? `signal ${event.signal}`
@@ -213,7 +170,7 @@ export function TerminalPanel({ workspaceRoot, isVisible, height, onHide }: Term
     }
 
     setIsStarting(false);
-    clearStartupPromptKick();
+    isSessionStartingRef.current = false;
     setStatusText(event.message);
     terminal.writeln(`\r\n[终端错误] ${event.message}`);
   };
@@ -292,7 +249,6 @@ export function TerminalPanel({ workspaceRoot, isVisible, height, onHide }: Term
       observer.disconnect();
       inputDisposable.dispose();
       resizeDisposable.dispose();
-      clearStartupPromptKick();
       void closeSession();
       terminal.dispose();
       terminalRef.current = null;

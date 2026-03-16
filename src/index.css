@@ -1,43 +1,43 @@
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  font-family: "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   line-height: 1.5;
   font-weight: 400;
   
-  /* OpenAI Prism / VS Code Light Modern Theme Colors */
-  --bg-app: #ffffff;
-  --bg-sidebar: #f9f9f9;
-  --bg-activity-bar: #f3f3f3;
+  /* Codex-like light workspace palette */
+  --bg-app: #eef2f6;
+  --bg-sidebar: #f8fafd;
+  --bg-activity-bar: #f5f8fc;
   --bg-surface: #ffffff;
-  --bg-surface-hover: #f0f0f0;
-  --bg-surface-active: #e6e6e6;
+  --bg-surface-hover: #f3f6fa;
+  --bg-surface-active: #e9eff6;
   
-  --border-light: #ececf1;
-  --border-focus: #10a37f;
+  --border-light: #dde5ee;
+  --border-focus: #0f766e;
   
-  --text-primary: #0d0d0d;
-  --text-secondary: #5e5e5e;
-  --text-tertiary: #8e8e8e;
+  --text-primary: #111827;
+  --text-secondary: #526075;
+  --text-tertiary: #8190a6;
   
-  --accent-primary: #10a37f; /* OpenAI Green */
-  --accent-primary-hover: #1a7f64;
-  --accent-bg: rgba(16, 163, 127, 0.1);
+  --accent-primary: #0f766e;
+  --accent-primary-hover: #0b5f59;
+  --accent-bg: rgba(15, 118, 110, 0.12);
   --danger: #ef4444;
   
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 2px 6px rgba(15, 23, 42, 0.08), 0 14px 28px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 12px 24px rgba(15, 23, 42, 0.12), 0 24px 48px rgba(15, 23, 42, 0.12);
   
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
   --radius-full: 9999px;
   
   --mono: "SF Mono", "ui-monospace", "Cascadia Code", "Menlo", monospace;
 
   /* Animation Timings */
   --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-spring: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --transition-spring: 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 * {
@@ -79,12 +79,12 @@ button {
 }
 
 .hover-spring:hover {
-  transform: translateY(-2px) scale(1.02);
+  transform: translateY(-1px);
   box-shadow: var(--shadow-md);
 }
 
 .hover-spring:active {
-  transform: translateY(0) scale(0.98);
+  transform: translateY(0);
   box-shadow: var(--shadow-sm);
 }
 
@@ -103,6 +103,9 @@ button {
   flex-direction: column;
   height: 100vh;
   width: 100vw;
+  padding: 0;
+  gap: 0;
+  background: var(--bg-app);
 }
 
 .app-shell.is-welcome {
@@ -110,14 +113,19 @@ button {
 }
 
 .topbar {
-  flex: 0 0 44px;
-  background: var(--bg-app);
+  flex: 0 0 54px;
+  min-height: 54px;
+  background: var(--bg-surface);
+  border: none;
   border-bottom: 1px solid var(--border-light);
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: blur(10px);
   display: flex;
   position: relative;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  padding: 0 14px;
   font-size: 13px;
   z-index: 10;
   gap: 14px;
@@ -129,8 +137,8 @@ button {
 }
 
 .topbar--overlay {
-  flex: 0 0 52px;
-  min-height: 52px;
+  flex: 0 0 60px;
+  min-height: 60px;
   padding-left: 84px;
   padding-right: 18px;
 }
@@ -196,9 +204,10 @@ button {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: var(--bg-surface-hover);
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
+  background: #f4f7fa;
+  border: 1px solid #e4eaf1;
+  padding: 6px 10px;
+  border-radius: var(--radius-full);
   font-size: 12px;
 }
 
@@ -210,14 +219,14 @@ button {
 .compile-launch-btn {
   width: 34px;
   height: 34px;
-  border-radius: var(--radius-full);
+  border-radius: 10px;
   border: 1px solid rgba(24, 134, 73, 0.18);
-  background: rgba(37, 180, 96, 0.12);
+  background: rgba(240, 253, 250, 0.98);
   color: #17884b;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  box-shadow: none;
 }
 
 .compile-launch-btn:hover {
@@ -281,10 +290,11 @@ button {
 
 .menu-trigger {
   min-width: 56px;
-  height: 30px;
-  padding: 0 10px;
-  border-radius: var(--radius-sm);
-  background: transparent;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: #f4f7fa;
+  border: 1px solid #e4eaf1;
   color: var(--text-secondary);
   transition: background-color var(--transition-fast), color var(--transition-fast);
 }
@@ -406,9 +416,9 @@ button {
   align-items: center;
   min-width: 0;
   max-width: 220px;
-  border-radius: 10px;
-  border: 1px solid transparent;
-  background: var(--bg-surface-hover);
+  border-radius: 11px;
+  border: 1px solid #e3eaf2;
+  background: #f5f8fc;
   transition: border-color var(--transition-fast), background-color var(--transition-fast);
 }
 
@@ -418,7 +428,7 @@ button {
 
 .workspace-top-tab.is-active {
   background: var(--bg-surface);
-  border-color: var(--border-light);
+  border-color: #cfd8e5;
   box-shadow: inset 0 -2px 0 var(--accent-primary);
 }
 
@@ -748,6 +758,10 @@ button {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  border: none;
+  border-radius: 0;
+  background: var(--bg-surface);
+  box-shadow: none;
 }
 
 .workspace-body {
@@ -756,7 +770,7 @@ button {
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  background: var(--bg-app);
+  background: transparent;
 }
 
 .workspace-main {
@@ -764,25 +778,25 @@ button {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
-  background: var(--bg-app);
+  background: transparent;
 }
 
 /* Activity Bar (Leftmost) */
 .activity-bar {
-  flex: 0 0 48px;
-  background: var(--bg-activity-bar);
+  flex: 0 0 56px;
+  background: linear-gradient(180deg, #fafcff 0%, #f4f8fc 100%);
   border-right: 1px solid var(--border-light);
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 12px;
-  gap: 16px;
+  padding-top: 14px;
+  gap: 10px;
 }
 
 .activity-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-md);
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -804,17 +818,18 @@ button {
 
 .activity-icon.is-active {
   color: var(--accent-primary);
+  background: rgba(15, 118, 110, 0.12);
 }
 
 .activity-icon.is-active::before {
   content: '';
   position: absolute;
-  left: -8px;
-  top: 4px;
-  bottom: 4px;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
   width: 3px;
   background: var(--accent-primary);
-  border-radius: 0 2px 2px 0;
+  border-radius: 999px;
 }
 
 .activity-icon-dot {
@@ -834,7 +849,7 @@ button {
 /* Primary Sidebar */
 .primary-sidebar {
   flex: 0 0 300px;
-  background: var(--bg-sidebar);
+  background: #fbfcff;
   border-right: 1px solid var(--border-light);
   display: flex;
   flex-direction: column;
@@ -845,7 +860,7 @@ button {
   flex: 0 0 250px;
   width: 250px;
   min-width: 220px;
-  background: var(--bg-sidebar);
+  background: #fbfcff;
   border-right: 1px solid var(--border-light);
   display: flex;
   flex-direction: column;
@@ -860,7 +875,7 @@ button {
 }
 
 .workspace-pane-header {
-  padding: 12px 14px 10px;
+  padding: 14px 14px 12px;
   border-bottom: 1px solid var(--border-light);
   display: flex;
   align-items: center;
@@ -908,7 +923,7 @@ button {
   gap: 4px;
   margin: 12px 12px 0;
   padding: 2px;
-  background: var(--bg-surface-hover);
+  background: #edf2f8;
   border-radius: var(--radius-full);
 }
 
@@ -936,7 +951,7 @@ button {
   align-items: center;
   gap: 4px;
   padding: 2px;
-  background: var(--bg-surface-hover);
+  background: #edf2f8;
   border-radius: var(--radius-full);
 }
 
@@ -1265,13 +1280,13 @@ button {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: var(--bg-app);
+  background: #ffffff;
 }
 
 .editor-tabs {
   display: flex;
   align-items: stretch;
-  background: var(--bg-sidebar);
+  background: #f6f8fb;
   border-bottom: 1px solid var(--border-light);
   overflow-x: auto;
   overflow-y: hidden;
@@ -1292,19 +1307,19 @@ button {
 .editor-tab {
   font-size: 13px;
   color: var(--text-secondary);
-  border-right: 1px solid var(--border-light);
+  border-right: 1px solid #e4ebf3;
   display: flex;
   align-items: center;
   flex: 0 0 auto;
   width: clamp(150px, 20vw, 220px);
   min-width: 0;
-  background: var(--bg-sidebar);
+  background: #f6f8fb;
   position: relative;
   transition: background var(--transition-fast);
 }
 
 .editor-tab:hover {
-  background: var(--bg-surface-hover);
+  background: #eef3f8;
 }
 
 .editor-tab-trigger {
@@ -1352,16 +1367,17 @@ button {
 }
 
 .editor-tab.is-active {
-  background: var(--bg-app);
+  background: #ffffff;
   color: var(--text-primary);
 }
 
 .editor-tab.is-active::before {
   content: '';
   position: absolute;
-  top: 0;
+  top: auto;
   left: 0;
   right: 0;
+  bottom: 0;
   height: 2px;
   background: var(--accent-primary);
 }
@@ -1524,7 +1540,7 @@ button {
 .preview-area {
   flex: 0 0 42%;
   border-left: 1px solid var(--border-light);
-  background: var(--bg-sidebar);
+  background: #ffffff;
   display: flex;
   flex-direction: column;
   min-width: 320px;
