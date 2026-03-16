@@ -11,7 +11,7 @@ use crate::models::{
     TerminalSessionInfo, TestResult, UsageRecord, WorkspaceSnapshot,
 };
 use crate::services::{
-    agent, compile, figure, profile, project, provider, sidecar, skill, sync, terminal,
+    agent, compile, figure, profile, project, provider, sidecar, skill, sync, terminal, worker,
 };
 use crate::state::AppState;
 
@@ -585,5 +585,17 @@ pub fn resize_terminal(
 pub fn close_terminal(state: State<'_, AppState>, session_id: String) -> Result<bool, String> {
     terminal::close_terminal(&state, &session_id)
         .map(|_| true)
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn prepare_worker_deploy_dir(
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let app_root = crate::resolve_app_root(&app_handle);
+    let template_dir = crate::resolve_worker_template_dir(&app_handle, &app_root);
+    worker::prepare_worker_deploy_dir(&state, &template_dir)
+        .map(|path| path.to_string_lossy().to_string())
         .map_err(|err| err.to_string())
 }

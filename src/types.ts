@@ -268,10 +268,18 @@ export interface WorkspaceCollabMetadata {
   linkedAt: string;
 }
 
+export type CollabFileSyncState = "synced" | "pending-push" | "pending-pull" | "conflict";
+
 export interface CollabStatus {
   enabled: boolean;
+  mode: "manual" | "realtime";
   connected: boolean;
   synced: boolean;
+  syncInProgress: boolean;
+  pendingLocalChanges: boolean;
+  pendingRemoteChanges: boolean;
+  hasConflict: boolean;
+  lastSyncAt: string;
   connectionError: string;
   members: CollabMember[];
 }

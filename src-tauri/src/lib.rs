@@ -117,7 +117,8 @@ pub fn run() {
             commands::start_terminal,
             commands::terminal_write,
             commands::resize_terminal,
-            commands::close_terminal
+            commands::close_terminal,
+            commands::prepare_worker_deploy_dir
         ])
         .run(tauri::generate_context!())
         .expect("failed to start ViewerLeaf");
@@ -183,7 +184,7 @@ fn resolve_sidecar_dir(app: &tauri::AppHandle, app_root: &std::path::Path) -> Pa
     manifest_sidecar
 }
 
-fn resolve_app_root(app: &tauri::AppHandle) -> PathBuf {
+pub(crate) fn resolve_app_root(app: &tauri::AppHandle) -> PathBuf {
     let mut candidates: Vec<PathBuf> = Vec::new();
 
     if let Ok(explicit) = std::env::var("VIEWERLEAF_APP_ROOT") {
@@ -222,6 +223,51 @@ fn resolve_app_root(app: &tauri::AppHandle) -> PathBuf {
     }
 
     manifest_root
+}
+
+pub(crate) fn resolve_worker_template_dir(
+    app: &tauri::AppHandle,
+    app_root: &std::path::Path,
+) -> PathBuf {
+    let mut candidates: Vec<PathBuf> = Vec::new();
+
+    if let Ok(explicit) = std::env::var("VIEWERLEAF_WORKER_TEMPLATE_DIR") {
+        let explicit = PathBuf::from(explicit.trim());
+        if !explicit.as_os_str().is_empty() {
+            candidates.push(explicit);
+        }
+    }
+
+    candidates.push(app_root.join("src-tauri/resources/worker-template"));
+    candidates.push(app_root.join("resources/worker-template"));
+    candidates.push(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("resources")
+            .join("worker-template"),
+    );
+
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        candidates.push(resource_dir.join("worker-template"));
+        candidates.push(resource_dir.join("../Resources/worker-template"));
+    }
+
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            candidates.push(parent.join("worker-template"));
+            candidates.push(parent.join("../Resources/worker-template"));
+            candidates.push(parent.join("../../Resources/worker-template"));
+        }
+    }
+
+    for candidate in candidates {
+        if candidate.join("wrangler.template.toml").is_file() {
+            return candidate;
+        }
+    }
+
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("resources")
+        .join("worker-template")
 }
 
 fn has_root_markers(path: &Path) -> bool {

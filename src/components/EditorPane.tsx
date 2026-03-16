@@ -471,14 +471,26 @@ function EditorPaneInner({
           {isDirty && <span style={{ color: "var(--danger)", marginLeft: 8 }}>● 未保存</span>}
           {collabStatus?.enabled && (
             <span style={{ color: "var(--text-secondary)", marginLeft: 8 }}>
-              · {collabStatus.synced ? "协作已同步" : collabStatus.connectionError ? "协作异常" : "协作连接中"}
+              · {collabStatus.connectionError
+                ? "云同步异常"
+                : collabStatus.hasConflict
+                  ? "云端存在冲突"
+                : collabStatus.syncInProgress
+                  ? "云同步进行中"
+                  : collabStatus.pendingLocalChanges
+                    ? "待推送到云端"
+                    : collabStatus.pendingRemoteChanges
+                      ? "待从云端拉取"
+                    : collabStatus.synced
+                      ? "云端已同步"
+                      : "手动同步模式"}
             </span>
           )}
         </span>
         <div className="editor-pane-toolbar-actions">
           <span className="editor-pane-toolbar-info">
             {file.language} · 共 {lineCount} 行
-            {collabStatus?.enabled && ` · ${collabStatus.members.length + 1} 人`}
+            {collabStatus?.enabled && " · 手动云同步"}
           </span>
           <button
             className="btn-secondary"
@@ -590,8 +602,14 @@ function areEditorPanePropsEqual(previous: EditorPaneProps, next: EditorPaneProp
     previous.awareness === next.awareness &&
     previous.comments === next.comments &&
     previous.collabStatus?.enabled === next.collabStatus?.enabled &&
+    previous.collabStatus?.mode === next.collabStatus?.mode &&
     previous.collabStatus?.synced === next.collabStatus?.synced &&
+    previous.collabStatus?.syncInProgress === next.collabStatus?.syncInProgress &&
+    previous.collabStatus?.pendingLocalChanges === next.collabStatus?.pendingLocalChanges &&
+    previous.collabStatus?.pendingRemoteChanges === next.collabStatus?.pendingRemoteChanges &&
+    previous.collabStatus?.hasConflict === next.collabStatus?.hasConflict &&
     previous.collabStatus?.connectionError === next.collabStatus?.connectionError &&
+    previous.collabStatus?.lastSyncAt === next.collabStatus?.lastSyncAt &&
     previous.collabStatus?.members.length === next.collabStatus?.members.length
   );
 }

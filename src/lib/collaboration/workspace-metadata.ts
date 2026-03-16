@@ -32,3 +32,11 @@ export async function writeWorkspaceCollabMetadata(
   }
   await fileAdapter.saveFile(WORKSPACE_COLLAB_METADATA_PATH, JSON.stringify(metadata, null, 2));
 }
+
+export async function clearWorkspaceCollabMetadata(fileAdapter: FileAdapter) {
+  try {
+    await fileAdapter.deleteFile(WORKSPACE_COLLAB_METADATA_PATH);
+  } catch {
+    // The metadata file may already be missing.
+  }
+}

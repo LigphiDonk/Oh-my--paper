@@ -75,7 +75,14 @@ interface SidebarProps {
   collabAuthSession: CollabAuthSession | null;
   collabConfig: CollabConfig | null;
   cloudCollab: WorkspaceCollabMetadata | null;
-  collabBusyAction: "save-config" | "create-project" | "link-project" | null;
+  collabBusyAction:
+    | "save-config"
+    | "create-project"
+    | "link-project"
+    | "unlink-project"
+    | "sync-project"
+    | "pull-project"
+    | null;
   collabNotice: { tone: "success" | "error"; text: string } | null;
   collabStatus: CollabStatus;
   activeFilePath: string;
@@ -84,8 +91,13 @@ interface SidebarProps {
   onSaveCollabConfig: (config: CollabConfig) => void;
   onCreateCloudProject: () => void;
   onLinkCloudProject: () => void;
+  onUnlinkCloudProject: () => void;
+  onSyncCloudProject: () => void;
+  onPullCloudProject: () => void;
   onCopyShareLink: () => void;
-  onRunTerminalCommand: (command: string) => void;
+  onWorkerLogin: () => Promise<void> | void;
+  onWorkerDeploy: () => Promise<void> | void;
+  onWorkerLoginAndDeploy: () => Promise<void> | void;
   // Comment props
   comments: ReviewComment[];
   onResolveComment: (id: string) => void;
@@ -195,8 +207,13 @@ export function Sidebar({
   onSaveCollabConfig,
   onCreateCloudProject,
   onLinkCloudProject,
+  onUnlinkCloudProject,
+  onSyncCloudProject,
+  onPullCloudProject,
   onCopyShareLink,
-  onRunTerminalCommand,
+  onWorkerLogin,
+  onWorkerDeploy,
+  onWorkerLoginAndDeploy,
   comments,
   onResolveComment,
   onReplyComment,
@@ -782,38 +799,26 @@ curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh`}</pre>
                 <button
                   className="btn-secondary"
                   style={{ width: "100%" }}
-                  onClick={() =>
-                    onRunTerminalCommand(
-                      'if [ -d "./workers" ]; then (cd "./workers" && npx wrangler login); else echo "[ViewerLeaf] 当前项目根目录未找到 workers/"; fi',
-                    )
-                  }
+                  onClick={() => void onWorkerLogin()}
                 >
                   打开终端并登录 Wrangler
                 </button>
                 <button
                   className="btn-primary"
                   style={{ width: "100%" }}
-                  onClick={() =>
-                    onRunTerminalCommand(
-                      'if [ -d "./workers" ]; then npm --prefix "./workers" run deploy; else echo "[ViewerLeaf] 当前项目根目录未找到 workers/"; fi',
-                    )
-                  }
+                  onClick={() => void onWorkerDeploy()}
                 >
                   一键远程部署 Worker
                 </button>
                 <button
                   className="btn-secondary"
                   style={{ width: "100%" }}
-                  onClick={() =>
-                    onRunTerminalCommand(
-                      'if [ -d "./workers" ]; then (cd "./workers" && (npx wrangler whoami >/dev/null 2>&1 || npx wrangler login) && npm run deploy); else echo "[ViewerLeaf] 当前项目根目录未找到 workers/"; fi',
-                    )
-                  }
+                  onClick={() => void onWorkerLoginAndDeploy()}
                 >
                   登录检查 + 自动部署
                 </button>
                 <div className="text-subtle text-xs">
-                  会自动打开内置终端并执行命令，日志会显示在终端里。
+                  首次会把内置 Worker 模板释放到本机应用数据目录，再自动安装依赖并执行部署。
                 </div>
               </div>
             </div>
@@ -827,25 +832,85 @@ curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh`}</pre>
                     <span
                       className={clsx(
                         "status-badge",
-                        collabStatus.connected ? "success" : "failed",
+                        collabStatus.connectionError
+                          ? "failed"
+                          : collabStatus.hasConflict
+                            ? "failed"
+                          : collabStatus.syncInProgress
+                            ? "running"
+                            : collabStatus.synced
+                              ? "success"
+                              : "running",
                       )}
                     >
-                      {collabStatus.connected
-                        ? collabStatus.synced ? "已同步" : "连接中"
-                        : "未连接"}
+                      {collabStatus.connectionError
+                        ? "同步失败"
+                        : collabStatus.hasConflict
+                          ? "存在冲突"
+                        : collabStatus.syncInProgress
+                          ? "同步中"
+                        : collabStatus.synced
+                            ? "已同步"
+                            : collabStatus.pendingLocalChanges
+                              ? "待推送"
+                              : collabStatus.pendingRemoteChanges
+                                ? "待拉取"
+                                : "手动同步"}
                     </span>
                     <span className="text-subtle text-xs" style={{ wordBreak: "break-all" }}>
                       {cloudCollab.cloudProjectId.slice(0, 8)}…
                     </span>
                   </div>
-                  {collabStatus.members.length > 0 && (
+                  <div className="text-subtle text-xs">
+                    当前为手动同步模式，实时光标和在线成员已关闭。
+                  </div>
+                  <div className="text-subtle text-xs">
+                    绿点已同步，黄点待推送，蓝点待拉取，红点表示本地和云端同时有未同步修改。
+                  </div>
+                  {collabStatus.lastSyncAt && (
                     <div className="text-subtle text-xs">
-                      在线: {collabStatus.members.map((m) => m.name).join(", ")}
+                      上次同步: {formatUsageTimestamp(collabStatus.lastSyncAt)}
                     </div>
                   )}
+                  {collabStatus.connectionError && (
+                    <div className="text-subtle text-xs" style={{ color: "var(--danger)" }}>
+                      {collabStatus.connectionError}
+                    </div>
+                  )}
+                  <button
+                    className="btn-primary"
+                    style={{ width: "100%", marginTop: 8 }}
+                    onClick={onSyncCloudProject}
+                    disabled={collabBusyAction === "sync-project" || collabBusyAction === "pull-project"}
+                  >
+                    {collabBusyAction === "sync-project" ? "推送中..." : "推送待同步文件"}
+                  </button>
+                  <button
+                    className="btn-secondary"
+                    style={{ width: "100%" }}
+                    onClick={onPullCloudProject}
+                    disabled={collabBusyAction === "sync-project" || collabBusyAction === "pull-project"}
+                  >
+                    {collabBusyAction === "pull-project" ? "拉取中..." : "拉取待更新文件"}
+                  </button>
                   <button className="btn-secondary" style={{ width: "100%", marginTop: 8 }} onClick={onCopyShareLink}>
                     复制分享链接
                   </button>
+                  <button
+                    className="btn-secondary"
+                    style={{ width: "100%" }}
+                    onClick={onUnlinkCloudProject}
+                    disabled={
+                      collabBusyAction === "unlink-project" ||
+                      collabBusyAction === "sync-project" ||
+                      collabBusyAction === "pull-project"
+                    }
+                  >
+                    {collabBusyAction === "unlink-project" ? "解除中..." : "解除当前工作区关联"}
+                  </button>
+                  <div className="text-subtle text-xs">
+                    只解绑当前工作区，不会删除云端已有项目。
+                  </div>
                 </div>
               ) : (
                 <div className="sidebar-stack-compact">
@@ -854,7 +919,11 @@ curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh`}</pre>
                     className="btn-primary"
                     style={{ width: "100%" }}
                     onClick={onCreateCloudProject}
-                    disabled={collabBusyAction === "create-project" || collabBusyAction === "link-project"}
+                    disabled={
+                      collabBusyAction === "create-project" ||
+                      collabBusyAction === "link-project" ||
+                      collabBusyAction === "unlink-project"
+                    }
                   >
                     {collabBusyAction === "create-project" ? "创建中..." : "创建云协作项目"}
                   </button>
@@ -862,7 +931,11 @@ curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh`}</pre>
                     className="btn-secondary"
                     style={{ width: "100%" }}
                     onClick={onLinkCloudProject}
-                    disabled={collabBusyAction === "create-project" || collabBusyAction === "link-project"}
+                    disabled={
+                      collabBusyAction === "create-project" ||
+                      collabBusyAction === "link-project" ||
+                      collabBusyAction === "unlink-project"
+                    }
                   >
                     {collabBusyAction === "link-project" ? "关联中..." : "关联已有项目"}
                   </button>

@@ -6,9 +6,10 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "viewerleaf:deploy": "node ./scripts/viewerleaf-deploy.mjs",
     "check": "tsc --noEmit",
-    "d1:migrate:local": "wrangler d1 migrations apply viewerleaf --local",
-    "d1:migrate:remote": "wrangler d1 migrations apply viewerleaf --remote"
+    "d1:migrate:local": "wrangler d1 migrations apply DB --local",
+    "d1:migrate:remote": "wrangler d1 migrations apply DB --remote"
   },
   "dependencies": {
     "y-protocols": "^1.0.7",
@@ -20,4 +21,3 @@
     "wrangler": "^4.73.0"
   }
 }
-

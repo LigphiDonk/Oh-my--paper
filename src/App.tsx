@@ -42,8 +42,13 @@ import {
 } from "./lib/collaboration/collab-config";
 import { CommentStore } from "./lib/collaboration/comment-store";
 import { generateShareLink, parseProjectReference } from "./lib/collaboration/share";
-import { CollabDocManager } from "./lib/collaboration/doc-manager";
 import {
+  CollabDocManager,
+  seedCollabSyncBaseline,
+  type CollabWorkspaceSyncSummary,
+} from "./lib/collaboration/doc-manager";
+import {
+  clearWorkspaceCollabMetadata,
   readWorkspaceCollabMetadata,
   writeWorkspaceCollabMetadata,
 } from "./lib/collaboration/workspace-metadata";
@@ -82,7 +87,13 @@ type PreviewSelection =
   | { kind: "unsupported"; path: string; title: string; description: string };
 
 type EditorJumpTarget = { path: string; line: number; nonce: number };
-type CollabBusyAction = "save-config" | "create-project" | "link-project";
+type CollabBusyAction =
+  | "save-config"
+  | "create-project"
+  | "link-project"
+  | "unlink-project"
+  | "sync-project"
+  | "pull-project";
 type CollabNotice = {
   tone: "success" | "error";
   text: string;
@@ -94,6 +105,10 @@ type CollabLoginMode = "edit" | "bootstrap";
 
 function normalizeProjectPath(path: string) {
   return path.replaceAll("\\", "/");
+}
+
+function shellQuote(value: string) {
+  return `'${value.replaceAll("'", "'\"'\"'")}'`;
 }
 
 function isSamePathOrChild(path: string, target: string) {
@@ -287,7 +302,7 @@ function App() {
   const [terminalCommandRequest, setTerminalCommandRequest] = useState<{ id: number; command: string } | null>(null);
   const terminalCommandCounterRef = useRef(0);
   const [workspacePaneMode, setWorkspacePaneMode] = useState<WorkspacePaneMode>("files");
-  const [isWorkspacePaneCollapsed, setIsWorkspacePaneCollapsed] = useState(false);
+  const [isWorkspacePaneVisible, setIsWorkspacePaneVisible] = useState(true);
   const [cursorLine, setCursorLine] = useState(1);
   const [selectedText, setSelectedText] = useState("");
   const [selectedBrief, setSelectedBrief] = useState<FigureBriefDraft | null>(null);
@@ -296,6 +311,7 @@ function App() {
   const [editorJumpTarget, setEditorJumpTarget] = useState<EditorJumpTarget | null>(null);
   const [collabRevision, setCollabRevision] = useState(0);
   const [runtimeDebugLogLines, setRuntimeDebugLogLines] = useState<string[]>([]);
+  const [collabDebugLogLines, setCollabDebugLogLines] = useState<string[]>([]);
   const workspaceBodyRef = useRef<HTMLDivElement | null>(null);
 
   const { file: fileAdapter, project: projectAdapter, compile: compileAdapter } = useMemo(
@@ -349,6 +365,14 @@ function App() {
   const [activeDocComments, setActiveDocComments] = useState<ReviewComment[]>([]);
   const [collabBusyAction, setCollabBusyAction] = useState<CollabBusyAction | null>(null);
   const [collabNotice, setCollabNotice] = useState<CollabNotice | null>(null);
+  const [lastManualCollabSyncAt, setLastManualCollabSyncAt] = useState("");
+  const [collabSyncError, setCollabSyncError] = useState("");
+  const [collabWorkspaceSyncSummary, setCollabWorkspaceSyncSummary] = useState<CollabWorkspaceSyncSummary>({
+    byPath: {},
+    pendingPushCount: 0,
+    pendingPullCount: 0,
+    conflictCount: 0,
+  });
   const [collabProjectModal, setCollabProjectModal] = useState<CollabProjectModalState | null>(null);
   const [availableCloudProjects, setAvailableCloudProjects] = useState<CloudProjectSummary[]>([]);
   const [isLoadingCloudProjects, setIsLoadingCloudProjects] = useState(false);
@@ -363,6 +387,27 @@ function App() {
   const activeCollabProjectId =
     snapshot?.collab?.mode === "cloud" ? snapshot.collab.cloudProjectId : null;
 
+  const appendCollabDebugLog = useEffectEvent((message: string, details?: unknown) => {
+    const suffix = (() => {
+      if (details === undefined) {
+        return "";
+      }
+      if (typeof details === "string") {
+        return ` ${details}`;
+      }
+      try {
+        return ` ${JSON.stringify(details)}`;
+      } catch {
+        return ` ${String(details)}`;
+      }
+    })();
+    const line = `[${formatDebugTimestamp(new Date())}] ${message}${suffix}`;
+    setCollabDebugLogLines((current) => {
+      const next = [...current, line];
+      return next.length > 240 ? next.slice(next.length - 240) : next;
+    });
+  });
+
   useEffect(() => {
     if (!activeCollabProjectId || !collabAuthSession) {
       setAuthorizedCollabProjectId(null);
@@ -371,10 +416,19 @@ function App() {
 
     let cancelled = false;
     setAuthorizedCollabProjectId(null);
+    appendCollabDebugLog("[collab.http] joining cloud project", {
+      projectId: activeCollabProjectId,
+      httpBaseUrl: resolveCollabBaseUrls().httpBaseUrl,
+      hasToken: Boolean(collabAuthSession.token),
+      userId: collabAuthSession.userId,
+    });
 
     void joinCloudProject(collabAuthSession.token, activeCollabProjectId)
       .then(() => {
         if (!cancelled) {
+          appendCollabDebugLog("[collab.http] join succeeded", {
+            projectId: activeCollabProjectId,
+          });
           setAuthorizedCollabProjectId(activeCollabProjectId);
         }
       })
@@ -383,6 +437,10 @@ function App() {
           return;
         }
         const message = error instanceof Error ? error.message : String(error);
+        appendCollabDebugLog("[collab.http] join failed", {
+          projectId: activeCollabProjectId,
+          message,
+        });
         setAuthorizedCollabProjectId(null);
         setCollabNotice({
           tone: "error",
@@ -396,15 +454,24 @@ function App() {
     };
   }, [activeCollabProjectId, collabAuthSession]);
 
+  useEffect(() => {
+    setLastManualCollabSyncAt("");
+    setCollabSyncError("");
+    setCollabWorkspaceSyncSummary({
+      byPath: {},
+      pendingPushCount: 0,
+      pendingPullCount: 0,
+      conflictCount: 0,
+    });
+  }, [activeCollabProjectId]);
+
   const collabManager = useMemo(() => {
     const collabMetadata = snapshot?.collab;
-    const { wsBaseUrl } = resolveCollabBaseUrls();
     if (
       !collabMetadata ||
       collabMetadata.mode !== "cloud" ||
       !collabMetadata.cloudProjectId ||
       !collabAuthSession ||
-      !wsBaseUrl ||
       authorizedCollabProjectId !== collabMetadata.cloudProjectId
     ) {
       return null;
@@ -420,14 +487,35 @@ function App() {
         color: collabAuthSession.color,
       },
       fileAdapter,
+      realtimeSyncEnabled: false,
+      debugLog: appendCollabDebugLog,
     });
-  }, [authorizedCollabProjectId, collabAuthSession, fileAdapter, snapshot?.collab]);
+  }, [appendCollabDebugLog, authorizedCollabProjectId, collabAuthSession, fileAdapter, snapshot?.collab]);
 
   useEffect(() => {
     return () => {
       collabManager?.destroy();
     };
   }, [collabManager]);
+
+  const refreshCollabSyncSummary = useEffectEvent(async () => {
+    if (!collabManager || !snapshot) {
+      setCollabWorkspaceSyncSummary({
+        byPath: {},
+        pendingPushCount: 0,
+        pendingPullCount: 0,
+        conflictCount: 0,
+      });
+      return;
+    }
+
+    try {
+      const summary = await collabManager.getWorkspaceSyncSummary(snapshot);
+      setCollabWorkspaceSyncSummary(summary);
+    } catch (error) {
+      console.warn("failed to refresh collaborative workspace sync summary", error);
+    }
+  });
 
   useEffect(() => {
     if (!collabManager) {
@@ -437,9 +525,10 @@ function App() {
       if (event.kind === "content") {
         setCollabRevision((current) => current + 1);
       }
+      void refreshCollabSyncSummary();
     });
     return unsubscribe;
-  }, [collabManager]);
+  }, [collabManager, refreshCollabSyncSummary]);
 
   useEffect(() => {
     if (!collabManager) {
@@ -449,6 +538,10 @@ function App() {
       console.warn("failed to sync collaborative project", error);
     });
   }, [collabManager, snapshot]);
+
+  useEffect(() => {
+    void refreshCollabSyncSummary();
+  }, [collabManager, refreshCollabSyncSummary, snapshot]);
 
   useEffect(() => {
     if (!collabManager) {
@@ -631,16 +724,72 @@ function App() {
     manager: collabManager,
   });
 
+  const collabSyncInProgress =
+    collabBusyAction === "sync-project" || collabBusyAction === "pull-project";
   const currentCollabStatus = useMemo(
     () => ({
-      enabled: Boolean(snapshot?.collab?.cloudProjectId && activeCollaborativeDoc.yText),
-      connected: Boolean(activeCollaborativeDoc.provider),
-      synced: activeCollaborativeDoc.synced,
-      connectionError: activeCollaborativeDoc.connectionError,
-      members: activeCollaborativeDoc.members,
+      enabled: Boolean(snapshot?.collab?.cloudProjectId),
+      mode: "manual" as const,
+      connected: false,
+      synced:
+        collabWorkspaceSyncSummary.pendingPushCount === 0 &&
+        collabWorkspaceSyncSummary.pendingPullCount === 0 &&
+        collabWorkspaceSyncSummary.conflictCount === 0 &&
+        !collabSyncInProgress &&
+        Boolean(lastManualCollabSyncAt),
+      syncInProgress: collabSyncInProgress,
+      pendingLocalChanges:
+        collabWorkspaceSyncSummary.pendingPushCount > 0 || collabWorkspaceSyncSummary.conflictCount > 0,
+      pendingRemoteChanges:
+        collabWorkspaceSyncSummary.pendingPullCount > 0 || collabWorkspaceSyncSummary.conflictCount > 0,
+      hasConflict: collabWorkspaceSyncSummary.conflictCount > 0,
+      lastSyncAt: lastManualCollabSyncAt,
+      connectionError: collabSyncError || activeCollaborativeDoc.connectionError,
+      members: [],
     }),
-    [activeCollaborativeDoc, snapshot?.collab?.cloudProjectId],
+    [
+      activeCollaborativeDoc.connectionError,
+      collabSyncError,
+      collabSyncInProgress,
+      collabWorkspaceSyncSummary.conflictCount,
+      collabWorkspaceSyncSummary.pendingPullCount,
+      collabWorkspaceSyncSummary.pendingPushCount,
+      lastManualCollabSyncAt,
+      snapshot?.collab?.cloudProjectId,
+    ],
   );
+
+  useEffect(() => {
+    if (!activeCollabProjectId) {
+      return;
+    }
+    appendCollabDebugLog("[collab.state] active doc status", {
+      projectId: activeCollabProjectId,
+      docPath: activeFile?.path ?? "",
+      mode: currentCollabStatus.mode,
+      enabled: currentCollabStatus.enabled,
+      connected: currentCollabStatus.connected,
+      synced: currentCollabStatus.synced,
+      syncInProgress: currentCollabStatus.syncInProgress,
+      pendingLocalChanges: currentCollabStatus.pendingLocalChanges,
+      lastSyncAt: currentCollabStatus.lastSyncAt || "",
+      members: currentCollabStatus.members.length,
+      connectionError: currentCollabStatus.connectionError || "",
+    });
+  }, [
+    activeCollabProjectId,
+    activeFile?.path,
+    appendCollabDebugLog,
+    currentCollabStatus.connected,
+    currentCollabStatus.connectionError,
+    currentCollabStatus.enabled,
+    currentCollabStatus.lastSyncAt,
+    currentCollabStatus.members.length,
+    currentCollabStatus.mode,
+    currentCollabStatus.pendingLocalChanges,
+    currentCollabStatus.syncInProgress,
+    currentCollabStatus.synced,
+  ]);
 
   const commentStore = useMemo(() => {
     const yDoc = activeCollaborativeDoc.yDoc;
@@ -1001,6 +1150,36 @@ function App() {
     });
     setIsTerminalVisible(true);
   });
+
+  const handleWorkerTerminalAction = useEffectEvent(
+    async (mode: "login" | "deploy" | "login-deploy") => {
+      try {
+        const workerDir = await desktop.prepareWorkerDeployDir();
+        const quotedDir = shellQuote(workerDir);
+        const ensureDeps =
+          'if [ ! -d "./node_modules" ]; then npm install --no-audit --no-fund; fi';
+
+        let command = "";
+        if (mode === "login") {
+          command = `cd ${quotedDir} && ${ensureDeps} && npx wrangler login`;
+        } else if (mode === "deploy") {
+          command = `cd ${quotedDir} && ${ensureDeps} && npm run viewerleaf:deploy`;
+        } else {
+          command =
+            `cd ${quotedDir} && ${ensureDeps} ` +
+            '&& (npx wrangler whoami >/dev/null 2>&1 || npx wrangler login) ' +
+            "&& npm run viewerleaf:deploy";
+        }
+
+        handleRunTerminalCommand(command);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        handleRunTerminalCommand(
+          `printf '%s\\n' ${shellQuote(`[ViewerLeaf] 准备 Worker 模板失败: ${message}`)}`,
+        );
+      }
+    },
+  );
 
   const handleTerminalResizeStart = useEffectEvent((event: ReactMouseEvent<HTMLDivElement>) => {
     const workspaceBody = workspaceBodyRef.current;
@@ -1604,11 +1783,13 @@ function App() {
     await ensureCloudDocument(token, projectId, rootMainFile);
     const documents = await listCloudDocuments(token, projectId);
 
-    for (const document of documents) {
+    for (const document of documents.filter((item) => item.kind === "text")) {
       const snapshotUpdate = await fetchDocumentSnapshot(token, projectId, document.path);
       const content = decodeCollabTextSnapshot(snapshotUpdate);
       await fileAdapter.saveFile(document.path, content);
     }
+
+    await seedCollabSyncBaseline(fileAdapter, projectId, documents);
   }
 
   async function handleCreateCloudProject() {
@@ -1649,10 +1830,12 @@ function App() {
       };
       await writeWorkspaceCollabMetadata(fileAdapter, collab);
       setSnapshot((current) => (current ? { ...current, collab } : current));
+      setLastManualCollabSyncAt("");
+      setCollabSyncError("");
       setCollabProjectModal(null);
       setCollabNotice({
         tone: "success",
-        text: `云项目已创建并关联：${projectName.trim()}`,
+        text: `云项目已创建并关联：${projectName.trim()}。下一步请推送待同步文件。`,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1726,10 +1909,12 @@ function App() {
       };
       await writeWorkspaceCollabMetadata(fileAdapter, collab);
       setSnapshot((current) => (current ? { ...current, collab } : current));
+      setLastManualCollabSyncAt("");
+      setCollabSyncError("");
       setCollabProjectModal(null);
       setCollabNotice({
         tone: "success",
-        text: `云项目已关联：${cloudProjectId}`,
+        text: `云项目已关联：${cloudProjectId}。如需覆盖本地，请先拉取待更新文件；如需上传本地，请推送待同步文件。`,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1804,6 +1989,8 @@ function App() {
 
       const nextSnapshot = await loadSnapshotWithCollab(() => projectAdapter.openProject());
       applyFreshWorkspaceSnapshot(nextSnapshot);
+      setLastManualCollabSyncAt(new Date().toISOString());
+      setCollabSyncError("");
       setCollabNotice({
         tone: "success",
         text: `云项目已下载并关联：${project.name || resolvedProject.projectId}`,
@@ -1842,6 +2029,8 @@ function App() {
     setCollabProjectModal(null);
     setAvailableCloudProjects([]);
     setPendingCloudProjectReference(null);
+    setLastManualCollabSyncAt("");
+    setCollabSyncError("");
   }
 
   function handleSaveCollabConfig(config: CollabConfig) {
@@ -1873,6 +2062,149 @@ function App() {
     navigator.clipboard.writeText(link).then(() => {
       window.alert(`分享链接已复制:\n${link}`);
     });
+  }
+
+  async function handleUnlinkCloudProject() {
+    if (!snapshot?.collab?.cloudProjectId) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "解除当前工作区与云项目的关联？这不会删除云端项目，但你可以随后重新创建或重新关联别的云项目。",
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setCollabBusyAction("unlink-project");
+    setCollabNotice(null);
+
+    try {
+      await clearWorkspaceCollabMetadata(fileAdapter);
+      appendCollabDebugLog("[collab.local] workspace unlinked from cloud project", {
+        projectId: snapshot.collab.cloudProjectId,
+        workspaceRoot: snapshot.projectConfig.rootPath,
+      });
+      setSnapshot((current) => (current ? { ...current, collab: null } : current));
+      setLastManualCollabSyncAt("");
+      setCollabSyncError("");
+      setCollabNotice({
+        tone: "success",
+        text: "当前工作区已解除云关联，可以重新创建或关联新的云项目。",
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setCollabNotice({
+        tone: "error",
+        text: `解除云关联失败：${message}`,
+      });
+    } finally {
+      setCollabBusyAction(null);
+    }
+  }
+
+  async function handleSyncCloudWorkspace() {
+    if (!snapshot || !snapshot.collab?.cloudProjectId || !collabManager) {
+      return;
+    }
+
+    setCollabBusyAction("sync-project");
+    setCollabNotice(null);
+    setCollabSyncError("");
+    appendCollabDebugLog("[collab.manual] syncing workspace", {
+      projectId: snapshot.collab.cloudProjectId,
+      workspaceRoot: snapshot.projectConfig.rootPath,
+      mode: "push",
+    });
+
+    try {
+      const result = await collabManager.syncWorkspaceNow(snapshot);
+      await refreshCollabSyncSummary();
+      if (result.syncedCount > 0) {
+        const syncedAt = new Date().toISOString();
+        setLastManualCollabSyncAt(syncedAt);
+        setCollabNotice({
+          tone: "success",
+          text: `已推送 ${result.syncedCount} 个待同步文件到云端。`,
+        });
+        appendCollabDebugLog("[collab.manual] workspace sync succeeded", {
+          projectId: snapshot.collab.cloudProjectId,
+          syncedCount: result.syncedCount,
+          syncedAt,
+        });
+      } else {
+        setCollabNotice({
+          tone: "success",
+          text: "当前没有待同步的文本文件。",
+        });
+        appendCollabDebugLog("[collab.manual] workspace sync skipped", {
+          projectId: snapshot.collab.cloudProjectId,
+          reason: "no-pending-files",
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setCollabSyncError(message);
+      setCollabNotice({
+        tone: "error",
+        text: `手动同步失败：${message}`,
+      });
+      appendCollabDebugLog("[collab.manual] workspace sync failed", {
+        projectId: snapshot.collab.cloudProjectId,
+        message,
+      });
+    } finally {
+      setCollabBusyAction(null);
+    }
+  }
+
+  async function handlePullCloudWorkspace() {
+    if (!snapshot || !snapshot.collab?.cloudProjectId || !collabManager) {
+      return;
+    }
+
+    setCollabBusyAction("pull-project");
+    setCollabNotice(null);
+    setCollabSyncError("");
+    appendCollabDebugLog("[collab.manual] pulling workspace from cloud", {
+      projectId: snapshot.collab.cloudProjectId,
+      workspaceRoot: snapshot.projectConfig.rootPath,
+    });
+
+    try {
+      const result = await collabManager.pullWorkspace(snapshot);
+      const syncedAt = new Date().toISOString();
+      if (result.syncedCount > 0) {
+        await refreshWorkspace();
+      } else {
+        await refreshCollabSyncSummary();
+      }
+      setLastManualCollabSyncAt(syncedAt);
+      setCollabNotice({
+        tone: "success",
+        text: result.syncedCount > 0
+          ? `已从云端拉取 ${result.syncedCount} 个待更新文件。`
+          : "当前没有待拉取的文件。",
+      });
+      appendCollabDebugLog("[collab.manual] workspace pull succeeded", {
+        projectId: snapshot.collab.cloudProjectId,
+        syncedCount: result.syncedCount,
+        syncedAt,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setCollabSyncError(message);
+      setCollabNotice({
+        tone: "error",
+        text: `拉取云端内容失败：${message}`,
+      });
+      appendCollabDebugLog("[collab.manual] workspace pull failed", {
+        projectId: snapshot.collab.cloudProjectId,
+        message,
+      });
+    } finally {
+      setCollabBusyAction(null);
+    }
   }
 
   const handleAddComment = useEffectEvent((
@@ -2118,6 +2450,9 @@ function App() {
     if (runtimeDebugLogLines.length > 0) {
       sections.push(`=== Runtime Errors ===\n${runtimeDebugLogLines.join("\n")}`);
     }
+    if (collabDebugLogLines.length > 0) {
+      sections.push(`=== Collaboration Debug ===\n${collabDebugLogLines.join("\n")}`);
+    }
     if (workspaceDebugLogLines.length > 0) {
       sections.push(`=== Workspace Debug ===\n${workspaceDebugLogLines.join("\n")}`);
     }
@@ -2125,7 +2460,13 @@ function App() {
       sections.push(`=== Frontend Debug ===\n${frontendCompileDebugLog}`);
     }
     return sections.join("\n\n");
-  }, [frontendCompileDebugLog, runtimeDebugLogLines, snapshot?.compileResult.logOutput, workspaceDebugLogLines]);
+  }, [
+    collabDebugLogLines,
+    frontendCompileDebugLog,
+    runtimeDebugLogLines,
+    snapshot?.compileResult.logOutput,
+    workspaceDebugLogLines,
+  ]);
 
   const outlineNode = useMemo(() => {
     if (outlineLoading) {
@@ -2249,6 +2590,15 @@ function App() {
 
       <div className="workspace-container">
           <div className="activity-bar">
+            <button
+              className={`activity-icon hover-spring ${isWorkspacePaneVisible ? "is-active" : ""}`}
+              onClick={() => setIsWorkspacePaneVisible((current) => !current)}
+              title={isWorkspacePaneVisible ? "隐藏 Project 面板" : "显示 Project 面板"}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 7h5l2 2h11v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"></path>
+              </svg>
+            </button>
             <button
               className={`activity-icon hover-spring ${drawerTab === "latex" ? "is-active" : ""}`}
               onClick={() => setDrawerTab("latex")}
@@ -2378,8 +2728,13 @@ function App() {
             onSaveCollabConfig={handleSaveCollabConfig}
             onCreateCloudProject={() => void handleCreateCloudProject()}
             onLinkCloudProject={() => void handleLinkCloudProject()}
+            onUnlinkCloudProject={() => void handleUnlinkCloudProject()}
+            onSyncCloudProject={() => void handleSyncCloudWorkspace()}
+            onPullCloudProject={() => void handlePullCloudWorkspace()}
             onCopyShareLink={handleCopyShareLink}
-            onRunTerminalCommand={handleRunTerminalCommand}
+            onWorkerLogin={() => handleWorkerTerminalAction("login")}
+            onWorkerDeploy={() => handleWorkerTerminalAction("deploy")}
+            onWorkerLoginAndDeploy={() => handleWorkerTerminalAction("login-deploy")}
             comments={activeDocComments}
             onResolveComment={handleResolveComment}
             onReplyComment={handleReplyComment}
@@ -2389,7 +2744,8 @@ function App() {
 
           <div className="workspace-body" ref={workspaceBodyRef}>
             <div className="workspace-main">
-              <div className={`workspace-left-pane ${isWorkspacePaneCollapsed ? "is-collapsed" : ""}`}>
+              {isWorkspacePaneVisible && (
+                <div className="workspace-left-pane">
                 <div className="workspace-pane-header">
                   <div className="workspace-pane-meta">
                     <div className="workspace-pane-title">Project</div>
@@ -2398,67 +2754,49 @@ function App() {
                     </div>
                   </div>
                   <div className="workspace-pane-actions">
-                    {!isWorkspacePaneCollapsed && (
-                      <>
-                        <button className="icon-btn" title="新建文件" type="button" onClick={() => void handleQuickCreateFile()}>
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
-                        </button>
-                        <button className="icon-btn" title="新建文件夹" type="button" onClick={() => void handleQuickCreateFolder()}>
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7h5l2 2h11v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"></path><path d="M12 12v6"></path><path d="M9 15h6"></path></svg>
-                        </button>
-                      </>
-                    )}
-                    <button
-                      className="icon-btn"
-                      title={isWorkspacePaneCollapsed ? "展开 Project 面板" : "折叠 Project 面板"}
-                      type="button"
-                      onClick={() => setIsWorkspacePaneCollapsed((current) => !current)}
-                    >
-                      {isWorkspacePaneCollapsed ? (
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"></path></svg>
-                      ) : (
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"></path></svg>
-                      )}
+                    <button className="icon-btn" title="新建文件" type="button" onClick={() => void handleQuickCreateFile()}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+                    </button>
+                    <button className="icon-btn" title="新建文件夹" type="button" onClick={() => void handleQuickCreateFolder()}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7h5l2 2h11v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"></path><path d="M12 12v6"></path><path d="M9 15h6"></path></svg>
                     </button>
                   </div>
                 </div>
-                {!isWorkspacePaneCollapsed && (
-                  <>
-                    <div className="workspace-pane-segmented">
-                      <button
-                        type="button"
-                        className={`sidebar-segment ${workspacePaneMode === "files" ? "is-active" : ""}`}
-                        onClick={() => setWorkspacePaneMode("files")}
-                      >
-                        Files
-                      </button>
-                      <button
-                        type="button"
-                        className={`sidebar-segment ${workspacePaneMode === "outline" ? "is-active" : ""}`}
-                        onClick={() => setWorkspacePaneMode("outline")}
-                      >
-                        Outline
-                      </button>
-                    </div>
-                    <div className="workspace-pane-body">
-                      {workspacePaneMode === "files" ? (
-                        <ProjectTree
-                          nodes={snapshot.tree}
-                          activeFile={focusedTreePath}
-                          dirtyPaths={dirtyPathSet}
-                          onOpenNode={handleOpenNode}
-                          onCreateFile={handleCreateFile}
-                          onCreateFolder={handleCreateFolder}
-                          onDeleteFile={handleDeleteFile}
-                          onRenameFile={handleRenameFile}
-                        />
-                      ) : (
-                        outlineNode
-                      )}
-                    </div>
-                  </>
-                )}
+                <div className="workspace-pane-segmented">
+                  <button
+                    type="button"
+                    className={`sidebar-segment ${workspacePaneMode === "files" ? "is-active" : ""}`}
+                    onClick={() => setWorkspacePaneMode("files")}
+                  >
+                    Files
+                  </button>
+                  <button
+                    type="button"
+                    className={`sidebar-segment ${workspacePaneMode === "outline" ? "is-active" : ""}`}
+                    onClick={() => setWorkspacePaneMode("outline")}
+                  >
+                    Outline
+                  </button>
+                </div>
+                <div className="workspace-pane-body">
+                  {workspacePaneMode === "files" ? (
+                    <ProjectTree
+                      nodes={snapshot.tree}
+                      activeFile={focusedTreePath}
+                      dirtyPaths={dirtyPathSet}
+                      collabSyncStates={collabWorkspaceSyncSummary.byPath}
+                      onOpenNode={handleOpenNode}
+                      onCreateFile={handleCreateFile}
+                      onCreateFolder={handleCreateFolder}
+                      onDeleteFile={handleDeleteFile}
+                      onRenameFile={handleRenameFile}
+                    />
+                  ) : (
+                    outlineNode
+                  )}
+                </div>
               </div>
+              )}
 
               <div className="editor-area">
                 <div className="editor-tabs" onWheel={handleEditorTabsWheel}>

@@ -1,4 +1,3 @@
-import * as awarenessProtocol from "y-protocols/awareness.js";
 import type { Awareness } from "y-protocols/awareness";
 import * as Y from "yjs";
 
@@ -6,6 +5,7 @@ const FRAME_SYNC_REQUEST = 0;
 const FRAME_SYNC_RESPONSE = 1;
 const FRAME_DOCUMENT_UPDATE = 2;
 const FRAME_AWARENESS_UPDATE = 3;
+const AWARENESS_SYNC_ENABLED = false;
 
 type ProviderEventMap = {
   sync: () => void;
@@ -13,6 +13,18 @@ type ProviderEventMap = {
   status: (connected: boolean) => void;
   reconnecting: (attempt: number, delay: number) => void;
 };
+
+function sanitizeWsUrl(rawUrl: string) {
+  try {
+    const url = new URL(rawUrl);
+    if (url.searchParams.has("token")) {
+      url.searchParams.set("token", "***");
+    }
+    return url.toString();
+  } catch {
+    return rawUrl;
+  }
+}
 
 function encodeFrame(type: number, payload?: Uint8Array) {
   const bytes = payload ?? new Uint8Array(0);
@@ -48,6 +60,7 @@ export class ViewerLeafProvider {
   private shouldReconnect = true;
   private static readonly MAX_DELAY = 30_000;
   private static readonly BASE_DELAY = 1_000;
+  private readonly debugLog?: (message: string, details?: unknown) => void;
 
   private readonly handleDocumentUpdate = (update: Uint8Array, origin: unknown) => {
     if (origin === this || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
@@ -60,15 +73,15 @@ export class ViewerLeafProvider {
     { added, updated, removed }: { added: number[]; updated: number[]; removed: number[] },
     origin: unknown,
   ) => {
+    if (!AWARENESS_SYNC_ENABLED) {
+      return;
+    }
     if (origin === this || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
       return;
     }
-    const changedClients = [...added, ...updated, ...removed];
-    if (!changedClients.length) {
+    if (added.length + updated.length + removed.length === 0) {
       return;
     }
-    const update = awarenessProtocol.encodeAwarenessUpdate(this.awareness, changedClients);
-    this.ws.send(encodeFrame(FRAME_AWARENESS_UPDATE, update));
   };
 
   constructor(
@@ -78,6 +91,7 @@ export class ViewerLeafProvider {
     authToken: string,
     user: { userId: string; name: string; color: string },
     docPath: string,
+    debugLog?: (message: string, details?: unknown) => void,
   ) {
     this.wsUrl = wsUrl;
     this.yDoc = yDoc;
@@ -85,8 +99,11 @@ export class ViewerLeafProvider {
     this.authToken = authToken;
     this.user = user;
     this.docPath = docPath;
+    this.debugLog = debugLog;
     this.yDoc.on("update", this.handleDocumentUpdate);
-    this.awareness.on("update", this.handleAwarenessUpdate);
+    if (AWARENESS_SYNC_ENABLED) {
+      this.awareness.on("update", this.handleAwarenessUpdate);
+    }
   }
 
   get synced() {
@@ -103,11 +120,19 @@ export class ViewerLeafProvider {
 
   connect() {
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      this.debugLog?.("[collab.ws] connect skipped because socket is already active", {
+        path: this.docPath,
+        readyState: this.ws.readyState,
+      });
       return;
     }
 
     this.shouldReconnect = true;
     this.syncedState = false;
+    this.debugLog?.("[collab.ws] opening websocket", {
+      path: this.docPath,
+      url: sanitizeWsUrl(this.wsUrl),
+    });
     const ws = new WebSocket(this.wsUrl);
     ws.binaryType = "arraybuffer";
     ws.addEventListener("open", this.handleOpen);
@@ -121,6 +146,10 @@ export class ViewerLeafProvider {
     this.shouldReconnect = false;
     this.clearReconnectTimer();
     this.stopHeartbeat();
+    this.debugLog?.("[collab.ws] disconnect requested", {
+      path: this.docPath,
+      hadSocket: Boolean(this.ws),
+    });
     if (!this.ws) {
       return;
     }
@@ -137,7 +166,9 @@ export class ViewerLeafProvider {
 
   destroy() {
     this.disconnect();
-    this.awareness.off("update", this.handleAwarenessUpdate);
+    if (AWARENESS_SYNC_ENABLED) {
+      this.awareness.off("update", this.handleAwarenessUpdate);
+    }
     this.yDoc.off("update", this.handleDocumentUpdate);
     this.awareness.setLocalState(null);
     this.reconnectAttempt = 0;
@@ -159,6 +190,10 @@ export class ViewerLeafProvider {
     }
 
     this.reconnectAttempt = 0;
+    this.debugLog?.("[collab.ws] websocket open", {
+      path: this.docPath,
+      url: sanitizeWsUrl(this.wsUrl),
+    });
     this.emit("status", true);
     this.ws.send(
       JSON.stringify({
@@ -171,16 +206,20 @@ export class ViewerLeafProvider {
         token: this.authToken,
       }),
     );
-    this.awareness.setLocalStateField("user", {
-      userId: this.user.userId,
-      name: this.user.name,
-      color: this.user.color,
-      colorLight: `${this.user.color}33`,
-      openFile: this.docPath,
-    });
+    if (AWARENESS_SYNC_ENABLED) {
+      this.awareness.setLocalStateField("user", {
+        userId: this.user.userId,
+        name: this.user.name,
+        color: this.user.color,
+        colorLight: `${this.user.color}33`,
+        openFile: this.docPath,
+      });
+    }
     this.ws.send(encodeFrame(FRAME_SYNC_REQUEST, Y.encodeStateVector(this.yDoc)));
-    this.sendAwarenessPing();
-    this.startHeartbeat();
+    if (AWARENESS_SYNC_ENABLED) {
+      this.sendAwarenessPing();
+      this.startHeartbeat();
+    }
   };
 
   private readonly handleMessage = (event: MessageEvent<string | ArrayBuffer>) => {
@@ -188,9 +227,17 @@ export class ViewerLeafProvider {
       try {
         const payload = JSON.parse(event.data) as { type?: string; message?: string };
         if (payload.type === "error") {
+          this.debugLog?.("[collab.ws] server error frame", {
+            path: this.docPath,
+            message: payload.message || "Connection failed",
+          });
           this.emit("connection-error", new Error(payload.message || "Connection failed"));
         }
       } catch (error) {
+        this.debugLog?.("[collab.ws] failed to parse text frame", {
+          path: this.docPath,
+          message: error instanceof Error ? error.message : String(error),
+        });
         this.emit("connection-error", error instanceof Error ? error : new Error(String(error)));
       }
       return;
@@ -203,26 +250,48 @@ export class ViewerLeafProvider {
         Y.applyUpdate(this.yDoc, payload, this);
         if (!this.syncedState) {
           this.syncedState = true;
+          this.debugLog?.("[collab.ws] document synced", {
+            path: this.docPath,
+            frameType: type === FRAME_SYNC_RESPONSE ? "sync-response" : "document-update",
+            bytes: payload.byteLength,
+          });
           this.emit("sync");
         }
         break;
       case FRAME_AWARENESS_UPDATE:
-        awarenessProtocol.applyAwarenessUpdate(this.awareness, payload, this);
+        if (AWARENESS_SYNC_ENABLED) {
+          // Awareness frames are intentionally ignored unless presence sync is enabled.
+        }
         break;
       default:
+        this.debugLog?.("[collab.ws] unknown frame received", {
+          path: this.docPath,
+          frameType: type,
+          bytes: payload.byteLength,
+        });
         this.emit("connection-error", new Error("Unknown collaboration frame"));
     }
   };
 
-  private readonly handleClose = () => {
+  private readonly handleClose = (event: CloseEvent) => {
     this.stopHeartbeat();
     this.ws = null;
     this.syncedState = false;
+    this.debugLog?.("[collab.ws] websocket closed", {
+      path: this.docPath,
+      code: event.code,
+      reason: event.reason || "",
+      wasClean: event.wasClean,
+    });
     this.emit("status", false);
     this.scheduleReconnect();
   };
 
   private readonly handleError = () => {
+    this.debugLog?.("[collab.ws] websocket error", {
+      path: this.docPath,
+      url: sanitizeWsUrl(this.wsUrl),
+    });
     this.emit("connection-error", new Error("WebSocket connection error"));
   };
 
@@ -241,13 +310,9 @@ export class ViewerLeafProvider {
   }
 
   private sendAwarenessPing() {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+    if (!AWARENESS_SYNC_ENABLED || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
       return;
     }
-
-    const clientIds = [this.awareness.clientID];
-    const update = awarenessProtocol.encodeAwarenessUpdate(this.awareness, clientIds);
-    this.ws.send(encodeFrame(FRAME_AWARENESS_UPDATE, update));
   }
 
   private scheduleReconnect() {
@@ -257,6 +322,11 @@ export class ViewerLeafProvider {
       ViewerLeafProvider.MAX_DELAY,
     );
     this.reconnectAttempt++;
+    this.debugLog?.("[collab.ws] scheduling reconnect", {
+      path: this.docPath,
+      attempt: this.reconnectAttempt,
+      delayMs: delay,
+    });
     this.emit("reconnecting", this.reconnectAttempt, delay);
     this.reconnectTimer = window.setTimeout(() => this.connect(), delay);
   }

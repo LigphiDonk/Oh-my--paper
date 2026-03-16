@@ -23,6 +23,7 @@ interface CollaborativeDocState {
   yText: Y.Text | null;
   provider: ManagedCollabDocHandle["provider"] | null;
   awareness: Awareness | null;
+  connected: boolean;
   synced: boolean;
   connectionError: string;
   members: CollabMember[];
@@ -30,8 +31,8 @@ interface CollaborativeDocState {
 
 function projectScopedManager(projectId: string, fileAdapter: FileAdapter, userId?: string | null) {
   const session = readCollabAuthSession();
-  const { wsBaseUrl } = resolveCollabBaseUrls();
-  if (!session || !projectId || !wsBaseUrl) {
+  const { httpBaseUrl } = resolveCollabBaseUrls();
+  if (!session || !projectId || !httpBaseUrl) {
     return null;
   }
 
@@ -45,6 +46,7 @@ function projectScopedManager(projectId: string, fileAdapter: FileAdapter, userI
       color: session.color,
     },
     fileAdapter,
+    realtimeSyncEnabled: false,
   });
 }
 
@@ -57,13 +59,14 @@ export function useCollaborativeDoc({
   fileAdapter,
 }: UseCollaborativeDocParams): CollaborativeDocState {
   const [state, setState] = useState<CollaborativeDocState>({
-    yDoc: null,
-    yText: null,
-    provider: null,
-    awareness: null,
-    synced: false,
-    connectionError: "",
-    members: [],
+      yDoc: null,
+      yText: null,
+      provider: null,
+      awareness: null,
+      connected: false,
+      synced: false,
+      connectionError: "",
+      members: [],
   });
 
   useEffect(() => {
@@ -73,6 +76,7 @@ export function useCollaborativeDoc({
         yText: null,
         provider: null,
         awareness: null,
+        connected: false,
         synced: false,
         connectionError: "",
         members: [],
@@ -99,6 +103,7 @@ export function useCollaborativeDoc({
           yText: handle.yText,
           provider: handle.provider,
           awareness: handle.awareness,
+          connected: handle.connected,
           synced: handle.synced,
           connectionError: handle.connectionError,
           members: handle.members,
@@ -117,4 +122,3 @@ export function useCollaborativeDoc({
 
   return state;
 }
-

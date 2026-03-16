@@ -10,6 +10,7 @@ pub mod sidecar;
 pub mod skill;
 pub mod sync;
 pub mod terminal;
+pub mod worker;
 
 /// Build a PATH string that includes common TeX installation directories.
 /// When a macOS .app is launched from Finder the inherited PATH is minimal

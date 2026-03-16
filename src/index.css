@@ -1426,6 +1426,31 @@ button {
   flex: 0 0 auto;
 }
 
+.tree-collab-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.tree-collab-dot.is-synced {
+  background: #16a34a;
+}
+
+.tree-collab-dot.is-pending-push {
+  background: #ca8a04;
+}
+
+.tree-collab-dot.is-pending-pull {
+  background: #2563eb;
+}
+
+.tree-collab-dot.is-conflict {
+  background: var(--danger);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);
+}
+
 .editor-content {
   flex: 1;
   overflow: hidden;

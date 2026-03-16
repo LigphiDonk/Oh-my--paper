@@ -321,6 +321,11 @@ export const desktop = {
       Promise.reject(new Error("内置终端仅支持桌面版")),
     );
   },
+  prepareWorkerDeployDir() {
+    return runOrMock<string>("prepare_worker_deploy_dir", {}, () =>
+      Promise.reject(new Error("Worker 一键部署仅支持桌面版")),
+    );
+  },
   terminalWrite(sessionId: string, data: string) {
     return runOrMock("terminal_write", { sessionId, data }, () => Promise.resolve(true));
   },

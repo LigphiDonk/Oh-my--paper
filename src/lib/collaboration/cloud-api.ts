@@ -87,6 +87,23 @@ export async function fetchDocumentSnapshot(token: string, projectId: string, pa
   return new Uint8Array(await response.arrayBuffer());
 }
 
+export async function uploadDocumentSnapshot(token: string, projectId: string, path: string, update: Uint8Array) {
+  const { httpBaseUrl } = resolveCollabBaseUrls();
+  const url = new URL(`${httpBaseUrl}/api/projects/${projectId}/documents/snapshot`);
+  url.searchParams.set("path", path);
+  const bodyBytes = Uint8Array.from(update);
+  const response = await fetch(url.toString(), {
+    method: "POST",
+    headers: {
+      ...authHeaders(token),
+      "content-type": "application/octet-stream",
+    },
+    body: new Blob([bodyBytes.buffer], { type: "application/octet-stream" }),
+  });
+  const payload = await parseJson<{ ok: boolean; latestVersion: number }>(response);
+  return payload.latestVersion;
+}
+
 export async function joinCloudProject(token: string, projectId: string) {
   const { httpBaseUrl } = resolveCollabBaseUrls();
   const response = await fetch(`${httpBaseUrl}/api/projects/${projectId}/join`, {

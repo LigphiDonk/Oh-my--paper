@@ -69,6 +69,7 @@ You may also need to open the app once from `System Settings -> Privacy & Securi
 
 - The browser runtime uses a mock backend so the UI can be exercised without Tauri.
 - The packaged desktop app expects a local LaTeX toolchain for compile and SyncTeX features.
+- Worker quick deploy in the desktop app exports a bundled Worker template into the app data directory first, so end users do not need a local `./workers` repo folder. They still need Node.js and a Cloudflare account logged in via Wrangler.
 - Unsigned macOS builds are suitable for personal/testing distribution, not polished end-user release distribution.
 
 ### License
@@ -138,6 +139,7 @@ xattr -dr com.apple.quarantine /path/to/ViewerLeaf_0.1.0_aarch64.dmg
 
 - 浏览器运行模式使用 mock backend，因此不依赖 Tauri 也可以体验界面。
 - 打包后的桌面应用依赖本地 LaTeX 工具链来完成编译与 SyncTeX 功能。
+- 桌面版里的 Worker 快捷部署会先把内置 Worker 模板释放到应用数据目录，所以最终用户不需要项目仓库里的 `./workers` 文件夹；但仍然需要本机有 Node.js，并且已通过 Wrangler 登录 Cloudflare。
 - 未签名的 macOS 构建更适合个人测试分发，不适合作为正式面向普通用户的安装包。
 
 ### 许可证

@@ -1,11 +1,8 @@
-import * as awarenessProtocol from "y-protocols/awareness.js";
 import * as Y from "yjs";
 
 const FRAME_SYNC_REQUEST = 0;
 const FRAME_SYNC_RESPONSE = 1;
 const FRAME_DOCUMENT_UPDATE = 2;
-const FRAME_AWARENESS_UPDATE = 3;
-
 interface ConnectionMeta {
   userId: string;
   role: "owner" | "editor" | "viewer";
@@ -40,7 +37,6 @@ function toBinaryBody(data: Uint8Array) {
 export class DocumentRoom implements DurableObject {
   private readonly ctx: DurableObjectState;
   private readonly yDoc = new Y.Doc();
-  private readonly awareness = new awarenessProtocol.Awareness(this.yDoc);
   private readonly ready: Promise<void>;
   private updateCountSinceFlush = 0;
   private flushPromise: Promise<void> | null = null;
@@ -63,12 +59,25 @@ export class DocumentRoom implements DurableObject {
       return this.handleWebSocket(request);
     }
 
-    if (url.pathname.endsWith("/snapshot")) {
+    if (url.pathname.endsWith("/snapshot") && request.method === "GET") {
       const snapshot = Y.encodeStateAsUpdate(this.yDoc);
       return new Response(toBinaryBody(snapshot), {
         headers: {
           "content-type": "application/octet-stream",
           "cache-control": "no-store",
+        },
+      });
+    }
+
+    if (url.pathname.endsWith("/snapshot") && request.method === "POST") {
+      const payload = new Uint8Array(await request.arrayBuffer());
+      if (payload.byteLength > 0) {
+        Y.applyUpdate(this.yDoc, payload, this);
+        await this.flushState();
+      }
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: {
+          "content-type": "application/json",
         },
       });
     }
@@ -110,7 +119,6 @@ export class DocumentRoom implements DurableObject {
       case FRAME_SYNC_REQUEST: {
         const diff = Y.encodeStateAsUpdate(this.yDoc, payload);
         ws.send(encodeFrame(FRAME_SYNC_RESPONSE, diff));
-        this.sendAwarenessSnapshot(ws);
         break;
       }
       case FRAME_DOCUMENT_UPDATE: {
@@ -124,25 +132,13 @@ export class DocumentRoom implements DurableObject {
         await this.scheduleFlush();
         break;
       }
-      case FRAME_AWARENESS_UPDATE: {
-        awarenessProtocol.applyAwarenessUpdate(this.awareness, payload, ws);
-        this.broadcast(encodeFrame(FRAME_AWARENESS_UPDATE, payload), ws);
-        break;
-      }
       default:
         ws.send(JSON.stringify({ type: "error", message: "unknown_frame" }));
     }
   }
 
-  async webSocketClose(ws: WebSocket) {
+  async webSocketClose(_ws: WebSocket) {
     await this.ready;
-    const meta = (ws.deserializeAttachment() as ConnectionMeta | null) ?? null;
-    if (meta?.clientId) {
-      awarenessProtocol.removeAwarenessStates(this.awareness, [meta.clientId], this);
-      const removal = awarenessProtocol.encodeAwarenessUpdate(this.awareness, [meta.clientId]);
-      this.broadcast(encodeFrame(FRAME_AWARENESS_UPDATE, removal), ws);
-    }
-
     if (this.ctx.getWebSockets().length === 0) {
       await this.flushState();
     }
@@ -200,20 +196,10 @@ export class DocumentRoom implements DurableObject {
       };
       ws.serializeAttachment(nextMeta);
       ws.send(JSON.stringify({ type: "joined", userId: nextMeta.userId }));
-      this.sendAwarenessSnapshot(ws);
     } catch (error) {
       console.warn("invalid join payload", error);
       ws.send(JSON.stringify({ type: "error", message: "invalid_join_payload" }));
     }
-  }
-
-  private sendAwarenessSnapshot(ws: WebSocket) {
-    const clientIds = Array.from(this.awareness.getStates().keys());
-    if (clientIds.length === 0) {
-      return;
-    }
-    const awarenessUpdate = awarenessProtocol.encodeAwarenessUpdate(this.awareness, clientIds);
-    ws.send(encodeFrame(FRAME_AWARENESS_UPDATE, awarenessUpdate));
   }
 
   private broadcast(message: string | ArrayBuffer | ArrayBufferView, except?: WebSocket) {

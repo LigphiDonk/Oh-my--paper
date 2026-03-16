@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import type { MouseEvent } from "react";
 
-import type { ProjectNode } from "../types";
+import type { CollabFileSyncState, ProjectNode } from "../types";
 
 interface ProjectTreeProps {
   nodes: ProjectNode[];
   activeFile: string;
   dirtyPaths?: Set<string>;
+  collabSyncStates?: Record<string, CollabFileSyncState>;
   onOpenNode: (node: ProjectNode) => void;
   onCreateFile?: (parentDir: string, fileName: string) => void | Promise<void>;
   onCreateFolder?: (parentDir: string, folderName: string) => void | Promise<void>;
@@ -18,6 +19,7 @@ interface TreeNodeProps {
   node: ProjectNode;
   activeFile: string;
   dirtyPaths: Set<string>;
+  collabSyncStates: Record<string, CollabFileSyncState>;
   collapsedDirs: Set<string>;
   depth: number;
   onOpenNode: (node: ProjectNode) => void;
@@ -59,6 +61,7 @@ function TreeNode({
   node,
   activeFile,
   dirtyPaths,
+  collabSyncStates,
   collapsedDirs,
   depth,
   onOpenNode,
@@ -68,6 +71,7 @@ function TreeNode({
   const paddingLeft = 8 + depth * 12;
   const isActive = node.path === activeFile;
   const isDirty = dirtyPaths.has(node.path);
+  const collabSyncState = collabSyncStates[node.path];
 
   if (node.kind === "directory") {
     const isCollapsed = collapsedDirs.has(node.path);
@@ -89,6 +93,7 @@ function TreeNode({
               node={child}
               activeFile={activeFile}
               dirtyPaths={dirtyPaths}
+              collabSyncStates={collabSyncStates}
               collapsedDirs={collapsedDirs}
               depth={depth + 1}
               onOpenNode={onOpenNode}
@@ -109,6 +114,21 @@ function TreeNode({
     >
       <span className="list-item-icon">{fileIcon(node)}</span>
       <span>{node.name}</span>
+      {collabSyncState && (
+        <span
+          className={`tree-collab-dot is-${collabSyncState}`}
+          title={
+            collabSyncState === "synced"
+              ? "已与云端同步"
+              : collabSyncState === "pending-push"
+              ? "待推送到云端"
+              : collabSyncState === "pending-pull"
+                ? "待从云端拉取"
+                : "本地和云端都有未同步修改"
+          }
+          aria-hidden="true"
+        />
+      )}
       {isDirty && <span className="tree-dirty-dot" aria-hidden="true"></span>}
     </div>
   );
@@ -123,6 +143,7 @@ export function ProjectTree({
   nodes,
   activeFile,
   dirtyPaths = new Set<string>(),
+  collabSyncStates = {},
   onOpenNode,
   onCreateFile,
   onCreateFolder,
@@ -267,6 +288,7 @@ export function ProjectTree({
           node={node}
           activeFile={activeFile}
           dirtyPaths={dirtyPaths}
+          collabSyncStates={collabSyncStates}
           collapsedDirs={collapsedDirs}
           depth={0}
           onOpenNode={onOpenNode}

@@ -287,6 +287,36 @@ async function ensureDocument(env: Env, projectId: string, path: string) {
     .run();
 }
 
+async function touchDocument(env: Env, projectId: string, path: string) {
+  await env.DB.prepare(
+    `UPDATE documents
+     SET latest_version = latest_version + 1,
+         updated_at = datetime('now')
+     WHERE project_id = ?1 AND path = ?2`,
+  )
+    .bind(projectId, path)
+    .run();
+
+  await env.DB.prepare(
+    `UPDATE projects
+     SET updated_at = datetime('now')
+     WHERE id = ?1`,
+  )
+    .bind(projectId)
+    .run();
+
+  const row = await env.DB.prepare(
+    `SELECT latest_version AS latestVersion
+     FROM documents
+     WHERE project_id = ?1 AND path = ?2
+     LIMIT 1`,
+  )
+    .bind(projectId, path)
+    .first<{ latestVersion: number }>();
+
+  return row?.latestVersion ?? 0;
+}
+
 function projectRoomStub(env: Env, projectId: string, path: string) {
   return env.DOCUMENT_ROOM.get(env.DOCUMENT_ROOM.idFromName(`${projectId}:${path}`));
 }
@@ -435,6 +465,40 @@ export default {
         });
       }
 
+      if (snapshotMatch && request.method === "POST") {
+        const projectId = snapshotMatch[1];
+        const role = await requireProjectRole(env, projectId, user.id);
+        if (role === "viewer") {
+          return json({ error: "read_only" }, { status: 403 });
+        }
+        const path = url.searchParams.get("path")?.trim();
+        if (!path) {
+          return json({ error: "missing_path" }, { status: 400 });
+        }
+        await ensureDocument(env, projectId, path);
+        const payload = await request.arrayBuffer();
+        const stub = projectRoomStub(env, projectId, path);
+        const uploadResponse = await stub.fetch("https://viewerleaf.internal/snapshot", {
+          method: "POST",
+          headers: {
+            "content-type": "application/octet-stream",
+          },
+          body: payload,
+        });
+        if (!uploadResponse.ok) {
+          const errorHeaders = new Headers(uploadResponse.headers);
+          for (const [key, value] of Object.entries(corsHeaders())) {
+            errorHeaders.set(key, value);
+          }
+          return new Response(uploadResponse.body, {
+            status: uploadResponse.status,
+            headers: errorHeaders,
+          });
+        }
+        const latestVersion = await touchDocument(env, projectId, path);
+        return json({ ok: true, latestVersion });
+      }
+
       const wsMatch = url.pathname.match(/^\/api\/projects\/([^/]+)\/ws$/);
       if (wsMatch) {
         const projectId = wsMatch[1];
@@ -448,12 +512,20 @@ export default {
         const forwardedHeaders = new Headers(request.headers);
         forwardedHeaders.set("x-viewerleaf-user-id", user.id);
         forwardedHeaders.set("x-viewerleaf-role", role);
-        return stub.fetch(
-          new Request(`https://viewerleaf.internal/ws?path=${encodeURIComponent(path)}`, {
-            method: request.method,
-            headers: forwardedHeaders,
-          }),
+        // Clone the original upgrade request so the WebSocket handshake survives
+        // the hop into the Durable Object.
+        const forwardedRequest = new Request(
+          `https://viewerleaf.internal/ws?path=${encodeURIComponent(path)}`,
+          request,
         );
+        forwardedRequest.headers.set("x-viewerleaf-user-id", user.id);
+        forwardedRequest.headers.set("x-viewerleaf-role", role);
+        for (const [key, value] of forwardedHeaders.entries()) {
+          if (key === "x-viewerleaf-user-id" || key === "x-viewerleaf-role") {
+            forwardedRequest.headers.set(key, value);
+          }
+        }
+        return stub.fetch(forwardedRequest);
       }
 
       const joinMatch = url.pathname.match(/^\/api\/projects\/([^/]+)\/join$/);

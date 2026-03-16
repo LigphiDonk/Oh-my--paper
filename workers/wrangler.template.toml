@@ -1,4 +1,4 @@
-name = "viewerleaf-collab"
+name = "__VIEWERLEAF_WORKER_NAME__"
 main = "src/index.ts"
 compatibility_date = "2026-03-15"
 
@@ -10,11 +10,5 @@ class_name = "DocumentRoom"
 tag = "v1"
 new_sqlite_classes = ["DocumentRoom"]
 
-[[d1_databases]]
-binding = "DB"
-database_name = "viewerleaf"
-database_id = "a3b3c92f-612e-4d38-930c-943da83939b0"
-
 [vars]
 ALLOW_INSECURE_AUTH = "true"
-
