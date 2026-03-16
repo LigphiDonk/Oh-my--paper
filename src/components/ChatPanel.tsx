@@ -402,6 +402,50 @@ const SLASH_COMMANDS: SlashCommand[] = [
   { name: "/files", description: "列出项目文件", action: "send" },
 ];
 
+function getSessionTitle(session: AgentSessionSummary) {
+  return (session.title || session.lastMessagePreview || session.id).trim();
+}
+
+function getSessionPreview(session: AgentSessionSummary) {
+  const preview = session.lastMessagePreview.trim();
+  const title = getSessionTitle(session);
+  if (!preview || preview === title) {
+    return `共 ${session.messageCount} 条消息`;
+  }
+  return preview;
+}
+
+function formatSessionTimestamp(value: string) {
+  if (!value.trim()) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfTarget = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffDays = Math.round((startOfToday.getTime() - startOfTarget.getTime()) / 86_400_000);
+
+  if (diffDays === 0) {
+    return `今天 ${date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`;
+  }
+  if (diffDays === 1) {
+    return `昨天 ${date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`;
+  }
+  if (diffDays > 1 && diffDays < 7) {
+    return `${diffDays} 天前`;
+  }
+
+  const sameYear = date.getFullYear() === now.getFullYear();
+  return date.toLocaleString("zh-CN", sameYear
+    ? { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }
+    : { year: "numeric", month: "2-digit", day: "2-digit" });
+}
+
 /* ─── Main ChatPanel ──────────────────────────────────── */
 export interface ChatPanelProps {
   messages: AgentMessage[];
@@ -439,7 +483,21 @@ export function ChatPanel({
   const [inputText, setInputText] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const sessionSearchRef = useRef<HTMLInputElement>(null);
   const normalizedStreamToolCalls = (streamToolCalls ?? []).map(toToolCallBlock);
+  const [isSessionPickerOpen, setIsSessionPickerOpen] = useState(false);
+  const [sessionQuery, setSessionQuery] = useState("");
+  const activeSession = sessions.find((session) => session.id === activeSessionId) ?? null;
+  const filteredSessions = useMemo(() => {
+    const keyword = sessionQuery.trim().toLowerCase();
+    if (!keyword) {
+      return sessions;
+    }
+    return sessions.filter((session) => {
+      const haystacks = [session.title, session.lastMessagePreview, session.id];
+      return haystacks.some((value) => value.toLowerCase().includes(keyword));
+    });
+  }, [sessionQuery, sessions]);
 
   // @ file mention state
   const [showAtMenu, setShowAtMenu] = useState(false);
@@ -472,6 +530,32 @@ export function ChatPanel({
     ta.style.height = "auto";
     ta.style.height = `${Math.min(ta.scrollHeight, 180)}px`;
   }, [inputText]);
+
+  useEffect(() => {
+    if (!isSessionPickerOpen) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      sessionSearchRef.current?.focus();
+    });
+
+    const handleWindowKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsSessionPickerOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleWindowKeyDown);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("keydown", handleWindowKeyDown);
+    };
+  }, [isSessionPickerOpen]);
+
+  useEffect(() => {
+    setIsSessionPickerOpen(false);
+  }, [activeSessionId]);
 
   const handleSend = useCallback(() => {
     const text = inputText.trim();
@@ -568,39 +652,154 @@ export function ChatPanel({
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   }, [handleSend, showAtMenu, filteredFiles, atIndex, insertAtMention, showSlashMenu, filteredCommands, slashIndex, insertSlashCommand]);
 
+  const handleOpenSessionPicker = useCallback(() => {
+    if (isStreaming || sessions.length === 0) {
+      return;
+    }
+    setSessionQuery("");
+    setIsSessionPickerOpen(true);
+  }, [isStreaming, sessions.length]);
+
+  const handleSelectSession = useCallback((sessionId: string) => {
+    onSelectSession(sessionId);
+    setIsSessionPickerOpen(false);
+  }, [onSelectSession]);
+
   return (
     <div className="ag-panel">
-      <div className="ag-session-header">
-        <button
-          type="button"
-          className="ag-new-session-btn"
-          onClick={onNewSession}
-          disabled={isStreaming}
-        >
-          + 新对话
-        </button>
-        <select
-          className="ag-session-select"
-          value={activeSessionId}
-          onChange={(event) => onSelectSession(event.target.value)}
-          disabled={isStreaming || sessions.length === 0}
-        >
-          <option value="">{sessions.length === 0 ? "暂无历史会话" : "选择历史会话"}</option>
-          {sessions.map((session) => (
-            <option key={session.id} value={session.id}>
-              {(session.title || session.lastMessagePreview || session.id).trim()}
-            </option>
-          ))}
-        </select>
+      <div className="ag-session-bar">
+        <div className="ag-session-actions">
+          <button
+            type="button"
+            className="ag-session-btn ag-session-btn--primary"
+            onClick={onNewSession}
+            disabled={isStreaming}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            <span>新对话</span>
+          </button>
+          <button
+            type="button"
+            className="ag-session-btn"
+            onClick={handleOpenSessionPicker}
+            disabled={isStreaming || sessions.length === 0}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" width="15" height="15">
+              <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7A2.5 2.5 0 0 1 17.5 16H9l-5 4V6.5Z" />
+            </svg>
+            <span>历史对话</span>
+            <span className="ag-session-count">{sessions.length}</span>
+          </button>
+        </div>
+        {activeSession && (
+          <button
+            type="button"
+            className="ag-session-current"
+            onClick={handleOpenSessionPicker}
+            disabled={isStreaming || sessions.length === 0}
+            title={getSessionTitle(activeSession)}
+          >
+            <span className="ag-session-current-label">当前对话</span>
+            <span className="ag-session-current-title">{getSessionTitle(activeSession)}</span>
+          </button>
+        )}
       </div>
+
+      {isSessionPickerOpen && (
+        <div
+          className="ag-session-picker-backdrop"
+          role="presentation"
+          onClick={() => setIsSessionPickerOpen(false)}
+        >
+          <div
+            className="ag-session-picker"
+            role="dialog"
+            aria-modal="true"
+            aria-label="选择历史会话"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="ag-session-picker-head">
+              <div>
+                <div className="ag-session-picker-eyebrow">历史对话</div>
+                <div className="ag-session-picker-title">选择一个继续处理的会话</div>
+              </div>
+              <button
+                type="button"
+                className="ag-session-picker-close"
+                aria-label="关闭历史会话"
+                onClick={() => setIsSessionPickerOpen(false)}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="16" height="16">
+                  <path d="M6 6l12 12M18 6 6 18" />
+                </svg>
+              </button>
+            </div>
+
+            <label className="ag-session-search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="15" height="15">
+                <circle cx="11" cy="11" r="6" />
+                <path d="m20 20-3.5-3.5" />
+              </svg>
+              <input
+                ref={sessionSearchRef}
+                type="text"
+                value={sessionQuery}
+                onChange={(event) => setSessionQuery(event.target.value)}
+                placeholder="搜索标题或历史内容"
+              />
+            </label>
+
+            <div className="ag-session-picker-list">
+              {filteredSessions.length === 0 ? (
+                <div className="ag-session-picker-empty">
+                  <div className="ag-session-picker-empty-title">没有匹配的历史会话</div>
+                  <div className="ag-session-picker-empty-sub">换个关键词，或者直接开始新对话。</div>
+                </div>
+              ) : (
+                filteredSessions.map((session) => {
+                  const isActive = session.id === activeSessionId;
+                  return (
+                    <button
+                      key={session.id}
+                      type="button"
+                      className={`ag-session-item${isActive ? " ag-session-item--active" : ""}`}
+                      onClick={() => handleSelectSession(session.id)}
+                    >
+                      <div className="ag-session-item-main">
+                        <div className="ag-session-item-row">
+                          <span className="ag-session-item-title">{getSessionTitle(session)}</span>
+                          <span className="ag-session-item-time">{formatSessionTimestamp(session.updatedAt)}</span>
+                        </div>
+                        <div className="ag-session-item-preview">{getSessionPreview(session)}</div>
+                      </div>
+                      <div className="ag-session-item-meta">
+                        <span>{session.messageCount} 条</span>
+                        {isActive && (
+                          <span className="ag-session-item-check" aria-hidden="true">
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" width="14" height="14">
+                              <path d="M3 8.5 6.2 11.5 13 4.5" />
+                            </svg>
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Messages scroll area */}
       <div className="ag-messages">
         {messages.length === 0 && !isStreaming && (
           <div className="ag-empty">
             <div className="ag-empty-glyph">✦</div>
-            <div className="ag-empty-title">AI 助手已就绪</div>
-            <div className="ag-empty-sub">发送消息，或选中编辑器内容后点击 + 分析</div>
+            <div className="ag-empty-title">开始一个新对话</div>
+            <div className="ag-empty-sub">发送消息，或从历史对话里继续上一次上下文。</div>
           </div>
         )}
 

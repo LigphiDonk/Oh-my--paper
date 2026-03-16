@@ -190,7 +190,10 @@ pub fn run_agent(
     }
 
     let stdout = child.stdout.take().context("sidecar stdout unavailable")?;
-    let reader = std::io::BufReader::new(stdout);
+    // Use a small buffer (256 bytes) so that streaming text_delta events
+    // are read and emitted promptly instead of waiting for the default 8KB
+    // BufReader buffer to fill.
+    let reader = std::io::BufReader::with_capacity(256, stdout);
     let mut full_response = String::new();
     let mut last_error: Option<String> = None;
     let mut done_usage: Option<UsageInfo> = None;

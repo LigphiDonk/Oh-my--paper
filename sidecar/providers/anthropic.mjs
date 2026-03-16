@@ -135,7 +135,8 @@ export function createAnthropicProvider(config) {
         input_schema: tool.parameters,
       }));
 
-      const thinkingEnabled = isThinkingCapable(config.model);
+      // Only enable thinking if explicitly opted in via config
+      const thinkingEnabled = config.enableThinking && isThinkingCapable(config.model);
       const streamParams = {
         model: config.model,
         max_tokens: resolveMaxTokens(config.model),

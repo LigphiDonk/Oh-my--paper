@@ -427,34 +427,31 @@ curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh`}</pre>
       )}
 
       {tab === "ai" && (
-        <>
-          <div className="sidebar-header">AI 智能体助手</div>
-          <div className="sidebar-content" style={{ padding: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-            <ChatPanel
-              messages={messages}
-              sessions={sessions}
-              activeSessionId={activeSessionId}
-              onSelectSession={onSelectSession}
-              onNewSession={onNewSession}
-              onRunAgent={onRunAgent}
-              onSendMessage={onSendMessage}
-              onCancelAgent={onCancelAgent}
-              pendingPatchSummary={pendingPatchSummary}
-              pendingPatchDiff={pendingPatchDiff}
-              onApplyPatch={onApplyPatch}
-              onDismissPatch={onDismissPatch}
-              streamThinkingText={streamThinkingText}
-              streamText={streamText}
-              streamToolCalls={streamToolCalls}
-              streamError={streamError}
-              isStreaming={isStreaming}
-              skills={skills}
-              onToggleSkill={onToggleSkill}
-              usageRecords={usageRecords}
-              projectTree={projectTree}
-            />
-          </div>
-        </>
+        <div className="sidebar-content sidebar-content--chat">
+          <ChatPanel
+            messages={messages}
+            sessions={sessions}
+            activeSessionId={activeSessionId}
+            onSelectSession={onSelectSession}
+            onNewSession={onNewSession}
+            onRunAgent={onRunAgent}
+            onSendMessage={onSendMessage}
+            onCancelAgent={onCancelAgent}
+            pendingPatchSummary={pendingPatchSummary}
+            pendingPatchDiff={pendingPatchDiff}
+            onApplyPatch={onApplyPatch}
+            onDismissPatch={onDismissPatch}
+            streamThinkingText={streamThinkingText}
+            streamText={streamText}
+            streamToolCalls={streamToolCalls}
+            streamError={streamError}
+            isStreaming={isStreaming}
+            skills={skills}
+            onToggleSkill={onToggleSkill}
+            usageRecords={usageRecords}
+            projectTree={projectTree}
+          />
+        </div>
       )}
 
       {tab === "figures" && (
