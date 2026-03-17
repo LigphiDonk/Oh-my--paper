@@ -1924,6 +1924,8 @@ function App() {
     for (const document of documents.filter((item) => item.kind === "text" || item.kind === "tex" || item.kind === "bib")) {
       const snapshotUpdate = await fetchDocumentSnapshot(token, projectId, document.path);
       const content = decodeCollabTextSnapshot(snapshotUpdate);
+      // Skip empty documents — don't create blank local files for unedited cloud placeholders
+      if (content.trim() === "") continue;
       await fileAdapter.saveFile(document.path, content);
     }
 
