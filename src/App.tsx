@@ -1627,6 +1627,15 @@ function App() {
     );
   }
 
+  async function handleSkillsChanged() {
+    try {
+      const fresh = await desktop.listSkills();
+      setSnapshot((current) => current ? { ...current, skills: fresh } : current);
+    } catch {
+      // ignore
+    }
+  }
+
   async function handleCreateFile(parentDir: string, fileName: string) {
     const targetPath = parentDir ? `${parentDir}/${fileName}` : fileName;
     await fileAdapter.createFile(targetPath, "");
@@ -2101,7 +2110,14 @@ function App() {
         sanitizeProjectFolderName(project.name) || `Cloud Project ${resolvedProject.projectId.slice(0, 8)}`;
 
       await saveDirtyFilesBeforeWorkspaceSwitch();
-      const createdSnapshot = await projectAdapter.createProject(parentDir, localProjectName.trim());
+
+      // Create an empty directory and switch to it — do NOT use createProject
+      // which generates template files (main.tex, sections/, refs/) that would
+      // show up as untracked changes needing to be pushed.
+      const projectRoot = `${parentDir}/${localProjectName.trim()}`;
+      await desktop.createWorkspaceDir(projectRoot);
+      const createdSnapshot = await loadSnapshotWithCollab(() => projectAdapter.switchProject(projectRoot));
+
       const rootMainFile = project.rootMainFile?.trim() || "main.tex";
       let projectConfig = createdSnapshot.projectConfig;
       if (rootMainFile !== createdSnapshot.projectConfig.mainTex) {
@@ -2109,10 +2125,6 @@ function App() {
           ...createdSnapshot.projectConfig,
           mainTex: rootMainFile,
         });
-      }
-
-      for (const node of createdSnapshot.tree) {
-        await fileAdapter.deleteFile(node.path);
       }
 
       const collab: WorkspaceCollabMetadata = {
@@ -2923,6 +2935,7 @@ function App() {
               onTestProvider={handleTestProvider}
               onActivateProvider={(id) => void handleActivateProvider(id)}
               onToggleSkill={handleToggleSkill}
+              onSkillsChanged={handleSkillsChanged}
               streamThinkingText={streamThinkingText}
               streamThinkingHistoryText={streamThinkingHistoryText}
               streamThinkingDurationMs={streamThinkingDurationMs}

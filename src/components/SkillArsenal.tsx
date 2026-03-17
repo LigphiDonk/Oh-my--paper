@@ -1,16 +1,21 @@
 import { useState } from "react";
 import { weaponSvg, BUILTIN_SKILLS } from "../lib/weaponPixels";
+import { desktop } from "../lib/desktop";
 import type { AcademicSkill, SkillManifest } from "../types";
 
 interface SkillArsenalProps {
   skills: SkillManifest[];
   onToggleSkill: (skill: SkillManifest) => Promise<void>;
   onSkillAction?: (skill: AcademicSkill) => void;
+  onSkillsChanged?: () => void;
   compact?: boolean;
 }
 
-export function SkillArsenal({ skills, onToggleSkill, onSkillAction, compact = false }: SkillArsenalProps) {
+export function SkillArsenal({ skills, onToggleSkill, onSkillAction, onSkillsChanged, compact = false }: SkillArsenalProps) {
   const [pending, setPending] = useState<string | null>(null);
+  const [gitUrl, setGitUrl] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
 
   const mappedSkills: AcademicSkill[] = skills.map((manifest) => {
     const enabled = manifest.isEnabled ?? manifest.enabled ?? false;
@@ -47,8 +52,59 @@ export function SkillArsenal({ skills, onToggleSkill, onSkillAction, compact = f
     onSkillAction?.(skill);
   };
 
+  const handleImport = async () => {
+    const url = gitUrl.trim();
+    if (!url || importing) return;
+    setImporting(true);
+    setImportError(null);
+    try {
+      await desktop.importSkillFromGit(url);
+      setGitUrl("");
+      onSkillsChanged?.();
+    } catch (err: unknown) {
+      setImportError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleRemove = async (e: React.MouseEvent, skillId: string) => {
+    e.stopPropagation();
+    if (pending === skillId) return;
+    setPending(skillId);
+    try {
+      await desktop.removeSkill(skillId);
+      onSkillsChanged?.();
+    } catch {
+      // ignore
+    } finally {
+      setPending(null);
+    }
+  };
+
   return (
     <div className={`arsenal ${compact ? "arsenal--compact" : ""}`}>
+      {!compact && (
+        <div className="arsenal-import">
+          <input
+            className="arsenal-import-input"
+            type="text"
+            placeholder="输入 Git 仓库地址导入 Skill…"
+            value={gitUrl}
+            onChange={(e) => setGitUrl(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleImport()}
+            disabled={importing}
+          />
+          <button
+            className="arsenal-import-btn"
+            onClick={handleImport}
+            disabled={importing || !gitUrl.trim()}
+          >
+            {importing ? "导入中…" : "导入"}
+          </button>
+          {importError && <div className="arsenal-import-error">{importError}</div>}
+        </div>
+      )}
       <div className="arsenal-grid">
         {mappedSkills.map((skill, index) => {
           const manifest = skills.find((s) => s.id === skill.id);
@@ -77,11 +133,24 @@ export function SkillArsenal({ skills, onToggleSkill, onSkillAction, compact = f
               >
                 {skill.actionLabel}
               </button>
-              {skill.isCustom && <span className="arsenal-custom-dot" />}
+              {skill.isCustom && (
+                <button
+                  className="arsenal-remove-btn"
+                  title="删除此 Skill"
+                  onClick={(e) => handleRemove(e, skill.id)}
+                >
+                  ×
+                </button>
+              )}
             </div>
           );
         })}
       </div>
+      {skills.length === 0 && !compact && (
+        <div className="arsenal-empty">
+          还没有安装任何 Skill，通过上方输入框从 Git 仓库导入。
+        </div>
+      )}
     </div>
   );
 }

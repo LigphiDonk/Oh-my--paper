@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use rusqlite::{params, Connection};
 
@@ -191,4 +192,87 @@ fn extract_body(content: &str) -> Option<String> {
     let rest = &trimmed[3..];
     let end = rest.find("---")?;
     Some(rest[end + 3..].trim().to_string())
+}
+
+pub fn import_skill_from_git(
+    conn: &Connection,
+    app_data_dir: &Path,
+    git_url: &str,
+) -> Result<SkillManifest, String> {
+    let skills_dir = app_data_dir.join("skills");
+    fs::create_dir_all(&skills_dir).map_err(|e| e.to_string())?;
+
+    // Derive a folder name from the URL
+    let repo_name = git_url
+        .trim_end_matches('/')
+        .rsplit('/')
+        .next()
+        .unwrap_or("skill")
+        .trim_end_matches(".git");
+    let dest = skills_dir.join(repo_name);
+
+    if dest.exists() {
+        // Pull latest
+        let status = Command::new("git")
+            .args(["pull"])
+            .current_dir(&dest)
+            .status()
+            .map_err(|e| format!("git pull failed: {e}"))?;
+        if !status.success() {
+            return Err("git pull failed".into());
+        }
+    } else {
+        let status = Command::new("git")
+            .args(["clone", "--depth", "1", git_url])
+            .arg(&dest)
+            .status()
+            .map_err(|e| format!("git clone failed: {e}"))?;
+        if !status.success() {
+            return Err("git clone failed".into());
+        }
+    }
+
+    // Look for SKILL.md in the repo root
+    let skill_md = dest.join("SKILL.md");
+    if !skill_md.exists() {
+        let _ = fs::remove_dir_all(&dest);
+        return Err("No SKILL.md found in repository".into());
+    }
+
+    let content = fs::read_to_string(&skill_md).map_err(|e| e.to_string())?;
+    let (id, name, version, stages, tools) =
+        parse_skill_md(&content).ok_or("Failed to parse SKILL.md frontmatter")?;
+
+    let manifest = SkillManifest {
+        id: id.clone(),
+        name,
+        version,
+        stages,
+        tools,
+        source: "git".into(),
+        dir_path: dest.to_string_lossy().to_string(),
+        is_enabled: true,
+    };
+
+    install_skill(conn, &manifest)?;
+    Ok(manifest)
+}
+
+pub fn remove_skill(conn: &Connection, skill_id: &str, delete_files: bool) -> Result<(), String> {
+    if delete_files {
+        let dir_path: String = conn
+            .query_row(
+                "SELECT dir_path FROM skills WHERE id=?1",
+                params![skill_id],
+                |row| row.get(0),
+            )
+            .unwrap_or_default();
+        if !dir_path.is_empty() {
+            let _ = fs::remove_dir_all(&dir_path);
+        }
+    }
+
+    conn.execute("DELETE FROM skills WHERE id=?1", params![skill_id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }

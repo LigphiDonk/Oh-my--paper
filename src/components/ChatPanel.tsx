@@ -856,12 +856,12 @@ export function ChatPanel({
   }, [handleSend, showAtMenu, filteredFiles, atIndex, insertAtMention, showSlashMenu, filteredCommands, slashIndex, insertSlashCommand]);
 
   const handleOpenSessionPicker = useCallback(() => {
-    if (isStreaming || sessions.length === 0) {
+    if (isStreaming) {
       return;
     }
     setSessionQuery("");
     setIsSessionPickerOpen(true);
-  }, [isStreaming, sessions.length]);
+  }, [isStreaming]);
 
   const handleSelectSession = useCallback((sessionId: string) => {
     onSelectSession(sessionId);
@@ -888,7 +888,7 @@ export function ChatPanel({
             type="button"
             className={`ag-session-btn${activeSession ? " ag-session-btn--active" : ""}`}
             onClick={handleOpenSessionPicker}
-            disabled={isStreaming || sessions.length === 0}
+            disabled={isStreaming}
             aria-label="历史对话"
             title={activeSession ? `历史对话 · ${getSessionTitle(activeSession)}` : "历史对话"}
           >
@@ -948,8 +948,14 @@ export function ChatPanel({
             <div className="ag-session-picker-list">
               {filteredSessions.length === 0 ? (
                 <div className="ag-session-picker-empty">
-                  <div className="ag-session-picker-empty-title">没有匹配的历史会话</div>
-                  <div className="ag-session-picker-empty-sub">换个关键词，或者直接开始新对话。</div>
+                  <div className="ag-session-picker-empty-title">
+                    {sessions.length === 0 ? "还没有历史对话" : "没有匹配的历史会话"}
+                  </div>
+                  <div className="ag-session-picker-empty-sub">
+                    {sessions.length === 0
+                      ? "发送第一条消息后，对话会自动保存在这里。"
+                      : "换个关键词，或者直接开始新对话。"}
+                  </div>
                 </div>
               ) : (
                 filteredSessions.map((session) => {

@@ -224,6 +224,19 @@ export const desktop = {
   enableSkill(skillId: string, enabled: boolean) {
     return runOrMock("enable_skill", { skillId, enabled }, () => mockRuntime.enableSkill(skillId, enabled));
   },
+  importSkillFromGit(url: string) {
+    return runOrMock<SkillManifest>("import_skill_from_git", { url }, () =>
+      Promise.reject(new Error("Git skill import only available in desktop")),
+    );
+  },
+  removeSkill(skillId: string, deleteFiles = true) {
+    return runOrMock("remove_skill", { skillId, deleteFiles }, () =>
+      Promise.reject(new Error("Skill removal only available in desktop")),
+    );
+  },
+  createWorkspaceDir(path: string) {
+    return runOrMock("create_workspace_dir", { path }, () => Promise.resolve());
+  },
   listProviders() {
     return runOrMock<ProviderConfig[]>("list_providers", {}, () => mockRuntime.listProviders());
   },

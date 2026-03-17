@@ -28,13 +28,14 @@ pub fn init_db(app_data_dir: &Path) -> SqlResult<Connection> {
     // Recreate profiles table without restrictive CHECK constraints if needed.
     migrate_profiles_table(&conn)?;
 
+    // Recreate skills table to accept 'git' source if needed.
+    migrate_skills_table(&conn)?;
+
     conn.execute_batch(include_str!("schema.sql"))?;
 
-    let count: i64 = conn.query_row("SELECT COUNT(*) FROM providers", [], |row| row.get(0))?;
-    if count == 0 {
-        seed_providers(&conn)?;
+    let profile_count: i64 = conn.query_row("SELECT COUNT(*) FROM profiles", [], |row| row.get(0))?;
+    if profile_count == 0 {
         seed_profiles(&conn)?;
-        seed_skills(&conn)?;
     } else {
         migrate_profiles(&conn)?;
     }
@@ -99,52 +100,67 @@ fn migrate_profiles_table(conn: &rusqlite::Connection) -> SqlResult<()> {
     Ok(())
 }
 
-fn seed_providers(conn: &Connection) -> SqlResult<()> {
-    let providers = vec![
-        (
-            "openai-main",
-            "OpenAI",
-            "openai",
-            "https://api.openai.com/v1",
-            "gpt-4.1",
-        ),
-        (
-            "anthropic-main",
-            "Anthropic",
-            "anthropic",
-            "https://api.anthropic.com",
-            "claude-sonnet-4",
-        ),
-        (
-            "openrouter-lab",
-            "OpenRouter",
-            "openrouter",
-            "https://openrouter.ai/api/v1",
-            "claude-3.7-sonnet",
-        ),
-        (
-            "deepseek-main",
-            "DeepSeek",
-            "deepseek",
-            "https://api.deepseek.com/v1",
-            "deepseek-chat",
-        ),
-    ];
-
-    for (id, name, vendor, url, model) in providers {
-        conn.execute(
-            "INSERT INTO providers (id, name, vendor, base_url, default_model) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![id, name, vendor, url, model],
-        )?;
+/// Drop and recreate the skills table if it doesn't accept 'git' source.
+fn migrate_skills_table(conn: &rusqlite::Connection) -> SqlResult<()> {
+    let table_exists: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='skills'",
+        [],
+        |row| row.get(0),
+    )?;
+    if table_exists == 0 {
+        return Ok(());
     }
+
+    let check_ok = conn.execute_batch(
+        "SAVEPOINT probe_skills;
+         INSERT INTO skills (id,name,source,dir_path) VALUES ('__probe__','probe','git','');
+         DELETE FROM skills WHERE id='__probe__';
+         RELEASE SAVEPOINT probe_skills;",
+    );
+
+    if check_ok.is_ok() {
+        return Ok(());
+    }
+
+    let _ = conn.execute_batch("ROLLBACK TO SAVEPOINT probe_skills; RELEASE SAVEPOINT probe_skills;");
+
+    conn.execute_batch(
+        "PRAGMA foreign_keys=OFF;
+         BEGIN;
+         CREATE TABLE skills_new (
+             id          TEXT PRIMARY KEY,
+             name        TEXT NOT NULL,
+             version     TEXT NOT NULL DEFAULT '1.0.0',
+             stages_json TEXT NOT NULL DEFAULT '[]',
+             tools_json  TEXT NOT NULL DEFAULT '[]',
+             source      TEXT NOT NULL CHECK(source IN ('builtin','local','project','git')),
+             dir_path    TEXT NOT NULL DEFAULT '',
+             is_enabled  INTEGER NOT NULL DEFAULT 1,
+             created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+         );
+         INSERT INTO skills_new SELECT id,name,version,stages_json,tools_json,source,dir_path,is_enabled,created_at FROM skills;
+         DROP TABLE skills;
+         ALTER TABLE skills_new RENAME TO skills;
+         COMMIT;
+         PRAGMA foreign_keys=ON;",
+    )?;
 
     Ok(())
 }
 
+
 fn seed_profiles(conn: &Connection) -> SqlResult<()> {
+    // Pick the first provider if any exist, otherwise use empty string
+    let provider_id: String = conn
+        .query_row(
+            "SELECT id FROM providers ORDER BY sort_order LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or_default();
     conn.execute(
         "INSERT INTO profiles (id, label, summary, stage, provider_id, model, skill_ids_json, tool_allowlist_json, output_mode, is_builtin) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,1)",
-        params!["chat", "Chat", "General assistant", "chat", "anthropic-main", "claude-sonnet-4", "[]", DEFAULT_CHAT_TOOLS, "chat"],
+        params!["chat", "Chat", "General assistant", "chat", provider_id, "", "[]", DEFAULT_CHAT_TOOLS, "chat"],
     )?;
     Ok(())
 }
@@ -216,55 +232,5 @@ fn ensure_builtin_chat_tools(conn: &Connection, tool_ids: &[&str]) -> SqlResult<
         "UPDATE profiles SET tool_allowlist_json=?1 WHERE id='chat' AND is_builtin=1",
         params![tools_json],
     )?;
-    Ok(())
-}
-
-fn seed_skills(conn: &Connection) -> SqlResult<()> {
-    let skills = vec![
-        (
-            "academic-outline",
-            "Academic Outline",
-            r#"["planning"]"#,
-            r#"["read_section","list_sections","insert_at_line"]"#,
-        ),
-        (
-            "academic-draft",
-            "Academic Draft",
-            r#"["drafting"]"#,
-            r#"["read_section","apply_text_patch"]"#,
-        ),
-        (
-            "academic-polish",
-            "Academic Polish",
-            r#"["revision"]"#,
-            r#"["read_section","apply_text_patch"]"#,
-        ),
-        (
-            "academic-de-ai",
-            "Academic De-AI",
-            r#"["revision"]"#,
-            r#"["read_section","apply_text_patch"]"#,
-        ),
-        (
-            "academic-review",
-            "Academic Review",
-            r#"["submission"]"#,
-            r#"["read_section","search_project","read_bib_entries"]"#,
-        ),
-        (
-            "banana-figure",
-            "Banana Figure",
-            r#"["figures"]"#,
-            r#"["read_section"]"#,
-        ),
-    ];
-
-    for (id, name, stages, tools) in skills {
-        conn.execute(
-            "INSERT INTO skills (id, name, stages_json, tools_json, source) VALUES (?1,?2,?3,?4,'builtin')",
-            params![id, name, stages, tools],
-        )?;
-    }
-
     Ok(())
 }

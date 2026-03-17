@@ -4444,3 +4444,38 @@ div.ve-tok-math-rendered .katex { font-size: 1.15em; }
 .arsenal--compact .arsenal-action-btn { display: none; }
 .arsenal--compact .arsenal-name { font-size: 12px; }
 .arsenal--compact .arsenal-icon svg { width: 24px; height: 24px; }
+
+/* Skill import bar */
+.arsenal-import {
+  display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0; margin-bottom: 8px;
+}
+.arsenal-import-input {
+  flex: 1; min-width: 0; padding: 6px 10px; border-radius: 6px;
+  border: 1px solid var(--border-subtle); background: var(--bg-surface);
+  color: var(--text-primary); font-size: 13px; outline: none;
+}
+.arsenal-import-input:focus { border-color: var(--accent-primary); }
+.arsenal-import-btn {
+  padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer;
+  background: var(--accent-primary); color: #fff; font-size: 13px; font-weight: 500;
+  white-space: nowrap;
+}
+.arsenal-import-btn:disabled { opacity: .5; cursor: default; }
+.arsenal-import-error {
+  width: 100%; font-size: 12px; color: var(--error-text, #f44); margin-top: 2px;
+}
+/* Remove button on skill cards */
+.arsenal-card { position: relative; }
+.arsenal-remove-btn {
+  position: absolute; top: 4px; right: 4px; width: 20px; height: 20px;
+  display: flex; align-items: center; justify-content: center;
+  border: none; border-radius: 50%; background: transparent;
+  color: var(--text-tertiary); font-size: 14px; cursor: pointer;
+  opacity: 0; transition: opacity .15s;
+}
+.arsenal-card:hover .arsenal-remove-btn { opacity: 1; }
+.arsenal-remove-btn:hover { background: var(--bg-surface-hover); color: var(--error-text, #f44); }
+/* Empty state */
+.arsenal-empty {
+  text-align: center; padding: 24px 12px; color: var(--text-secondary); font-size: 13px;
+}

@@ -17,14 +17,13 @@ CREATE TABLE IF NOT EXISTS profiles (
     label                TEXT NOT NULL,
     summary              TEXT NOT NULL DEFAULT '',
     stage                TEXT NOT NULL DEFAULT 'chat',
-    provider_id          TEXT NOT NULL,
+    provider_id          TEXT NOT NULL DEFAULT '',
     model                TEXT NOT NULL,
     skill_ids_json       TEXT NOT NULL DEFAULT '[]',
     tool_allowlist_json  TEXT NOT NULL DEFAULT '[]',
     output_mode          TEXT NOT NULL DEFAULT 'chat',
     sort_order           INTEGER NOT NULL DEFAULT 0,
-    is_builtin           INTEGER NOT NULL DEFAULT 0,
-    FOREIGN KEY (provider_id) REFERENCES providers(id)
+    is_builtin           INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS skills (
@@ -33,7 +32,7 @@ CREATE TABLE IF NOT EXISTS skills (
     version     TEXT NOT NULL DEFAULT '1.0.0',
     stages_json TEXT NOT NULL DEFAULT '[]',
     tools_json  TEXT NOT NULL DEFAULT '[]',
-    source      TEXT NOT NULL CHECK(source IN ('builtin','local','project')),
+    source      TEXT NOT NULL CHECK(source IN ('builtin','local','project','git')),
     dir_path    TEXT NOT NULL DEFAULT '',
     is_enabled  INTEGER NOT NULL DEFAULT 1,
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))

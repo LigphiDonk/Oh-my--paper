@@ -605,3 +605,32 @@ pub fn prepare_worker_deploy_dir(
 pub fn cancel_agent(state: State<'_, AppState>) -> Result<bool, String> {
     agent::cancel_agent(&state).map_err(|err| err.to_string())
 }
+
+#[tauri::command]
+pub async fn import_skill_from_git(
+    app_handle: AppHandle,
+    url: String,
+) -> Result<SkillManifest, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app_handle.state::<AppState>();
+        let conn = state.db.lock().map_err(|err| err.to_string())?;
+        skill::import_skill_from_git(&conn, &state.app_data_dir, &url)
+    })
+    .await
+    .map_err(|err| err.to_string())?
+}
+
+#[tauri::command]
+pub fn remove_skill(
+    state: State<'_, AppState>,
+    skill_id: String,
+    delete_files: Option<bool>,
+) -> Result<(), String> {
+    let conn = state.db.lock().map_err(|err| err.to_string())?;
+    skill::remove_skill(&conn, &skill_id, delete_files.unwrap_or(true))
+}
+
+#[tauri::command]
+pub fn create_workspace_dir(path: String) -> Result<(), String> {
+    fs::create_dir_all(&path).map_err(|err| err.to_string())
+}

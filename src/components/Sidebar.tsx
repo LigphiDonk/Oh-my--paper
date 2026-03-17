@@ -65,6 +65,7 @@ interface SidebarProps {
   onTestProvider: (providerId: string) => Promise<TestResult>;
   onActivateProvider: (providerId: string) => void;
   onToggleSkill: (skill: SkillManifest) => Promise<void>;
+  onSkillsChanged?: () => void;
   streamThinkingText?: string;
   streamThinkingHistoryText?: string;
   streamThinkingDurationMs?: number;
@@ -189,6 +190,7 @@ export function Sidebar({
   onTestProvider,
   onActivateProvider,
   onToggleSkill,
+  onSkillsChanged,
   streamThinkingText,
   streamThinkingHistoryText,
   streamThinkingDurationMs,
@@ -524,8 +526,9 @@ curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh`}</pre>
             <SkillArsenal
               skills={skills}
               onToggleSkill={onToggleSkill}
+              onSkillsChanged={onSkillsChanged}
             />
-            {skills.length === 0 && <div className="sidebar-empty-state">暂无技能</div>}
+
           </div>
         </>
       )}

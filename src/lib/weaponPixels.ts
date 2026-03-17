@@ -141,45 +141,5 @@ export interface BuiltinSkillDef {
   themeColors: { primary: string; secondary: string; accent: string };
 }
 
-export const BUILTIN_SKILLS: BuiltinSkillDef[] = [
-  {
-    id: "structure-check",
-    name: "结构检查",
-    weaponType: "blade",
-    description: "检查论文结构完整性",
-    actionLabel: "开始检查",
-    themeColors: { primary: "#4fc3f7", secondary: "#0288d1", accent: "#b3e5fc" },
-  },
-  {
-    id: "citation-scan",
-    name: "引用扫描",
-    weaponType: "bow",
-    description: "扫描引用格式与完整性",
-    actionLabel: "扫描引用",
-    themeColors: { primary: "#ffb74d", secondary: "#f57c00", accent: "#ffe0b2" },
-  },
-  {
-    id: "format-polish",
-    name: "格式润色",
-    weaponType: "hammer",
-    description: "自动修正格式问题",
-    actionLabel: "开始润色",
-    themeColors: { primary: "#81c784", secondary: "#388e3c", accent: "#c8e6c9" },
-  },
-  {
-    id: "grammar-guard",
-    name: "语法守卫",
-    weaponType: "shield",
-    description: "检查语法与拼写错误",
-    actionLabel: "检查语法",
-    themeColors: { primary: "#ce93d8", secondary: "#7b1fa2", accent: "#e1bee7" },
-  },
-  {
-    id: "compile-lance",
-    name: "编译之矛",
-    weaponType: "spear",
-    description: "一键编译并诊断错误",
-    actionLabel: "编译项目",
-    themeColors: { primary: "#ef5350", secondary: "#c62828", accent: "#ffcdd2" },
-  },
-];
+/** No builtin skills — users import their own. */
+export const BUILTIN_SKILLS: BuiltinSkillDef[] = [];
