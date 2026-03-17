@@ -270,6 +270,16 @@ export interface CloudDocumentSummary {
   updatedAt: string;
 }
 
+export interface CloudBlobSummary {
+  id: string;
+  projectId: string;
+  path: string;
+  mime: string;
+  size: number;
+  latestVersion: number;
+  updatedAt: string;
+}
+
 export interface CollabMember {
   clientId: number;
   userId: string;

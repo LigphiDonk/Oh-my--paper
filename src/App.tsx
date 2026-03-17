@@ -26,12 +26,15 @@ import { ShareLinkModal } from "./components/ShareLinkModal";
 import { createLocalAdapter } from "./lib/adapters";
 import {
   createCloudProject,
+  downloadCloudBlob,
   ensureCloudDocument,
   fetchDocumentSnapshot,
   getCloudProject,
   joinCloudProject,
+  listCloudBlobs,
   listCloudDocuments,
   listCloudProjects,
+  uploadCloudBlob,
 } from "./lib/collaboration/cloud-api";
 import {
   readCollabAuthSession,
@@ -48,8 +51,11 @@ import { CommentStore } from "./lib/collaboration/comment-store";
 import { generateShareLink, parseProjectReference } from "./lib/collaboration/share";
 import {
   CollabDocManager,
+  readBlobSyncedVersions,
+  seedBlobBaseline,
   seedCollabSyncBaseline,
   type CollabWorkspaceSyncSummary,
+  writeBlobSyncedVersions,
 } from "./lib/collaboration/doc-manager";
 import {
   clearWorkspaceCollabMetadata,
@@ -173,6 +179,43 @@ function decodeCollabTextSnapshot(update: Uint8Array) {
   } finally {
     doc.destroy();
   }
+}
+
+const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "tiff", "tif", "eps"]);
+
+function imageMimeType(path: string): string {
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  const map: Record<string, string> = {
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    gif: "image/gif",
+    webp: "image/webp",
+    svg: "image/svg+xml",
+    bmp: "image/bmp",
+    tiff: "image/tiff",
+    tif: "image/tiff",
+    eps: "application/postscript",
+  };
+  return map[ext] ?? "application/octet-stream";
+}
+
+function collectImagePaths(nodes: WorkspaceSnapshot["tree"]): string[] {
+  const result: string[] = [];
+  function visit(currentNodes: WorkspaceSnapshot["tree"]) {
+    for (const node of currentNodes) {
+      if (node.kind === "directory") {
+        visit(node.children ?? []);
+        continue;
+      }
+      const ext = node.name.split(".").pop()?.toLowerCase() ?? "";
+      if (IMAGE_EXTENSIONS.has(ext)) {
+        result.push(node.path);
+      }
+    }
+  }
+  visit(nodes);
+  return result;
 }
 
 function collectTextPathsFromTree(nodes: WorkspaceSnapshot["tree"]) {
@@ -1932,6 +1975,18 @@ function App() {
     await seedCollabSyncBaseline(fileAdapter, projectId, documents, {
       additionalSyncedPaths: options?.additionalSyncedPaths,
     });
+
+    // Download all binary blobs (images, etc.)
+    const blobs = await listCloudBlobs(token, projectId);
+    for (const blob of blobs) {
+      try {
+        const data = await downloadCloudBlob(token, projectId, blob.path);
+        await desktop.saveFileBinary(blob.path, data);
+      } catch (error) {
+        console.warn("[collab.hydrate] failed to download blob", blob.path, error);
+      }
+    }
+    await seedBlobBaseline(fileAdapter, projectId, blobs);
   }
 
   async function handleCreateCloudProject() {
@@ -2299,23 +2354,61 @@ function App() {
 
     try {
       const result = await collabManager.syncWorkspaceNow(snapshot);
+
+      // Push new/modified images to R2
+      let blobSyncedCount = 0;
+      const collabMeta = snapshot.collab;
+      if (collabMeta?.cloudProjectId && collabAuthSession) {
+        const token = collabAuthSession.token;
+        const projectId = collabMeta.cloudProjectId;
+        const remoteBlobs = await listCloudBlobs(token, projectId);
+        const remoteBlobsByPath = new Map(remoteBlobs.map((b) => [b.path, b]));
+        const blobVersions = await readBlobSyncedVersions(fileAdapter, projectId);
+        const localImagePaths = collectImagePaths(snapshot.tree);
+        for (const imagePath of localImagePaths) {
+          const remoteVersion = remoteBlobsByPath.get(imagePath)?.latestVersion ?? 0;
+          const syncedVersion = blobVersions.get(imagePath) ?? 0;
+          // Push if not yet in cloud, or if we've never synced it (syncedVersion=0 & it exists locally)
+          if (remoteVersion === 0 || syncedVersion === 0) {
+            try {
+              const data = await desktop.readFileBinary(imagePath);
+              if (data && data.length > 0) {
+                const latestVersion = await uploadCloudBlob(token, projectId, imagePath, data, imageMimeType(imagePath));
+                blobVersions.set(imagePath, latestVersion);
+                blobSyncedCount += 1;
+              }
+            } catch (error) {
+              console.warn("[collab.sync] failed to upload blob", imagePath, error);
+            }
+          }
+        }
+        if (blobSyncedCount > 0) {
+          await writeBlobSyncedVersions(fileAdapter, projectId, blobVersions);
+        }
+      }
+
       await refreshCollabSyncSummary();
-      if (result.syncedCount > 0) {
+      const totalSynced = result.syncedCount + blobSyncedCount;
+      if (totalSynced > 0) {
         const syncedAt = new Date().toISOString();
         setLastManualCollabSyncAt(syncedAt);
+        const parts: string[] = [];
+        if (result.syncedCount > 0) parts.push(`${result.syncedCount} 个文本文件`);
+        if (blobSyncedCount > 0) parts.push(`${blobSyncedCount} 个图片`);
         setCollabNotice({
           tone: "success",
-          text: `已推送 ${result.syncedCount} 个待同步文件到云端。`,
+          text: `已推送 ${parts.join("、")} 到云端。`,
         });
         appendCollabDebugLog("[collab.manual] workspace sync succeeded", {
           projectId: snapshot.collab.cloudProjectId,
           syncedCount: result.syncedCount,
+          blobSyncedCount,
           syncedAt,
         });
       } else {
         setCollabNotice({
           tone: "success",
-          text: "当前没有待同步的文本文件。",
+          text: "当前没有待同步的文件。",
         });
         appendCollabDebugLog("[collab.manual] workspace sync skipped", {
           projectId: snapshot.collab.cloudProjectId,
@@ -2353,22 +2446,59 @@ function App() {
 
     try {
       const result = await collabManager.pullWorkspace(snapshot);
+
+      // Pull new/updated blobs from R2
+      let blobPulledCount = 0;
+      const collabMeta = snapshot.collab;
+      if (collabMeta?.cloudProjectId && collabAuthSession) {
+        const token = collabAuthSession.token;
+        const projectId = collabMeta.cloudProjectId;
+        const remoteBlobs = await listCloudBlobs(token, projectId);
+        const blobVersions = await readBlobSyncedVersions(fileAdapter, projectId);
+        for (const blob of remoteBlobs) {
+          const syncedVersion = blobVersions.get(blob.path) ?? 0;
+          if (blob.latestVersion > syncedVersion) {
+            try {
+              const data = await downloadCloudBlob(token, projectId, blob.path);
+              await desktop.saveFileBinary(blob.path, data);
+              blobVersions.set(blob.path, blob.latestVersion);
+              blobPulledCount += 1;
+            } catch (error) {
+              console.warn("[collab.pull] failed to download blob", blob.path, error);
+            }
+          }
+        }
+        if (blobPulledCount > 0) {
+          await writeBlobSyncedVersions(fileAdapter, projectId, blobVersions);
+        }
+      }
+
       const syncedAt = new Date().toISOString();
-      if (result.syncedCount > 0) {
+      const totalPulled = result.syncedCount + blobPulledCount;
+      if (totalPulled > 0) {
         await refreshWorkspace();
       } else {
         await refreshCollabSyncSummary();
       }
       setLastManualCollabSyncAt(syncedAt);
-      setCollabNotice({
-        tone: "success",
-        text: result.syncedCount > 0
-          ? `已从云端拉取 ${result.syncedCount} 个待更新文件。`
-          : "当前没有待拉取的文件。",
-      });
+      if (totalPulled > 0) {
+        const parts: string[] = [];
+        if (result.syncedCount > 0) parts.push(`${result.syncedCount} 个文本文件`);
+        if (blobPulledCount > 0) parts.push(`${blobPulledCount} 个图片`);
+        setCollabNotice({
+          tone: "success",
+          text: `已从云端拉取 ${parts.join("、")}。`,
+        });
+      } else {
+        setCollabNotice({
+          tone: "success",
+          text: "当前没有待拉取的文件。",
+        });
+      }
       appendCollabDebugLog("[collab.manual] workspace pull succeeded", {
         projectId: snapshot.collab.cloudProjectId,
         syncedCount: result.syncedCount,
+        blobPulledCount,
         syncedAt,
       });
     } catch (error) {

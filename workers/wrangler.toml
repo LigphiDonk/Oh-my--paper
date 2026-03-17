@@ -15,6 +15,10 @@ binding = "DB"
 database_name = "viewerleaf"
 database_id = "a3b3c92f-612e-4d38-930c-943da83939b0"
 
+[[kv_namespaces]]
+binding = "BLOBS"
+id = "71d6d53be3154bddae01df4beb7fb067"
+
 [vars]
 ALLOW_INSECURE_AUTH = "true"
 

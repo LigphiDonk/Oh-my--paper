@@ -324,6 +324,16 @@ export const desktop = {
         return null;
       });
   },
+  readFileBinary(path: string): Promise<Uint8Array | null> {
+    if (!isTauriRuntime()) return Promise.resolve(null);
+    return invoke<number[]>("read_file_binary", { path })
+      .then((raw) => (raw?.length ? new Uint8Array(raw) : null))
+      .catch(() => null);
+  },
+  saveFileBinary(filePath: string, data: Uint8Array): Promise<void> {
+    if (!isTauriRuntime()) return Promise.resolve();
+    return invoke("save_file_binary", { filePath, data: Array.from(data) });
+  },
   onAgentStream(callback: (chunk: StreamChunk) => void): Promise<UnlistenFn> {
     if (!isTauriRuntime()) {
       return Promise.resolve(() => { });

@@ -1,4 +1,4 @@
-import type { CloudDocumentSummary, CloudProjectSummary } from "../../types";
+import type { CloudBlobSummary, CloudDocumentSummary, CloudProjectSummary } from "../../types";
 import { resolveCollabBaseUrls } from "./auth";
 
 function authHeaders(token: string) {
@@ -119,4 +119,63 @@ export async function joinCloudProject(
     body: JSON.stringify(role ? { role } : {}),
   });
   return parseJson<{ ok: boolean; role: CloudProjectSummary["role"] }>(response);
+}
+
+export async function listCloudBlobs(token: string, projectId: string): Promise<CloudBlobSummary[]> {
+  const { httpBaseUrl } = resolveCollabBaseUrls();
+  const response = await fetch(`${httpBaseUrl}/api/projects/${projectId}/blobs`, {
+    headers: authHeaders(token),
+  });
+  const payload = await parseJson<{ blobs: CloudBlobSummary[] }>(response);
+  return payload.blobs;
+}
+
+export async function uploadCloudBlob(
+  token: string,
+  projectId: string,
+  path: string,
+  data: Uint8Array,
+  mime: string,
+): Promise<number> {
+  const { httpBaseUrl } = resolveCollabBaseUrls();
+  const url = new URL(`${httpBaseUrl}/api/projects/${projectId}/blobs/data`);
+  url.searchParams.set("path", path);
+  const response = await fetch(url.toString(), {
+    method: "POST",
+    headers: {
+      ...authHeaders(token),
+      "content-type": mime,
+    },
+    body: new Blob([data.buffer as ArrayBuffer], { type: mime }),
+  });
+  const payload = await parseJson<{ ok: boolean; latestVersion: number }>(response);
+  return payload.latestVersion;
+}
+
+export async function downloadCloudBlob(
+  token: string,
+  projectId: string,
+  path: string,
+): Promise<Uint8Array> {
+  const { httpBaseUrl } = resolveCollabBaseUrls();
+  const url = new URL(`${httpBaseUrl}/api/projects/${projectId}/blobs/data`);
+  url.searchParams.set("path", path);
+  const response = await fetch(url.toString(), {
+    headers: authHeaders(token),
+  });
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+  return new Uint8Array(await response.arrayBuffer());
+}
+
+export async function deleteCloudBlob(token: string, projectId: string, path: string): Promise<void> {
+  const { httpBaseUrl } = resolveCollabBaseUrls();
+  const url = new URL(`${httpBaseUrl}/api/projects/${projectId}/blobs/data`);
+  url.searchParams.set("path", path);
+  const response = await fetch(url.toString(), {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+  await parseJson<{ ok: boolean }>(response);
 }

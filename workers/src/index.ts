@@ -8,6 +8,7 @@ type ProjectRole = "owner" | "editor" | "commenter" | "viewer";
 interface Env {
   DOCUMENT_ROOM: DurableObjectNamespace;
   DB: D1Database;
+  BLOBS: KVNamespace;
   ALLOW_INSECURE_AUTH?: string;
 }
 
@@ -616,6 +617,106 @@ export default {
           .bind(projectId)
           .all();
         return json({ members: result.results });
+      }
+
+      // ── Blob endpoints ────────────────────────────────────────────────────────
+
+      const blobsListMatch = url.pathname.match(/^\/api\/projects\/([^/]+)\/blobs$/);
+      if (blobsListMatch && request.method === "GET") {
+        const projectId = blobsListMatch[1];
+        await requireProjectRole(env, projectId, user.id);
+        const result = await env.DB.prepare(
+          `SELECT id, project_id AS projectId, path, mime, size,
+                  latest_version AS latestVersion, updated_at AS updatedAt
+           FROM project_blobs
+           WHERE project_id = ?1
+           ORDER BY path ASC`,
+        )
+          .bind(projectId)
+          .all();
+        return json({ blobs: result.results });
+      }
+
+      const blobDataMatch = url.pathname.match(/^\/api\/projects\/([^/]+)\/blobs\/data$/);
+      if (blobDataMatch && request.method === "GET") {
+        const projectId = blobDataMatch[1];
+        await requireProjectRole(env, projectId, user.id);
+        const blobPath = url.searchParams.get("path")?.trim();
+        if (!blobPath) return json({ error: "missing_path" }, { status: 400 });
+
+        const kvKey = `${projectId}/${blobPath}`;
+        const data = await env.BLOBS.get(kvKey, "arrayBuffer");
+        if (!data) return json({ error: "not_found" }, { status: 404 });
+
+        const row = await env.DB.prepare(
+          `SELECT mime FROM project_blobs WHERE project_id = ?1 AND path = ?2 LIMIT 1`,
+        )
+          .bind(projectId, blobPath)
+          .first<{ mime: string }>();
+
+        return new Response(data, {
+          headers: {
+            "content-type": row?.mime ?? "application/octet-stream",
+            "cache-control": "no-store",
+            ...corsHeaders(),
+          },
+        });
+      }
+
+      if (blobDataMatch && request.method === "POST") {
+        const projectId = blobDataMatch[1];
+        const role = await requireProjectRole(env, projectId, user.id);
+        if (role === "viewer") return json({ error: "read_only" }, { status: 403 });
+
+        const blobPath = url.searchParams.get("path")?.trim();
+        if (!blobPath) return json({ error: "missing_path" }, { status: 400 });
+        const mime = request.headers.get("content-type") ?? "application/octet-stream";
+
+        const payload = await request.arrayBuffer();
+        const kvKey = `${projectId}/${blobPath}`;
+        await env.BLOBS.put(kvKey, payload, { metadata: { mime } });
+
+        const id = crypto.randomUUID();
+        await env.DB.prepare(
+          `INSERT INTO project_blobs (id, project_id, path, mime, size, latest_version)
+           VALUES (?1, ?2, ?3, ?4, ?5, 1)
+           ON CONFLICT(project_id, path) DO UPDATE SET
+             mime = excluded.mime,
+             size = excluded.size,
+             latest_version = latest_version + 1,
+             updated_at = datetime('now')`,
+        )
+          .bind(id, projectId, blobPath, mime, payload.byteLength)
+          .run();
+
+        await env.DB.prepare(`UPDATE projects SET updated_at = datetime('now') WHERE id = ?1`)
+          .bind(projectId)
+          .run();
+
+        const row = await env.DB.prepare(
+          `SELECT latest_version AS latestVersion FROM project_blobs WHERE project_id = ?1 AND path = ?2 LIMIT 1`,
+        )
+          .bind(projectId, blobPath)
+          .first<{ latestVersion: number }>();
+
+        return json({ ok: true, latestVersion: row?.latestVersion ?? 1 });
+      }
+
+      if (blobDataMatch && request.method === "DELETE") {
+        const projectId = blobDataMatch[1];
+        const role = await requireProjectRole(env, projectId, user.id);
+        if (role === "viewer") return json({ error: "read_only" }, { status: 403 });
+
+        const blobPath = url.searchParams.get("path")?.trim();
+        if (!blobPath) return json({ error: "missing_path" }, { status: 400 });
+
+        const kvKey = `${projectId}/${blobPath}`;
+        await env.BLOBS.delete(kvKey);
+        await env.DB.prepare(`DELETE FROM project_blobs WHERE project_id = ?1 AND path = ?2`)
+          .bind(projectId, blobPath)
+          .run();
+
+        return json({ ok: true });
       }
 
       return json({ error: "not_found" }, { status: 404 });

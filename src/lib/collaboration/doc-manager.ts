@@ -2,7 +2,7 @@ import { Awareness } from "y-protocols/awareness.js";
 import * as Y from "yjs";
 
 import type { FileAdapter } from "../adapters";
-import type { CloudDocumentSummary, CollabFileSyncState, CollabMember, WorkspaceSnapshot } from "../../types";
+import type { CloudBlobSummary, CloudDocumentSummary, CollabFileSyncState, CollabMember, WorkspaceSnapshot } from "../../types";
 import {
   ensureCloudDocument,
   fetchDocumentSnapshot,
@@ -66,6 +66,10 @@ function syncedVersionManifestPath(projectId: string) {
   return `.viewerleaf/collab/${projectId}/synced-versions.json`;
 }
 
+function blobVersionManifestPath(projectId: string) {
+  return `.viewerleaf/collab/${projectId}/blob-versions.json`;
+}
+
 async function ensureCollabPersistenceDirectories(fileAdapter: FileAdapter, projectId: string) {
   const folders = [
     ".viewerleaf",
@@ -125,6 +129,45 @@ export async function seedCollabSyncBaseline(
 
 function isEmptyDocSnapshot(update: Uint8Array | null | undefined) {
   return Boolean(update && update.length === 2 && update[0] === 0 && update[1] === 0);
+}
+
+export async function readBlobSyncedVersions(
+  fileAdapter: FileAdapter,
+  projectId: string,
+): Promise<Map<string, number>> {
+  try {
+    const file = await fileAdapter.readFile(blobVersionManifestPath(projectId));
+    const parsed = JSON.parse(file.content) as { versions?: Record<string, unknown> };
+    if (!parsed.versions || typeof parsed.versions !== "object") return new Map();
+    return new Map(
+      Object.entries(parsed.versions).filter(([, v]) => typeof v === "number") as [string, number][],
+    );
+  } catch {
+    return new Map();
+  }
+}
+
+export async function writeBlobSyncedVersions(
+  fileAdapter: FileAdapter,
+  projectId: string,
+  versions: Map<string, number>,
+): Promise<void> {
+  const sorted = Object.fromEntries(
+    Array.from(versions.entries()).sort(([a], [b]) => a.localeCompare(b)),
+  );
+  await fileAdapter.saveFile(
+    blobVersionManifestPath(projectId),
+    JSON.stringify({ updatedAt: new Date().toISOString(), versions: sorted }),
+  );
+}
+
+export async function seedBlobBaseline(
+  fileAdapter: FileAdapter,
+  projectId: string,
+  blobs: CloudBlobSummary[],
+): Promise<void> {
+  const versions = new Map(blobs.map((b) => [b.path, b.latestVersion]));
+  await writeBlobSyncedVersions(fileAdapter, projectId, versions);
 }
 
 export interface ManagedCollabDocHandle {

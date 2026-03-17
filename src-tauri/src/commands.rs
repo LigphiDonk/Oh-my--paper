@@ -634,3 +634,40 @@ pub fn remove_skill(
 pub fn create_workspace_dir(path: String) -> Result<(), String> {
     fs::create_dir_all(&path).map_err(|err| err.to_string())
 }
+
+#[tauri::command]
+pub async fn read_file_binary(app_handle: AppHandle, path: String) -> Result<Vec<u8>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app_handle.state::<AppState>();
+        let root = state
+            .project_config
+            .read()
+            .expect("project config lock poisoned")
+            .root_path
+            .clone();
+        let absolute = Path::new(&root).join(&path);
+        fs::read(&absolute).map_err(|err| err.to_string())
+    })
+    .await
+    .map_err(|err| err.to_string())?
+}
+
+#[tauri::command]
+pub async fn save_file_binary(app_handle: AppHandle, file_path: String, data: Vec<u8>) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app_handle.state::<AppState>();
+        let root = state
+            .project_config
+            .read()
+            .expect("project config lock poisoned")
+            .root_path
+            .clone();
+        let absolute = Path::new(&root).join(&file_path);
+        if let Some(parent) = absolute.parent() {
+            fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+        }
+        fs::write(&absolute, &data).map_err(|err| err.to_string())
+    })
+    .await
+    .map_err(|err| err.to_string())?
+}
