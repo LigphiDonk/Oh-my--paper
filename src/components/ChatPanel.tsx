@@ -154,10 +154,20 @@ function parseSerializedToolBlocks(raw: string): { toolCalls: ToolCallBlock[]; c
     if (toolMatch) {
       const toolId = toolMatch[1];
       let result = "";
-      // Check if next line is a [Result: ...] block
-      if (i + 1 < lines.length && lines[i + 1].startsWith("[Result: ")) {
+      // New multi-line format: [Result] ... [/Result]
+      if (i + 1 < lines.length && lines[i + 1].trim() === "[Result]") {
+        i += 2; // skip [Result] line
+        const resultLines: string[] = [];
+        while (i < lines.length && lines[i].trim() !== "[/Result]") {
+          resultLines.push(lines[i]);
+          i++;
+        }
+        result = resultLines.join("\n");
+        // i now points at [/Result], will be incremented at end of loop
+      }
+      // Legacy single-line format: [Result: ...]
+      else if (i + 1 < lines.length && lines[i + 1].startsWith("[Result: ")) {
         const resultLine = lines[i + 1];
-        // Find the LAST ] on this line to handle ] inside content
         const lastBracket = resultLine.lastIndexOf("]");
         if (lastBracket > "[Result: ".length - 1) {
           result = resultLine.slice("[Result: ".length, lastBracket);

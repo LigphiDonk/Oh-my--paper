@@ -34,7 +34,7 @@ function safelyDisposeListener(listener?: (() => void | Promise<void>) | null) {
 function serializeStreamToolCalls(toolCalls: StreamToolCall[]) {
   return toolCalls
     .map((call) => {
-      const resultBlock = call.output ? `[Result: ${call.output}]\n` : "";
+      const resultBlock = call.output ? `[Result]\n${call.output}\n[/Result]\n` : "";
       return `[Tool: ${call.toolId}]\n${resultBlock}`.trimEnd();
     })
     .join("\n\n");
@@ -334,7 +334,9 @@ export function useAgentChat({
 
   const resetForSnapshot = useEffectEvent(() => {
     currentStreamSessionIdRef.current = "";
+    didBootstrapRef.current = false;
     setMessages([]);
+    setAgentSessions([]);
     setActiveSessionId("");
     setPendingPatch(null);
     resetStreamState();

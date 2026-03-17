@@ -92,7 +92,7 @@ export async function seedCollabSyncBaseline(
   await ensureCollabPersistenceDirectories(fileAdapter, projectId);
   const versionEntries = new Map<string, number>(
     documents
-      .filter((document) => document.kind === "text")
+      .filter((document) => document.kind === "text" || document.kind === "tex" || document.kind === "bib")
       .map((document) => [document.path, document.latestVersion] as const),
   );
   for (const path of options?.additionalSyncedPaths ?? []) {
@@ -779,7 +779,7 @@ export class CollabDocManager {
     const documents = await listCloudDocuments(this.options.authToken, this.options.projectId);
     return new Map(
       documents
-        .filter((document) => document.kind === "text")
+        .filter((document) => document.kind === "text" || document.kind === "tex" || document.kind === "bib")
         .map((document) => [document.path, document]),
     );
   }

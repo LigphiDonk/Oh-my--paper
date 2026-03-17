@@ -1921,7 +1921,7 @@ function App() {
     await ensureCloudDocument(token, projectId, rootMainFile);
     const documents = await listCloudDocuments(token, projectId);
 
-    for (const document of documents.filter((item) => item.kind === "text")) {
+    for (const document of documents.filter((item) => item.kind === "text" || item.kind === "tex" || item.kind === "bib")) {
       const snapshotUpdate = await fetchDocumentSnapshot(token, projectId, document.path);
       const content = decodeCollabTextSnapshot(snapshotUpdate);
       await fileAdapter.saveFile(document.path, content);

@@ -567,17 +567,17 @@ fn build_assistant_message_content(
     if !trimmed_thinking.is_empty() {
         parts.push(format!("<think>\n{trimmed_thinking}\n</think>"));
     }
+    if !text.trim().is_empty() {
+        parts.push(text.to_string());
+    }
     if !tool_calls.is_empty() {
         for (tool_id, _status, preview) in tool_calls {
             if preview.is_empty() {
                 parts.push(format!("[Tool: {tool_id}]"));
             } else {
-                parts.push(format!("[Tool: {tool_id}]\n[Result: {preview}]"));
+                parts.push(format!("[Tool: {tool_id}]\n[Result]\n{preview}\n[/Result]"));
             }
         }
-    }
-    if !text.trim().is_empty() {
-        parts.push(text.to_string());
     }
     parts.join("\n")
 }
