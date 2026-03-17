@@ -461,6 +461,7 @@ function App() {
     pendingPullCount: 0,
     conflictCount: 0,
   });
+  const [ignoredSyncPaths, setIgnoredSyncPaths] = useState<Set<string>>(new Set());
   const [collabProjectModal, setCollabProjectModal] = useState<CollabProjectModalState | null>(null);
   const [createEntryModal, setCreateEntryModal] = useState<CreateEntryModalState | null>(null);
   const [shareLinkModalOpen, setShareLinkModalOpen] = useState(false);
@@ -561,6 +562,17 @@ function App() {
       pendingPullCount: 0,
       conflictCount: 0,
     });
+    // Load ignored paths for this project from localStorage
+    if (activeCollabProjectId) {
+      try {
+        const stored = localStorage.getItem(`viwerleaf.collab.ignored.${activeCollabProjectId}`);
+        setIgnoredSyncPaths(stored ? new Set(JSON.parse(stored) as string[]) : new Set());
+      } catch {
+        setIgnoredSyncPaths(new Set());
+      }
+    } else {
+      setIgnoredSyncPaths(new Set());
+    }
   }, [activeCollabProjectId]);
 
   const collabManager = useMemo(() => {
@@ -981,11 +993,14 @@ function App() {
     () =>
       Object.entries(collabWorkspaceSyncSummary.byPath)
         .filter(([, state]) => state !== "synced")
-        .sort(([leftPath, leftState], [rightPath, rightState]) =>
-          leftState === rightState ? leftPath.localeCompare(rightPath) : leftState.localeCompare(rightState),
-        )
-        .map(([path, state]) => ({ path, state })),
-    [collabWorkspaceSyncSummary.byPath],
+        .map(([path, state]) => ({
+          path,
+          state: (ignoredSyncPaths.has(path) ? "ignored" : state) as import("./types").CollabFileSyncState,
+        }))
+        .sort((left, right) =>
+          left.state === right.state ? left.path.localeCompare(right.path) : left.state.localeCompare(right.state),
+        ),
+    [collabWorkspaceSyncSummary.byPath, ignoredSyncPaths],
   );
   const activeWorkspaceRoot = snapshot?.projectConfig.rootPath ?? "";
   const isMacOverlayWindow =
@@ -2396,6 +2411,28 @@ function App() {
     }
   }
 
+  function handleIgnoreSyncPath(path: string) {
+    const projectId = snapshot?.collab?.cloudProjectId;
+    if (!projectId) return;
+    setIgnoredSyncPaths((current) => {
+      const next = new Set(current);
+      next.add(path);
+      localStorage.setItem(`viwerleaf.collab.ignored.${projectId}`, JSON.stringify([...next]));
+      return next;
+    });
+  }
+
+  function handleUnignoreSyncPath(path: string) {
+    const projectId = snapshot?.collab?.cloudProjectId;
+    if (!projectId) return;
+    setIgnoredSyncPaths((current) => {
+      const next = new Set(current);
+      next.delete(path);
+      localStorage.setItem(`viwerleaf.collab.ignored.${projectId}`, JSON.stringify([...next]));
+      return next;
+    });
+  }
+
   async function handleSyncCloudWorkspace() {
     if (!snapshot || !snapshot.collab?.cloudProjectId || !collabManager) {
       return;
@@ -2429,6 +2466,7 @@ function App() {
         const blobBaseline = await readBlobSyncBaseline(fileAdapter, projectId);
         const localImagePaths = collectImagePaths(snapshot.tree);
         for (const imagePath of localImagePaths) {
+          if (ignoredSyncPaths.has(imagePath)) continue;
           try {
             const data = await desktop.readFileBinary(imagePath);
             if (!data || data.length === 0) continue;
@@ -2966,10 +3004,11 @@ function App() {
           </>
         )}
         {isWindows && (
-          <div className="win-controls" data-tauri-drag-region="false">
+          <div className="win-controls" onMouseDown={(e) => e.stopPropagation()}>
             <button
               className="win-ctrl win-ctrl--min"
               title="最小化"
+              onMouseDown={(e) => e.stopPropagation()}
               onClick={() => void desktop.minimizeWindow()}
               aria-label="最小化"
             >
@@ -2978,6 +3017,7 @@ function App() {
             <button
               className="win-ctrl win-ctrl--max"
               title="最大化"
+              onMouseDown={(e) => e.stopPropagation()}
               onClick={() => void desktop.toggleMaximizeWindow()}
               aria-label="最大化"
             >
@@ -2986,6 +3026,7 @@ function App() {
             <button
               className="win-ctrl win-ctrl--close"
               title="关闭"
+              onMouseDown={(e) => e.stopPropagation()}
               onClick={() => void desktop.closeWindow()}
               aria-label="关闭"
             >
@@ -3115,6 +3156,9 @@ function App() {
               collabStatus={currentCollabStatus}
               busyAction={collabBusyAction}
               changes={syncChangeEntries}
+              ignoredPaths={ignoredSyncPaths}
+              onIgnorePath={handleIgnoreSyncPath}
+              onUnignorePath={handleUnignoreSyncPath}
               onPush={() => void handleSyncCloudWorkspace()}
               onPull={() => void handlePullCloudWorkspace()}
               onOpenShareModal={handleOpenShareLinkModal}

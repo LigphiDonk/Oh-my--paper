@@ -1,4 +1,5 @@
 import clsx from "clsx";
+import { useState } from "react";
 
 import type { CloudProjectRole, CollabFileSyncState, CollabStatus } from "../types";
 
@@ -17,6 +18,9 @@ interface SyncSidebarProps {
   collabStatus: CollabStatus;
   busyAction: "save-config" | "create-project" | "link-project" | "unlink-project" | "sync-project" | "pull-project" | null;
   changes: SyncChangeEntry[];
+  ignoredPaths: Set<string>;
+  onIgnorePath: (path: string) => void;
+  onUnignorePath: (path: string) => void;
   onPush: () => void;
   onPull: () => void;
   onOpenShareModal: () => void;
@@ -45,6 +49,7 @@ function stateLabel(state: CollabFileSyncState) {
   if (state === "synced") return "已同步";
   if (state === "pending-push") return "待推送";
   if (state === "pending-pull") return "待拉取";
+  if (state === "ignored") return "已忽略";
   return "冲突";
 }
 
@@ -85,6 +90,8 @@ export function SyncSidebar({
   collabStatus,
   busyAction,
   changes,
+  onIgnorePath,
+  onUnignorePath,
   onPush,
   onPull,
   onOpenShareModal,
@@ -92,9 +99,12 @@ export function SyncSidebar({
   onLinkProject,
   onOpenCollabSettings,
 }: SyncSidebarProps) {
+  const [ignoredExpanded, setIgnoredExpanded] = useState(false);
   const pendingPush = changes.filter((entry) => entry.state === "pending-push");
   const pendingPull = changes.filter((entry) => entry.state === "pending-pull");
   const conflicts = changes.filter((entry) => entry.state === "conflict");
+  const ignored = changes.filter((entry) => entry.state === "ignored");
+  const activeChanges = changes.filter((entry) => entry.state !== "ignored");
   const hasCloudProject = Boolean(projectId);
   const graphEntries: SyncGraphEntry[] = hasCloudProject
     ? [
@@ -218,6 +228,10 @@ export function SyncSidebar({
                   <strong>{conflicts.length}</strong>
                   <span>冲突</span>
                 </div>
+                <div className="sync-metric is-ignored">
+                  <strong>{ignored.length}</strong>
+                  <span>已忽略</span>
+                </div>
               </div>
               <div className="sync-primary-actions">
                 <button
@@ -281,18 +295,18 @@ export function SyncSidebar({
             <div className="sync-section">
               <div className="sync-section-header">
                 <span>变更</span>
-                <span className="text-subtle text-xs">{changes.length} 个文件</span>
+                <span className="text-subtle text-xs">{activeChanges.length} 个文件</span>
               </div>
 
-              {changes.length === 0 ? (
+              {activeChanges.length === 0 ? (
                 <div className="sync-section-empty">当前没有待同步文件。</div>
               ) : (
                 <div className="sync-change-list">
-                  {changes.map((entry, index) => (
+                  {activeChanges.map((entry, index) => (
                     <div key={`${entry.state}:${entry.path}`} className="sync-change-item">
                       <div className="sync-change-rail" aria-hidden="true">
                         <span className={`sync-change-node is-${entry.state}`}></span>
-                        {index < changes.length - 1 && <span className="sync-change-line" />}
+                        {index < activeChanges.length - 1 && <span className="sync-change-line" />}
                       </div>
                       <span className="sync-change-path">{entry.path}</span>
                       <span
@@ -305,11 +319,60 @@ export function SyncSidebar({
                       >
                         {stateLabel(entry.state)}
                       </span>
+                      {entry.state === "pending-push" && (
+                        <button
+                          className="sync-ignore-btn"
+                          type="button"
+                          title="忽略此文件（不推送）"
+                          onClick={() => onIgnorePath(entry.path)}
+                        >
+                          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8">
+                            <line x1="3" y1="3" x2="13" y2="13"/>
+                            <line x1="13" y1="3" x2="3" y2="13"/>
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
               )}
             </div>
+
+            {ignored.length > 0 && (
+              <div className="sync-section">
+                <button
+                  className="sync-section-header sync-section-header--toggle"
+                  type="button"
+                  onClick={() => setIgnoredExpanded((v) => !v)}
+                >
+                  <span>已忽略</span>
+                  <span className="text-subtle text-xs">
+                    {ignored.length} 个文件
+                    <span className="sync-ignored-chevron">{ignoredExpanded ? " ▲" : " ▼"}</span>
+                  </span>
+                </button>
+                {ignoredExpanded && (
+                  <div className="sync-change-list">
+                    {ignored.map((entry) => (
+                      <div key={`ignored:${entry.path}`} className="sync-change-item is-ignored">
+                        <div className="sync-change-rail" aria-hidden="true">
+                          <span className="sync-change-node is-ignored"></span>
+                        </div>
+                        <span className="sync-change-path">{entry.path}</span>
+                        <button
+                          className="sync-unignore-btn"
+                          type="button"
+                          title="取消忽略"
+                          onClick={() => onUnignorePath(entry.path)}
+                        >
+                          恢复
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {conflicts.length > 0 && (
               <div className="sync-warning-card">

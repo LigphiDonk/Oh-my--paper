@@ -199,6 +199,7 @@ button {
   margin-left: 4px;
   flex-shrink: 0;
   -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 .win-ctrl {
@@ -213,6 +214,8 @@ button {
   border-radius: 0;
   cursor: pointer;
   transition: background-color 0.1s;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 .win-ctrl:hover {
@@ -4048,8 +4051,8 @@ button {
 
 .sync-summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
   margin-top: 12px;
 }
 
@@ -4088,6 +4091,15 @@ button {
   border-color: #f3c2c0;
 }
 
+.sync-metric.is-ignored {
+  background: #f5f5f5;
+  border-color: #d8d8d8;
+}
+
+.sync-metric.is-ignored strong {
+  color: var(--text-secondary);
+}
+
 .sync-section {
   padding: 10px 0;
   overflow: hidden;
@@ -4105,6 +4117,19 @@ button {
   font-size: 13px;
   font-weight: 700;
   color: var(--text-primary);
+}
+
+.sync-section-header--toggle {
+  width: 100%;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  padding: 6px 14px;
+  margin-bottom: 4px;
+  transition: background-color var(--transition-fast);
+}
+
+.sync-section-header--toggle:hover {
+  background: var(--bg-surface-hover);
 }
 
 .sync-section-empty {
@@ -4295,6 +4320,16 @@ button {
   background: #d14343;
 }
 
+.sync-change-node.is-ignored {
+  background: #b0bec5;
+}
+
+.sync-change-item.is-ignored .sync-change-path {
+  color: var(--text-secondary);
+  text-decoration: line-through;
+  text-decoration-color: #b0bec5;
+}
+
 .sync-change-line {
   position: absolute;
   top: 16px;
@@ -4331,6 +4366,46 @@ button {
 
 .sync-change-state.is-conflict {
   color: #b42318;
+}
+
+.sync-ignore-btn {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  opacity: 0;
+  transition: opacity var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.sync-change-item:hover .sync-ignore-btn {
+  opacity: 1;
+}
+
+.sync-ignore-btn:hover {
+  background: #fee2e2;
+  color: #b42318;
+}
+
+.sync-unignore-btn {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background-color var(--transition-fast);
+}
+
+.sync-unignore-btn:hover {
+  background: var(--accent-bg);
+}
+
+.sync-ignored-chevron {
+  font-size: 9px;
 }
 
 .sync-warning-card {

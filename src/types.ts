@@ -295,7 +295,7 @@ export interface WorkspaceCollabMetadata {
   linkedAt: string;
 }
 
-export type CollabFileSyncState = "synced" | "pending-push" | "pending-pull" | "conflict";
+export type CollabFileSyncState = "synced" | "pending-push" | "pending-pull" | "conflict" | "ignored";
 
 export interface CollabStatus {
   enabled: boolean;
