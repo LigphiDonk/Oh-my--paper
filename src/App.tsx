@@ -51,11 +51,11 @@ import { CommentStore } from "./lib/collaboration/comment-store";
 import { generateShareLink, parseProjectReference } from "./lib/collaboration/share";
 import {
   CollabDocManager,
-  readBlobSyncedVersions,
+  readBlobSyncBaseline,
   seedBlobBaseline,
   seedCollabSyncBaseline,
   type CollabWorkspaceSyncSummary,
-  writeBlobSyncedVersions,
+  writeBlobSyncBaseline,
 } from "./lib/collaboration/doc-manager";
 import {
   clearWorkspaceCollabMetadata,
@@ -216,6 +216,13 @@ function collectImagePaths(nodes: WorkspaceSnapshot["tree"]): string[] {
   }
   visit(nodes);
   return result;
+}
+
+async function computeHash(data: Uint8Array): Promise<string> {
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data.buffer as ArrayBuffer);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 function collectTextPathsFromTree(nodes: WorkspaceSnapshot["tree"]) {
@@ -602,6 +609,48 @@ function App() {
 
     try {
       const summary = await collabManager.getWorkspaceSyncSummary(snapshot);
+
+      // Merge blob sync states into the summary
+      const projectId = snapshot.collab?.cloudProjectId;
+      if (projectId && collabAuthSession) {
+        const blobBaseline = await readBlobSyncBaseline(fileAdapter, projectId);
+        const localImagePaths = new Set(collectImagePaths(snapshot.tree));
+
+        // pending-push: local image never synced (syncedVersion === 0)
+        for (const imagePath of localImagePaths) {
+          const syncedVersion = blobBaseline.versions.get(imagePath) ?? 0;
+          if (syncedVersion === 0) {
+            summary.byPath[imagePath] = "pending-push";
+            summary.pendingPushCount += 1;
+          } else {
+            summary.byPath[imagePath] ??= "synced";
+          }
+        }
+
+        // pending-pull: cloud blob newer than baseline
+        try {
+          const remoteBlobs = await listCloudBlobs(collabAuthSession.token, projectId);
+          for (const blob of remoteBlobs) {
+            const syncedVersion = blobBaseline.versions.get(blob.path) ?? 0;
+            if (blob.latestVersion > syncedVersion) {
+              const existing = summary.byPath[blob.path];
+              if (existing === "pending-push") {
+                summary.byPath[blob.path] = "conflict";
+                summary.pendingPushCount -= 1;
+                summary.conflictCount += 1;
+              } else {
+                summary.byPath[blob.path] = "pending-pull";
+                summary.pendingPullCount += 1;
+              }
+            } else if (!summary.byPath[blob.path]) {
+              summary.byPath[blob.path] = "synced";
+            }
+          }
+        } catch {
+          // network unavailable — skip remote blob check, local states still shown
+        }
+      }
+
       setCollabWorkspaceSyncSummary(summary);
     } catch (error) {
       console.warn("failed to refresh collaborative workspace sync summary", error);
@@ -1978,15 +2027,26 @@ function App() {
 
     // Download all binary blobs (images, etc.)
     const blobs = await listCloudBlobs(token, projectId);
+    const blobHashes = new Map<string, string>();
     for (const blob of blobs) {
       try {
         const data = await downloadCloudBlob(token, projectId, blob.path);
         await desktop.saveFileBinary(blob.path, data);
+        const hash = await computeHash(data);
+        blobHashes.set(blob.path, hash);
       } catch (error) {
         console.warn("[collab.hydrate] failed to download blob", blob.path, error);
       }
     }
     await seedBlobBaseline(fileAdapter, projectId, blobs);
+    // Patch in the hashes so first push won't re-upload everything
+    if (blobHashes.size > 0) {
+      const baseline = await readBlobSyncBaseline(fileAdapter, projectId);
+      for (const [path, hash] of blobHashes) {
+        baseline.hashes.set(path, hash);
+      }
+      await writeBlobSyncBaseline(fileAdapter, projectId, baseline);
+    }
   }
 
   async function handleCreateCloudProject() {
@@ -2355,35 +2415,34 @@ function App() {
     try {
       const result = await collabManager.syncWorkspaceNow(snapshot);
 
-      // Push new/modified images to R2
+      // Push new/modified images to KV
       let blobSyncedCount = 0;
       const collabMeta = snapshot.collab;
       if (collabMeta?.cloudProjectId && collabAuthSession) {
         const token = collabAuthSession.token;
         const projectId = collabMeta.cloudProjectId;
-        const remoteBlobs = await listCloudBlobs(token, projectId);
-        const remoteBlobsByPath = new Map(remoteBlobs.map((b) => [b.path, b]));
-        const blobVersions = await readBlobSyncedVersions(fileAdapter, projectId);
+        const blobBaseline = await readBlobSyncBaseline(fileAdapter, projectId);
         const localImagePaths = collectImagePaths(snapshot.tree);
         for (const imagePath of localImagePaths) {
-          const remoteVersion = remoteBlobsByPath.get(imagePath)?.latestVersion ?? 0;
-          const syncedVersion = blobVersions.get(imagePath) ?? 0;
-          // Push if not yet in cloud, or if we've never synced it (syncedVersion=0 & it exists locally)
-          if (remoteVersion === 0 || syncedVersion === 0) {
-            try {
-              const data = await desktop.readFileBinary(imagePath);
-              if (data && data.length > 0) {
-                const latestVersion = await uploadCloudBlob(token, projectId, imagePath, data, imageMimeType(imagePath));
-                blobVersions.set(imagePath, latestVersion);
-                blobSyncedCount += 1;
-              }
-            } catch (error) {
-              console.warn("[collab.sync] failed to upload blob", imagePath, error);
+          try {
+            const data = await desktop.readFileBinary(imagePath);
+            if (!data || data.length === 0) continue;
+            const hash = await computeHash(data);
+            const storedHash = blobBaseline.hashes.get(imagePath);
+            const syncedVersion = blobBaseline.versions.get(imagePath) ?? 0;
+            // Upload if never pushed OR content changed
+            if (syncedVersion === 0 || storedHash !== hash) {
+              const latestVersion = await uploadCloudBlob(token, projectId, imagePath, data, imageMimeType(imagePath));
+              blobBaseline.versions.set(imagePath, latestVersion);
+              blobBaseline.hashes.set(imagePath, hash);
+              blobSyncedCount += 1;
             }
+          } catch (error) {
+            console.warn("[collab.sync] failed to upload blob", imagePath, error);
           }
         }
         if (blobSyncedCount > 0) {
-          await writeBlobSyncedVersions(fileAdapter, projectId, blobVersions);
+          await writeBlobSyncBaseline(fileAdapter, projectId, blobBaseline);
         }
       }
 
@@ -2447,21 +2506,24 @@ function App() {
     try {
       const result = await collabManager.pullWorkspace(snapshot);
 
-      // Pull new/updated blobs from R2
+      // Pull new/updated blobs from KV
       let blobPulledCount = 0;
       const collabMeta = snapshot.collab;
       if (collabMeta?.cloudProjectId && collabAuthSession) {
         const token = collabAuthSession.token;
         const projectId = collabMeta.cloudProjectId;
         const remoteBlobs = await listCloudBlobs(token, projectId);
-        const blobVersions = await readBlobSyncedVersions(fileAdapter, projectId);
+        const blobBaseline = await readBlobSyncBaseline(fileAdapter, projectId);
         for (const blob of remoteBlobs) {
-          const syncedVersion = blobVersions.get(blob.path) ?? 0;
+          const syncedVersion = blobBaseline.versions.get(blob.path) ?? 0;
           if (blob.latestVersion > syncedVersion) {
             try {
               const data = await downloadCloudBlob(token, projectId, blob.path);
               await desktop.saveFileBinary(blob.path, data);
-              blobVersions.set(blob.path, blob.latestVersion);
+              blobBaseline.versions.set(blob.path, blob.latestVersion);
+              // Update hash so subsequent push won't re-upload what we just pulled
+              const hash = await computeHash(data);
+              blobBaseline.hashes.set(blob.path, hash);
               blobPulledCount += 1;
             } catch (error) {
               console.warn("[collab.pull] failed to download blob", blob.path, error);
@@ -2469,7 +2531,7 @@ function App() {
           }
         }
         if (blobPulledCount > 0) {
-          await writeBlobSyncedVersions(fileAdapter, projectId, blobVersions);
+          await writeBlobSyncBaseline(fileAdapter, projectId, blobBaseline);
         }
       }
 

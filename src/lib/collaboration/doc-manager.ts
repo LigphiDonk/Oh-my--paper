@@ -131,33 +131,47 @@ function isEmptyDocSnapshot(update: Uint8Array | null | undefined) {
   return Boolean(update && update.length === 2 && update[0] === 0 && update[1] === 0);
 }
 
-export async function readBlobSyncedVersions(
+export interface BlobSyncBaseline {
+  versions: Map<string, number>;
+  hashes: Map<string, string>;
+}
+
+export async function readBlobSyncBaseline(
   fileAdapter: FileAdapter,
   projectId: string,
-): Promise<Map<string, number>> {
+): Promise<BlobSyncBaseline> {
   try {
     const file = await fileAdapter.readFile(blobVersionManifestPath(projectId));
-    const parsed = JSON.parse(file.content) as { versions?: Record<string, unknown> };
-    if (!parsed.versions || typeof parsed.versions !== "object") return new Map();
-    return new Map(
-      Object.entries(parsed.versions).filter(([, v]) => typeof v === "number") as [string, number][],
+    const parsed = JSON.parse(file.content) as {
+      versions?: Record<string, unknown>;
+      hashes?: Record<string, unknown>;
+    };
+    const versions = new Map(
+      Object.entries(parsed.versions ?? {}).filter(([, v]) => typeof v === "number") as [string, number][],
     );
+    const hashes = new Map(
+      Object.entries(parsed.hashes ?? {}).filter(([, v]) => typeof v === "string") as [string, string][],
+    );
+    return { versions, hashes };
   } catch {
-    return new Map();
+    return { versions: new Map(), hashes: new Map() };
   }
 }
 
-export async function writeBlobSyncedVersions(
+export async function writeBlobSyncBaseline(
   fileAdapter: FileAdapter,
   projectId: string,
-  versions: Map<string, number>,
+  baseline: BlobSyncBaseline,
 ): Promise<void> {
-  const sorted = Object.fromEntries(
-    Array.from(versions.entries()).sort(([a], [b]) => a.localeCompare(b)),
+  const sortedVersions = Object.fromEntries(
+    Array.from(baseline.versions.entries()).sort(([a], [b]) => a.localeCompare(b)),
+  );
+  const sortedHashes = Object.fromEntries(
+    Array.from(baseline.hashes.entries()).sort(([a], [b]) => a.localeCompare(b)),
   );
   await fileAdapter.saveFile(
     blobVersionManifestPath(projectId),
-    JSON.stringify({ updatedAt: new Date().toISOString(), versions: sorted }),
+    JSON.stringify({ updatedAt: new Date().toISOString(), versions: sortedVersions, hashes: sortedHashes }),
   );
 }
 
@@ -166,8 +180,11 @@ export async function seedBlobBaseline(
   projectId: string,
   blobs: CloudBlobSummary[],
 ): Promise<void> {
-  const versions = new Map(blobs.map((b) => [b.path, b.latestVersion]));
-  await writeBlobSyncedVersions(fileAdapter, projectId, versions);
+  const baseline: BlobSyncBaseline = {
+    versions: new Map(blobs.map((b) => [b.path, b.latestVersion])),
+    hashes: new Map(),
+  };
+  await writeBlobSyncBaseline(fileAdapter, projectId, baseline);
 }
 
 export interface ManagedCollabDocHandle {
