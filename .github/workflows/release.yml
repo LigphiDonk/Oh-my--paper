@@ -111,6 +111,7 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_SIGNING_IDENTITY: "-"
         with:
           args: ${{ matrix.args }}
           releaseId: ${{ needs.create-release.outputs.release_id }}
