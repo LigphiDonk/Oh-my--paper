@@ -19,15 +19,23 @@ jobs:
           - platform: macos-latest
             args: --target aarch64-apple-darwin
             rust_target: aarch64-apple-darwin
+            artifact_name: viewerleaf-macos-aarch64
+            bundle_dir: src-tauri/target/aarch64-apple-darwin/release/bundle
           - platform: macos-latest
             args: --target x86_64-apple-darwin
             rust_target: x86_64-apple-darwin
+            artifact_name: viewerleaf-macos-x64
+            bundle_dir: src-tauri/target/x86_64-apple-darwin/release/bundle
           - platform: windows-latest
             args: ""
             rust_target: ""
+            artifact_name: viewerleaf-windows
+            bundle_dir: src-tauri/target/release/bundle
           - platform: ubuntu-22.04
             args: ""
             rust_target: ""
+            artifact_name: viewerleaf-linux
+            bundle_dir: src-tauri/target/release/bundle
 
     runs-on: ${{ matrix.platform }}
 
@@ -66,4 +74,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: ${{ matrix.args }}
-          uploadWorkflowArtifacts: true
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.bundle_dir }}/**
+          if-no-files-found: error

@@ -58,32 +58,40 @@ fn stage_sidecar() -> io::Result<()> {
 }
 
 fn emit_rerun_markers(path: &Path) -> io::Result<()> {
-    println!("cargo:rerun-if-changed={}", path.display());
-    if !path.is_dir() {
-        return Ok(());
-    }
+    let mut pending = vec![path.to_path_buf()];
 
-    for entry in fs::read_dir(path)? {
-        let entry = entry?;
-        emit_rerun_markers(&entry.path())?;
+    while let Some(current) = pending.pop() {
+        println!("cargo:rerun-if-changed={}", current.display());
+        if !current.is_dir() {
+            continue;
+        }
+
+        for entry in fs::read_dir(&current)? {
+            pending.push(entry?.path());
+        }
     }
 
     Ok(())
 }
 
 fn copy_path(source: &Path, target: &Path) -> io::Result<()> {
-    if source.is_dir() {
-        fs::create_dir_all(target)?;
-        for entry in fs::read_dir(source)? {
-            let entry = entry?;
-            copy_path(&entry.path(), &target.join(entry.file_name()))?;
+    let mut pending = vec![(source.to_path_buf(), target.to_path_buf())];
+
+    while let Some((current_source, current_target)) = pending.pop() {
+        if current_source.is_dir() {
+            fs::create_dir_all(&current_target)?;
+            for entry in fs::read_dir(&current_source)? {
+                let entry = entry?;
+                pending.push((entry.path(), current_target.join(entry.file_name())));
+            }
+            continue;
         }
-        return Ok(());
+
+        if let Some(parent) = current_target.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::copy(&current_source, &current_target)?;
     }
 
-    if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::copy(source, target)?;
     Ok(())
 }
