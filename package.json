@@ -8,6 +8,7 @@
     "dev": "npm run sidecar:install && vite --port 5173 --strictPort",
     "build": "npm run sidecar:install && tsc -b && vite build",
     "tauri": "tauri",
+    "version:bump": "node scripts/bump-version.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",

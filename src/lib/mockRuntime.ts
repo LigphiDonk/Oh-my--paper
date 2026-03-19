@@ -529,6 +529,10 @@ function createRunSummary(profileId: AgentProfileId, selection: string) {
 }
 
 export const mockRuntime = {
+  async getAppVersion() {
+    return "0.1.0";
+  },
+
   async openProject(): Promise<WorkspaceSnapshot> {
     const tree = buildTree(listTreeEntries());
     return {

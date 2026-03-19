@@ -22,6 +22,7 @@ import { WorkspaceMenuBar } from "./components/WorkspaceMenuBar";
 import { CollabLoginModal } from "./components/CollabLoginModal";
 import { CollabProjectModal } from "./components/CollabProjectModal";
 import { CreateEntryModal } from "./components/CreateEntryModal";
+import { ReleaseNotesModal } from "./components/ReleaseNotesModal";
 import { ShareLinkModal } from "./components/ShareLinkModal";
 import { createLocalAdapter } from "./lib/adapters";
 import {
@@ -117,6 +118,12 @@ type CollabProjectModalState =
   | { mode: "create"; defaultValue: string }
   | { mode: "link"; defaultValue: string };
 type CollabLoginMode = "edit" | "bootstrap";
+type ReleaseNotesModalState = {
+  version: string;
+  body: string;
+  publishedAt?: string;
+  htmlUrl?: string;
+};
 
 function normalizeProjectPath(path: string) {
   return path.replaceAll("\\", "/");
@@ -152,6 +159,8 @@ function toProjectRelativePath(rootPath: string, filePath?: string) {
 const RECENT_WORKSPACE_STORAGE_KEY = "viewerleaf:recent-workspaces:v1";
 const WINDOW_WORKSPACE_TABS_STORAGE_KEY = "viewerleaf:window-workspaces:v1";
 const AUTO_SAVE_STORAGE_KEY = "viewerleaf:auto-save:v1";
+const RELEASE_NOTES_VERSION_STORAGE_KEY = "viewerleaf:release-notes:last-seen-version:v1";
+const GITHUB_RELEASE_TAG_ENDPOINT = "https://api.github.com/repos/LigphiDonk/viwerleaf/releases/tags";
 const MAX_RECENT_WORKSPACES = 10;
 const MAX_OPEN_WORKSPACES = 6;
 const TERMINAL_PANEL_MIN_HEIGHT = 170;
@@ -364,6 +373,47 @@ function safelyDisposeListener(listener?: (() => void | Promise<void>) | null) {
   }
 }
 
+async function fetchReleaseNotesForVersion(version: string): Promise<ReleaseNotesModalState> {
+  const htmlUrl = `https://github.com/LigphiDonk/viwerleaf/releases/tag/v${version}`;
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 8000);
+
+  try {
+    const response = await fetch(`${GITHUB_RELEASE_TAG_ENDPOINT}/v${encodeURIComponent(version)}`, {
+      headers: {
+        Accept: "application/vnd.github+json",
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`GitHub returned ${response.status}`);
+    }
+
+    const payload = await response.json() as {
+      body?: string;
+      html_url?: string;
+      published_at?: string;
+    };
+
+    return {
+      version,
+      body: payload.body?.trim() || `ViewerLeaf 已更新到 v${version}。`,
+      publishedAt: payload.published_at,
+      htmlUrl: payload.html_url || htmlUrl,
+    };
+  } catch (error) {
+    console.warn("failed to fetch release notes", error);
+    return {
+      version,
+      body: `ViewerLeaf 已更新到 v${version}。\n\n当前未能加载本次 GitHub Release 更新日志，你仍可稍后在 GitHub 查看完整说明。`,
+      htmlUrl,
+    };
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 function upsertWorkspaceEntry(entries: WorkspaceEntry[], rootPath: string, max: number) {
   const nextEntry = toWorkspaceEntry(rootPath);
   return [nextEntry, ...entries.filter((entry) => entry.rootPath !== rootPath)].slice(0, max);
@@ -470,6 +520,7 @@ function App() {
   const [pendingCloudProjectReference, setPendingCloudProjectReference] = useState<string | null>(null);
   const [authorizedCollabProjectId, setAuthorizedCollabProjectId] = useState<string | null>(null);
   const [authorizedCollabProjectRole, setAuthorizedCollabProjectRole] = useState<CloudProjectRole | null>(null);
+  const [releaseNotesModal, setReleaseNotesModal] = useState<ReleaseNotesModalState | null>(null);
 
   const collabAuthSession = useMemo(
     () => readCollabAuthSession(),
@@ -1160,6 +1211,44 @@ function App() {
       }
     })();
   }, [refreshWorkspace]);
+
+  useEffect(() => {
+    if (!isTauriRuntime() || typeof window === "undefined") {
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const currentVersion = await desktop.getAppVersion();
+        if (!currentVersion || cancelled) {
+          return;
+        }
+
+        const lastSeenVersion = window.localStorage.getItem(RELEASE_NOTES_VERSION_STORAGE_KEY);
+        if (!lastSeenVersion) {
+          window.localStorage.setItem(RELEASE_NOTES_VERSION_STORAGE_KEY, currentVersion);
+          return;
+        }
+
+        if (lastSeenVersion === currentVersion) {
+          return;
+        }
+
+        const notes = await fetchReleaseNotesForVersion(currentVersion);
+        if (!cancelled) {
+          setReleaseNotesModal(notes);
+        }
+      } catch (error) {
+        console.warn("failed to resolve app release notes", error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (previewSelection.kind !== "asset") {
@@ -2932,6 +3021,13 @@ function App() {
       !compileEnvironment.availableEngines.includes(snapshot.projectConfig.engine as LatexEngine)),
   );
 
+  function handleDismissReleaseNotes() {
+    if (typeof window !== "undefined" && releaseNotesModal) {
+      window.localStorage.setItem(RELEASE_NOTES_VERSION_STORAGE_KEY, releaseNotesModal.version);
+    }
+    setReleaseNotesModal(null);
+  }
+
   return (
     <div className={`app-shell fade-in ${hasProject ? "" : "is-welcome"}`}>
       <header
@@ -3488,6 +3584,16 @@ function App() {
               setCollabProjectModal(null);
             }
           }}
+        />
+      )}
+
+      {releaseNotesModal && (
+        <ReleaseNotesModal
+          version={releaseNotesModal.version}
+          body={releaseNotesModal.body}
+          publishedAt={releaseNotesModal.publishedAt}
+          htmlUrl={releaseNotesModal.htmlUrl}
+          onClose={handleDismissReleaseNotes}
         />
       )}
     </div>

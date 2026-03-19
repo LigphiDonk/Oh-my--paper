@@ -1,3 +1,4 @@
+import { getVersion } from "@tauri-apps/api/app";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -125,6 +126,12 @@ function toAssetUrl(absolutePath: string): string {
 
 export const desktop = {
   isTauriRuntime,
+  getAppVersion() {
+    if (isTauriRuntime()) {
+      return getVersion();
+    }
+    return mockRuntime.getAppVersion?.() ?? Promise.resolve("0.1.0");
+  },
   openProject() {
     return runOrMock<WorkspaceSnapshot>("open_project", {}, () => mockRuntime.openProject());
   },

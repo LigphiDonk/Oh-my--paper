@@ -29,6 +29,7 @@ dist-ssr
 # Rust / Tauri build artifacts
 src-tauri/target/
 src-tauri/resources/worker-template/
+src-tauri/resources/sidecar/
 
 # LaTeX auxiliary files
 *.aux

@@ -163,6 +163,8 @@ fn resolve_sidecar_dir(app: &tauri::AppHandle, app_root: &std::path::Path) -> Pa
         }
     }
     candidates.push(app_root.join("sidecar"));
+    candidates.push(app_root.join("src-tauri/resources/sidecar"));
+    candidates.push(app_root.join("resources/sidecar"));
 
     if let Ok(resource_dir) = app.path().resource_dir() {
         candidates.push(resource_dir.join("sidecar"));
@@ -181,6 +183,11 @@ fn resolve_sidecar_dir(app: &tauri::AppHandle, app_root: &std::path::Path) -> Pa
         .join("..")
         .join("sidecar");
     candidates.push(manifest_sidecar.clone());
+    candidates.push(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("resources")
+            .join("sidecar"),
+    );
 
     for candidate in candidates {
         if candidate.join("index.mjs").is_file() {

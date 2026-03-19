@@ -37,7 +37,7 @@
     "active": true,
     "targets": "all",
     "resources": [
-      "../sidecar",
+      "resources/sidecar",
       "resources/worker-template"
     ],
     "icon": [

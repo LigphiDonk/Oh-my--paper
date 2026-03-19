@@ -362,39 +362,44 @@ pub fn delete_provider(state: State<'_, AppState>, id: String) -> Result<(), Str
 }
 
 #[tauri::command]
-pub fn test_provider(state: State<'_, AppState>, id: String) -> Result<TestResult, String> {
-    let conn = state.db.lock().map_err(|err| err.to_string())?;
-    let prov = provider::get_provider(&conn, &id)?;
-    drop(conn);
+pub async fn test_provider(app_handle: AppHandle, id: String) -> Result<TestResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app_handle.state::<AppState>();
+        let conn = state.db.lock().map_err(|err| err.to_string())?;
+        let prov = provider::get_provider(&conn, &id)?;
+        drop(conn);
 
-    let start = Instant::now();
-    let output = sidecar::run_sidecar(
-        &state,
-        "test-provider",
-        &serde_json::json!({
-            "vendor": prov.vendor,
-            "baseUrl": prov.base_url,
-            "apiKey": prov.api_key,
-            "model": prov.default_model,
-        })
-        .to_string(),
-    )
-    .map_err(|err| err.to_string())?;
-    let latency = start.elapsed().as_millis() as u64;
+        let start = Instant::now();
+        let output = sidecar::run_sidecar(
+            &state,
+            "test-provider",
+            &serde_json::json!({
+                "vendor": prov.vendor,
+                "baseUrl": prov.base_url,
+                "apiKey": prov.api_key,
+                "model": prov.default_model,
+            })
+            .to_string(),
+        )
+        .map_err(|err| err.to_string())?;
+        let latency = start.elapsed().as_millis() as u64;
 
-    if output.status.success() {
-        Ok(TestResult {
-            success: true,
-            latency_ms: latency,
-            error: None,
-        })
-    } else {
-        Ok(TestResult {
-            success: false,
-            latency_ms: latency,
-            error: Some(String::from_utf8_lossy(&output.stderr).to_string()),
-        })
-    }
+        if output.status.success() {
+            Ok(TestResult {
+                success: true,
+                latency_ms: latency,
+                error: None,
+            })
+        } else {
+            Ok(TestResult {
+                success: false,
+                latency_ms: latency,
+                error: Some(String::from_utf8_lossy(&output.stderr).to_string()),
+            })
+        }
+    })
+    .await
+    .map_err(|err| err.to_string())?
 }
 
 #[tauri::command]
