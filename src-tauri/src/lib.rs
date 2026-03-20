@@ -197,7 +197,7 @@ fn resolve_sidecar_dir(app: &tauri::AppHandle, app_root: &std::path::Path) -> Pa
     );
 
     for candidate in candidates {
-        if candidate.join("index.mjs").is_file() {
+        if has_sidecar_entry(&candidate) {
             return candidate;
         }
     }
@@ -299,13 +299,65 @@ pub(crate) fn resolve_worker_template_dir(
 }
 
 fn has_root_markers(path: &Path) -> bool {
-    path.join("sidecar").join("index.mjs").is_file()
+    has_sidecar_entry(&path.join("sidecar"))
         || path.join("skills").is_dir()
         || path.join("src-tauri").is_dir()
+}
+
+fn has_sidecar_entry(path: &Path) -> bool {
+    path.join("dist").join("index.mjs").is_file()
 }
 
 fn push_bundled_resource_candidates(candidates: &mut Vec<PathBuf>, base: &Path, resource: &str) {
     candidates.push(base.join(resource));
     candidates.push(base.join("resources").join(resource));
     candidates.push(base.join("_up_").join(resource));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{has_root_markers, has_sidecar_entry};
+    use std::fs;
+    use std::path::PathBuf;
+    use uuid::Uuid;
+
+    struct TempDir {
+        path: PathBuf,
+    }
+
+    impl TempDir {
+        fn new() -> Self {
+            let path = std::env::temp_dir().join(format!("viewerleaf-{}", Uuid::new_v4()));
+            fs::create_dir_all(&path).expect("failed to create temp dir");
+            Self { path }
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+
+    #[test]
+    fn recognizes_sidecar_dist_entry() {
+        let temp = TempDir::new();
+        let sidecar_dir = temp.path.join("sidecar");
+        fs::create_dir_all(sidecar_dir.join("dist")).expect("failed to create sidecar dist dir");
+        fs::write(sidecar_dir.join("dist/index.mjs"), "export {};\n")
+            .expect("failed to write sidecar entry");
+
+        assert!(has_sidecar_entry(&sidecar_dir));
+    }
+
+    #[test]
+    fn root_markers_accept_built_sidecar_layout() {
+        let temp = TempDir::new();
+        let sidecar_dir = temp.path.join("sidecar");
+        fs::create_dir_all(sidecar_dir.join("dist")).expect("failed to create sidecar dist dir");
+        fs::write(sidecar_dir.join("dist/index.mjs"), "export {};\n")
+            .expect("failed to write sidecar entry");
+
+        assert!(has_root_markers(&temp.path));
+    }
 }

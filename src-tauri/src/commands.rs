@@ -154,7 +154,8 @@ pub fn forward_search(
     line: usize,
     column: Option<usize>,
 ) -> Result<crate::models::SyncLocation, String> {
-    sync::forward_search(&state, &file_path, line, column.unwrap_or(1)).map_err(|err| err.to_string())
+    sync::forward_search(&state, &file_path, line, column.unwrap_or(1))
+        .map_err(|err| err.to_string())
 }
 
 #[tauri::command]
@@ -658,7 +659,11 @@ pub async fn read_file_binary(app_handle: AppHandle, path: String) -> Result<Vec
 }
 
 #[tauri::command]
-pub async fn save_file_binary(app_handle: AppHandle, file_path: String, data: Vec<u8>) -> Result<(), String> {
+pub async fn save_file_binary(
+    app_handle: AppHandle,
+    file_path: String,
+    data: Vec<u8>,
+) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = app_handle.state::<AppState>();
         let root = state

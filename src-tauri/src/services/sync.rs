@@ -29,7 +29,11 @@ pub fn forward_search(
         .args([
             "view",
             "-i",
-            &format!("{line}:{}:{}", column.max(1), file_absolute.to_string_lossy()),
+            &format!(
+                "{line}:{}:{}",
+                column.max(1),
+                file_absolute.to_string_lossy()
+            ),
             "-o",
             &pdf_path.to_string_lossy(),
         ])

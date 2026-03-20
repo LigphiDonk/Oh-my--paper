@@ -33,7 +33,8 @@ pub fn init_db(app_data_dir: &Path) -> SqlResult<Connection> {
 
     conn.execute_batch(include_str!("schema.sql"))?;
 
-    let profile_count: i64 = conn.query_row("SELECT COUNT(*) FROM profiles", [], |row| row.get(0))?;
+    let profile_count: i64 =
+        conn.query_row("SELECT COUNT(*) FROM profiles", [], |row| row.get(0))?;
     if profile_count == 0 {
         seed_profiles(&conn)?;
     } else {
@@ -122,7 +123,8 @@ fn migrate_skills_table(conn: &rusqlite::Connection) -> SqlResult<()> {
         return Ok(());
     }
 
-    let _ = conn.execute_batch("ROLLBACK TO SAVEPOINT probe_skills; RELEASE SAVEPOINT probe_skills;");
+    let _ =
+        conn.execute_batch("ROLLBACK TO SAVEPOINT probe_skills; RELEASE SAVEPOINT probe_skills;");
 
     conn.execute_batch(
         "PRAGMA foreign_keys=OFF;
@@ -147,7 +149,6 @@ fn migrate_skills_table(conn: &rusqlite::Connection) -> SqlResult<()> {
 
     Ok(())
 }
-
 
 fn seed_profiles(conn: &Connection) -> SqlResult<()> {
     // Pick the first provider if any exist, otherwise use empty string

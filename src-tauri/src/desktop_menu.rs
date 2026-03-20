@@ -1,9 +1,9 @@
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::process::Command;
 #[cfg(target_os = "macos")]
 use std::sync::{LazyLock, Mutex};
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
 
 use serde::{Deserialize, Serialize};
 use tauri::menu::{

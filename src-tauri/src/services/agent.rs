@@ -253,10 +253,7 @@ pub fn run_agent(
                     output,
                     status,
                 } => {
-                    let resolved_status = status
-                        .as_deref()
-                        .unwrap_or("completed")
-                        .to_string();
+                    let resolved_status = status.as_deref().unwrap_or("completed").to_string();
                     if let Some(entry) = tool_call_log
                         .iter_mut()
                         .rev()
@@ -305,16 +302,23 @@ pub fn run_agent(
             },
         );
         let all_thinking = merge_thinking_segments(&committed_thinking, &active_thinking);
-        let partial_content = build_assistant_message_content(&all_thinking, &full_response, &tool_call_log);
+        let partial_content =
+            build_assistant_message_content(&all_thinking, &full_response, &tool_call_log);
         if !partial_content.trim().is_empty() {
             persist_assistant_message(state, &session_id, profile_id, &partial_content)?;
         }
-        persist_assistant_message(state, &session_id, profile_id, &format!("Error: {error_message}"))?;
+        persist_assistant_message(
+            state,
+            &session_id,
+            profile_id,
+            &format!("Error: {error_message}"),
+        )?;
         return Err(anyhow::anyhow!("agent sidecar failed: {error_message}"));
     }
 
     let all_thinking = merge_thinking_segments(&committed_thinking, &active_thinking);
-    let final_content = build_assistant_message_content(&all_thinking, &full_response, &tool_call_log);
+    let final_content =
+        build_assistant_message_content(&all_thinking, &full_response, &tool_call_log);
     if !final_content.trim().is_empty() {
         persist_assistant_message(state, &session_id, profile_id, &final_content)?;
     } else if let Some(error_message) = last_error {
