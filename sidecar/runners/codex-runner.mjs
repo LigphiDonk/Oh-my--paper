@@ -10,6 +10,7 @@
 
 import { Codex } from "@openai/codex-sdk";
 import { emit } from "../utils/ndjson.mjs";
+import { requireCliExecutable } from "../utils/resolve-cli.mjs";
 
 /**
  * Map permission mode string to Codex SDK sandbox/approval options.
@@ -187,7 +188,8 @@ export async function runCodex(request) {
   const abortController = new AbortController();
 
   try {
-    const codex = new Codex();
+    const codexPathOverride = await requireCliExecutable("codex");
+    const codex = new Codex({ codexPathOverride });
 
     // Thread options
     const threadOptions = {

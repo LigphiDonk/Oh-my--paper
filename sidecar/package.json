@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "esbuild index.mjs --bundle --platform=node --format=esm --outfile=dist/index.mjs --external:@anthropic-ai/claude-agent-sdk --external:@openai/codex-sdk"
+    "build": "esbuild index.mjs --bundle --platform=node --format=esm --outfile=dist/index.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "*",

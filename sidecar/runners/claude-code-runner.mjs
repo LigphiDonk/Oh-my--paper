@@ -10,6 +10,7 @@
 
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { emit } from "../utils/ndjson.mjs";
+import { requireCliExecutable } from "../utils/resolve-cli.mjs";
 
 /**
  * Check if a message looks like system/skill prompt content
@@ -96,6 +97,7 @@ function extractTokenBudget(usage) {
  */
 export async function runClaudeCode(request) {
   const options = buildSdkOptions(request);
+  options.pathToClaudeCodeExecutable = await requireCliExecutable("claude-code");
   const userMessage =
     typeof request.userMessage === "string" && request.userMessage.trim()
       ? request.userMessage.trim()
