@@ -162,7 +162,7 @@ fn migrate_providers_table(conn: &rusqlite::Connection) -> SqlResult<()> {
     Ok(())
 }
 
-/// Drop and recreate the skills table if it doesn't accept 'git' source.
+/// Drop and recreate the skills table if it lacks the canonical metadata columns.
 fn migrate_skills_table(conn: &rusqlite::Connection) -> SqlResult<()> {
     let table_exists: i64 = conn.query_row(
         "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='skills'",
@@ -173,35 +173,98 @@ fn migrate_skills_table(conn: &rusqlite::Connection) -> SqlResult<()> {
         return Ok(());
     }
 
-    let check_ok = conn.execute_batch(
-        "SAVEPOINT probe_skills;
-         INSERT INTO skills (id,name,source,dir_path) VALUES ('__probe__','probe','git','');
-         DELETE FROM skills WHERE id='__probe__';
-         RELEASE SAVEPOINT probe_skills;",
-    );
+    let mut columns = Vec::new();
+    {
+        let mut stmt = conn.prepare("PRAGMA table_info(skills)")?;
+        let rows = stmt.query_map([], |row| row.get::<_, String>(1))?;
+        for row in rows {
+            columns.push(row?);
+        }
+    }
 
-    if check_ok.is_ok() {
+    let required_columns = [
+        "description",
+        "summary",
+        "primary_intent",
+        "intents_json",
+        "capabilities_json",
+        "domains_json",
+        "keywords_json",
+        "status",
+        "upstream_json",
+        "resource_flags_json",
+    ];
+    let has_required_columns = required_columns
+        .iter()
+        .all(|column| columns.iter().any(|existing| existing == column));
+
+    let supports_zip = conn
+        .execute_batch(
+            "SAVEPOINT probe_skills;
+             INSERT INTO skills (id,name,source,dir_path) VALUES ('__probe__','probe','zip','');
+             DELETE FROM skills WHERE id='__probe__';
+             RELEASE SAVEPOINT probe_skills;",
+        )
+        .is_ok();
+
+    if has_required_columns && supports_zip {
         return Ok(());
     }
 
-    let _ =
-        conn.execute_batch("ROLLBACK TO SAVEPOINT probe_skills; RELEASE SAVEPOINT probe_skills;");
+    let _ = conn.execute_batch(
+        "ROLLBACK TO SAVEPOINT probe_skills; RELEASE SAVEPOINT probe_skills;",
+    );
 
     conn.execute_batch(
         "PRAGMA foreign_keys=OFF;
          BEGIN;
          CREATE TABLE skills_new (
-             id          TEXT PRIMARY KEY,
-             name        TEXT NOT NULL,
-             version     TEXT NOT NULL DEFAULT '1.0.0',
-             stages_json TEXT NOT NULL DEFAULT '[]',
-             tools_json  TEXT NOT NULL DEFAULT '[]',
-             source      TEXT NOT NULL CHECK(source IN ('builtin','local','project','git')),
-             dir_path    TEXT NOT NULL DEFAULT '',
-             is_enabled  INTEGER NOT NULL DEFAULT 1,
-             created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+             id                  TEXT PRIMARY KEY,
+             name                TEXT NOT NULL,
+             version             TEXT NOT NULL DEFAULT '1.0.0',
+             stages_json         TEXT NOT NULL DEFAULT '[]',
+             tools_json          TEXT NOT NULL DEFAULT '[]',
+             description         TEXT NOT NULL DEFAULT '',
+             summary             TEXT NOT NULL DEFAULT '',
+             primary_intent      TEXT NOT NULL DEFAULT '',
+             intents_json        TEXT NOT NULL DEFAULT '[]',
+             capabilities_json   TEXT NOT NULL DEFAULT '[]',
+             domains_json        TEXT NOT NULL DEFAULT '[]',
+             keywords_json       TEXT NOT NULL DEFAULT '[]',
+             source              TEXT NOT NULL CHECK(source IN ('builtin','local','project','git','zip')),
+             status              TEXT NOT NULL DEFAULT '',
+             upstream_json       TEXT NOT NULL DEFAULT '{}',
+             resource_flags_json TEXT NOT NULL DEFAULT '{}',
+             dir_path            TEXT NOT NULL DEFAULT '',
+             is_enabled          INTEGER NOT NULL DEFAULT 1,
+             created_at          TEXT NOT NULL DEFAULT (datetime('now'))
          );
-         INSERT INTO skills_new SELECT id,name,version,stages_json,tools_json,source,dir_path,is_enabled,created_at FROM skills;
+         INSERT INTO skills_new (
+             id,name,version,stages_json,tools_json,description,summary,primary_intent,
+             intents_json,capabilities_json,domains_json,keywords_json,source,status,
+             upstream_json,resource_flags_json,dir_path,is_enabled,created_at
+         )
+         SELECT
+             id,
+             name,
+             version,
+             stages_json,
+             tools_json,
+             '',
+             '',
+             '',
+             '[]',
+             '[]',
+             '[]',
+             '[]',
+             source,
+             '',
+             '{}',
+             '{}',
+             dir_path,
+             is_enabled,
+             created_at
+         FROM skills;
          DROP TABLE skills;
          ALTER TABLE skills_new RENAME TO skills;
          COMMIT;

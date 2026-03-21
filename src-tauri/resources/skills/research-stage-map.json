@@ -1,0 +1,129 @@
+{
+  "survey": {
+    "base": [
+      "inno-deep-research",
+      "gemini-deep-research",
+      "academic-researcher",
+      "dataset-discovery",
+      "biorxiv-database"
+    ],
+    "byTaskType": {
+      "analysis": [
+        "inno-deep-research",
+        "gemini-deep-research",
+        "academic-researcher"
+      ],
+      "exploration": [
+        "inno-deep-research",
+        "gemini-deep-research",
+        "dataset-discovery",
+        "biorxiv-database",
+        "academic-researcher"
+      ]
+    }
+  },
+  "ideation": {
+    "base": [
+      "inno-pipeline-planner",
+      "inno-prepare-resources",
+      "inno-deep-research",
+      "dataset-discovery",
+      "inno-idea-generation",
+      "inno-idea-eval",
+      "biorxiv-database",
+      "academic-researcher"
+    ],
+    "byTaskType": {
+      "analysis": [
+        "inno-idea-generation",
+        "inno-idea-eval",
+        "inno-deep-research",
+        "academic-researcher"
+      ],
+      "exploration": [
+        "inno-idea-generation",
+        "inno-code-survey",
+        "inno-deep-research",
+        "dataset-discovery",
+        "biorxiv-database",
+        "academic-researcher"
+      ],
+      "implementation": [
+        "inno-prepare-resources"
+      ]
+    }
+  },
+  "experiment": {
+    "base": [
+      "inno-code-survey",
+      "dataset-discovery",
+      "inno-experiment-dev",
+      "inno-experiment-analysis",
+      "bioinformatics-init-analysis"
+    ],
+    "byTaskType": {
+      "implementation": [
+        "inno-experiment-dev",
+        "bioinformatics-init-analysis"
+      ],
+      "analysis": [
+        "inno-experiment-analysis",
+        "bioinformatics-init-analysis"
+      ],
+      "exploration": [
+        "inno-code-survey",
+        "dataset-discovery",
+        "inno-deep-research",
+        "biorxiv-database"
+      ]
+    }
+  },
+  "publication": {
+    "base": [
+      "inno-paper-writing",
+      "inno-figure-gen",
+      "inno-paper-reviewer",
+      "inno-reference-audit",
+      "inno-rclone-to-overleaf",
+      "scientific-writing",
+      "ml-paper-writing",
+      "inno-grant-proposal"
+    ],
+    "byTaskType": {
+      "writing": [
+        "inno-paper-writing",
+        "inno-figure-gen",
+        "scientific-writing",
+        "ml-paper-writing",
+        "inno-grant-proposal"
+      ],
+      "analysis": [
+        "inno-paper-reviewer",
+        "inno-reference-audit",
+        "inno-deep-research"
+      ],
+      "delivery": [
+        "inno-rclone-to-overleaf"
+      ]
+    }
+  },
+  "promotion": {
+    "base": [
+      "making-academic-presentations"
+    ],
+    "byTaskType": {
+      "scripting": [
+        "making-academic-presentations"
+      ],
+      "rendering": [
+        "making-academic-presentations"
+      ],
+      "narration": [
+        "making-academic-presentations"
+      ],
+      "delivery": [
+        "making-academic-presentations"
+      ]
+    }
+  }
+}

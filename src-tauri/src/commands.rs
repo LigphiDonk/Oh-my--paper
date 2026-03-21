@@ -91,15 +91,15 @@ pub async fn ensure_research_scaffold(
             return Err("no active project".into());
         }
 
-        research::ensure_research_scaffold(Path::new(&root_path), start_stage.as_deref())
+        research::ensure_research_scaffold(
+            Path::new(&state.app_root),
+            Path::new(&root_path),
+            start_stage.as_deref(),
+        )
             .map_err(|err| err.to_string())?;
         let conn = state.db.lock().map_err(|err| err.to_string())?;
-        skill::discover_skills(
-            &conn,
-            &research::project_skill_roots(Path::new(&root_path)),
-            "project",
-        )
-        .map_err(|err| err.to_string())?;
+        skill::refresh_skill_registry(&conn, &state.app_root, Some(Path::new(&root_path)))
+            .map_err(|err| err.to_string())?;
         drop(conn);
         project::load_project_snapshot(&state).map_err(|err| err.to_string())
     })
@@ -298,7 +298,15 @@ pub fn list_agent_sessions(state: State<'_, AppState>) -> Result<Vec<AgentSessio
 
 #[tauri::command]
 pub fn list_skills(state: State<'_, AppState>) -> Result<Vec<SkillManifest>, String> {
+    let root_path = state
+        .project_config
+        .read()
+        .map_err(|err| err.to_string())?
+        .root_path
+        .clone();
     let conn = state.db.lock().map_err(|err| err.to_string())?;
+    let project_root = (!root_path.trim().is_empty()).then(|| Path::new(&root_path));
+    skill::refresh_skill_registry(&conn, &state.app_root, project_root).map_err(|err| err.to_string())?;
     skill::list_skills(&conn)
 }
 

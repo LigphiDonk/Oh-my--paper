@@ -1,0 +1,216 @@
+{
+  "rubric_id": "nsf_general_2026",
+  "agency": "NSF",
+  "description": "National Science Foundation proposal scoring rubric based on the two NSF merit review criteria. All proposals are evaluated on Intellectual Merit and Broader Impacts, weighted equally.",
+  "version": "1.0",
+  "last_updated": "2026-03-19",
+  "minimum_passing_score": 3.5,
+  "overall_scoring": {
+    "method": "weighted_average",
+    "formula": "overall = 0.5 * intellectual_merit_score + 0.5 * broader_impacts_score",
+    "description": "Each category score is the weighted average of its sub-criteria. The overall score is the equally-weighted average of the two category scores."
+  },
+  "categories": {
+    "intellectual_merit": {
+      "name": "Intellectual Merit",
+      "description": "The Intellectual Merit criterion encompasses the potential to advance knowledge within and across fields.",
+      "weight": 0.5,
+      "sub_criteria": [
+        {
+          "id": "research_question_clarity",
+          "name": "Research Question Clarity",
+          "description": "How clearly and precisely the research questions or hypotheses are articulated, including well-defined scope and expected contributions.",
+          "weight": 0.20,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "Research questions are absent, vague, or incoherent. No clear direction for the proposed work.",
+            "2": "Research questions are poorly defined with significant ambiguity. Scope is unclear or overly broad.",
+            "3": "Research questions are stated but lack precision. Some aspects remain underdeveloped or loosely connected.",
+            "4": "Research questions are clearly articulated with well-defined scope. Minor gaps in specificity.",
+            "5": "Research questions are exceptionally precise, well-motivated, and demonstrate a deep understanding of the problem space."
+          }
+        },
+        {
+          "id": "innovation",
+          "name": "Innovation",
+          "description": "The degree to which the proposed work explores creative, original, or potentially transformative concepts and approaches.",
+          "weight": 0.20,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "No novelty. The work is entirely derivative with no new ideas or approaches.",
+            "2": "Minimal innovation. Incremental extension of existing work with little creative contribution.",
+            "3": "Moderate innovation. Some novel elements but largely builds on established approaches.",
+            "4": "Highly innovative. Introduces new concepts or methods that advance the field meaningfully.",
+            "5": "Potentially transformative. Challenges existing paradigms and could fundamentally reshape understanding or practice."
+          }
+        },
+        {
+          "id": "methodology_rigor",
+          "name": "Methodology Rigor",
+          "description": "The soundness and appropriateness of the proposed research methods, analytical framework, and experimental design.",
+          "weight": 0.20,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "Methods are absent or fundamentally flawed. No viable path to answering the research questions.",
+            "2": "Methods have significant weaknesses. Key controls, variables, or analytical steps are missing.",
+            "3": "Methods are generally sound but have notable gaps. Some aspects need further justification.",
+            "4": "Methods are well-designed and appropriate. Minor refinements could strengthen the approach.",
+            "5": "Methods are exemplary, thoroughly justified, and represent best practices. All potential issues are addressed."
+          }
+        },
+        {
+          "id": "feasibility",
+          "name": "Feasibility",
+          "description": "The likelihood that the proposed work can be accomplished within the stated timeframe, budget, and available resources.",
+          "weight": 0.15,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "The project is unrealistic given the proposed timeline, budget, or available resources.",
+            "2": "Major feasibility concerns. Critical resources or capabilities appear lacking.",
+            "3": "Generally feasible but some milestones or resource assumptions are questionable.",
+            "4": "Feasible with a realistic timeline and well-justified resource allocation. Minor risks identified.",
+            "5": "Highly feasible. Clear evidence of capacity, realistic milestones, and contingency planning."
+          }
+        },
+        {
+          "id": "preliminary_data",
+          "name": "Preliminary Data",
+          "description": "The quality and relevance of preliminary results or prior work that supports the proposed research direction.",
+          "weight": 0.10,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "No preliminary data provided. No evidence that the proposed approach is viable.",
+            "2": "Minimal or tangentially related preliminary data. Weak support for the proposed direction.",
+            "3": "Some relevant preliminary data but gaps remain. Partial support for feasibility.",
+            "4": "Strong preliminary data that clearly supports the proposed approach and its viability.",
+            "5": "Compelling preliminary data that convincingly demonstrates feasibility and strengthens the rationale."
+          }
+        },
+        {
+          "id": "team_qualification",
+          "name": "Team Qualification",
+          "description": "The qualifications, expertise, and track record of the PI and research team to carry out the proposed work.",
+          "weight": 0.15,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "Team lacks relevant expertise. No demonstrated ability to carry out the proposed work.",
+            "2": "Team has limited relevant experience. Significant skill gaps are evident.",
+            "3": "Team has adequate qualifications but some expertise gaps. Track record is modest.",
+            "4": "Team is well-qualified with strong relevant expertise and a solid publication record.",
+            "5": "Team is exceptionally qualified with leading expertise, outstanding track record, and complementary skills."
+          }
+        }
+      ]
+    },
+    "broader_impacts": {
+      "name": "Broader Impacts",
+      "description": "The Broader Impacts criterion encompasses the potential to benefit society and contribute to the achievement of specific, desired societal outcomes.",
+      "weight": 0.5,
+      "sub_criteria": [
+        {
+          "id": "societal_benefit",
+          "name": "Societal Benefit",
+          "description": "The potential for the research to produce tangible benefits for society, the economy, public health, or national security.",
+          "weight": 0.25,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "No societal benefit articulated or the connection is entirely implausible.",
+            "2": "Vague or unconvincing societal benefits. Claims are not well-supported.",
+            "3": "Some societal benefits identified but the pathway from research to impact is unclear.",
+            "4": "Clear and credible societal benefits with a plausible pathway to realization.",
+            "5": "Compelling societal benefits with a well-articulated and realistic plan for achieving real-world impact."
+          }
+        },
+        {
+          "id": "education_integration",
+          "name": "Education Integration",
+          "description": "The degree to which the project integrates research with education, training, and mentoring activities.",
+          "weight": 0.20,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "No educational component. Research and education are completely disconnected.",
+            "2": "Minimal educational integration. Token or superficial training activities.",
+            "3": "Some educational activities planned but they are generic or loosely connected to the research.",
+            "4": "Strong integration of research and education with clear training opportunities for students.",
+            "5": "Exceptional educational plan deeply woven into the research with innovative pedagogical approaches."
+          }
+        },
+        {
+          "id": "diversity_inclusion",
+          "name": "Diversity and Inclusion",
+          "description": "Plans to broaden participation of underrepresented groups in STEM through the proposed activities.",
+          "weight": 0.20,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "No attention to diversity or inclusion. No plans to broaden participation.",
+            "2": "Diversity is mentioned but no concrete plans or strategies are provided.",
+            "3": "Some diversity efforts planned but they lack specificity or institutional commitment.",
+            "4": "Well-developed diversity plan with specific strategies, partnerships, and measurable goals.",
+            "5": "Outstanding and innovative diversity plan with demonstrated institutional support and evidence-based strategies."
+          }
+        },
+        {
+          "id": "dissemination_plan",
+          "name": "Dissemination Plan",
+          "description": "The strategy for sharing results, data, and tools with the broader scientific community and the public.",
+          "weight": 0.20,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "No dissemination plan. Results would remain siloed.",
+            "2": "Dissemination limited to standard publications with no broader outreach.",
+            "3": "Reasonable dissemination plan including publications and some data sharing.",
+            "4": "Strong dissemination plan with open data, community engagement, and multi-channel outreach.",
+            "5": "Exemplary dissemination strategy including open-source tools, public engagement, media outreach, and policy briefs."
+          }
+        },
+        {
+          "id": "infrastructure_enhancement",
+          "name": "Infrastructure Enhancement",
+          "description": "The potential to enhance research infrastructure such as facilities, instrumentation, networks, or partnerships.",
+          "weight": 0.15,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "No contribution to research infrastructure.",
+            "2": "Marginal infrastructure enhancement with limited lasting value.",
+            "3": "Some infrastructure benefits such as shared datasets or minor facility improvements.",
+            "4": "Meaningful infrastructure contributions that will benefit the broader research community.",
+            "5": "Transformative infrastructure enhancement creating lasting shared resources, facilities, or collaborative networks."
+          }
+        }
+      ]
+    }
+  }
+}

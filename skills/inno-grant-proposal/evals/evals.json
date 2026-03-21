@@ -1,0 +1,25 @@
+{
+  "skill_name": "grant-proposal",
+  "evals": [
+    {
+      "id": 1,
+      "name": "nsfc-new-from-concept",
+      "prompt": "我是一个做遥感和深度学习方向的副教授，之前拿过一个青年基金做城市热岛效应的遥感反演。现在想申请面上项目，方向是用多模态遥感数据+物理约束的深度学习来监测碳排放。我有一些初步结果，用Sentinel-5P和OCO-2数据做了一个区域碳通量估算模型，精度比传统方法提升了约15%。帮我规划这个面上项目的申请书结构，包括立项依据的骨架和研究内容的S1-S4规划。",
+      "expected_output": "Should produce: 1) Project profiling with ROI score, 2) Four-paragraph closure structure for rationale, 3) S1-S4 internal planning framework for research content, 4) Claims-Aims-Evidence matrix, 5) Figure plan. All in Chinese with NSFC conventions.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "nih-r01-review-existing",
+      "prompt": "I'm a biomedical researcher and I have a draft of my NIH R01 Specific Aims page. Can you do a simulated review? Here's my draft:\n\nTitle: Neural Circuit Mechanisms of Fear Memory Consolidation\n\nAlzheimer's disease affects millions worldwide, and understanding memory consolidation is crucial for developing interventions. However, the neural circuit mechanisms underlying fear memory consolidation remain poorly understood. The long-term goal of our research is to elucidate the circuit-level mechanisms of memory formation. The objective of this application is to determine how prefrontal-amygdala circuits mediate fear memory consolidation. Our central hypothesis is that synchronized theta oscillations between the prefrontal cortex and amygdala drive synaptic plasticity necessary for fear memory consolidation.\n\nAim 1: Characterize the temporal dynamics of prefrontal-amygdala circuit activity during fear memory consolidation using in vivo calcium imaging.\nAim 2: Determine the causal role of theta-frequency synchronization in fear memory consolidation using optogenetic manipulation.\nAim 3: Identify the molecular mechanisms downstream of circuit-level theta synchronization that mediate synaptic consolidation.\n\nThis work will advance our understanding of memory circuits and may reveal new therapeutic targets for PTSD and anxiety disorders.",
+      "expected_output": "Should produce: 1) Three-pass reviewer simulation (2-min triage, 15-min deep read, scoring), 2) Criterion-by-criterion scores on NIH 1-9 scale, 3) Specific weaknesses with line references (e.g., weak opening hook, generic broader impact, Aim 3 depends on Aims 1-2), 4) Concrete revision suggestions prioritized by impact, 5) AI-flavor detection results.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "nsf-career-from-scratch",
+      "prompt": "I'm an assistant professor in computer science, just started my tenure-track position 2 years ago. I want to apply for an NSF CAREER award. My research is on privacy-preserving machine learning, specifically federated learning with differential privacy guarantees. I have 3 papers at top venues (NeurIPS, ICML) and some preliminary results showing my approach reduces the privacy-utility tradeoff by 40% compared to baselines. Help me plan the full CAREER proposal including the education/broader impacts plan. My university is a large R1 with a strong CS department but we're in a rural area with limited access to tech education for local communities.",
+      "expected_output": "Should produce: 1) ROI scoring and CAREER suitability assessment, 2) Project Summary draft (1 page with Overview/IM/BI), 3) Research plan outline with 3 aims, 4) Integrated education plan leveraging rural community context, 5) Broader impacts plan with specific activities and timeline, 6) Budget considerations for CAREER ($500K/5yr)."
+    }
+  ]
+}

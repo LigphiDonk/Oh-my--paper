@@ -1,0 +1,125 @@
+# =============================================================================
+# Grant-Proposal Skill Configuration
+# =============================================================================
+
+# --- Skill Metadata ---
+skill:
+  name: grant-proposal
+  version: "1.0.0"
+  author: "Grant-Proposal Skill Team"
+  description: >
+    AI-assisted grant proposal drafting, review, and polishing for
+    US (NSF, NIH, DOE) and Chinese (NSFC, MOE, MOST) funding agencies.
+
+# --- Default Settings ---
+defaults:
+  language: auto          # auto | en | zh — auto-detect from agency/template
+  mode: interactive       # interactive | batch
+  backup: true            # create timestamped backups before overwriting
+
+# --- US Agencies & Supported Programs ---
+us_agencies:
+  - name: NSF
+    programs:
+      - CAREER
+      - CIF
+      - CRII
+      - EAGER
+      - RAPID
+      - Standard Grant
+      - Collaborative Research
+  - name: NIH
+    programs:
+      - R01
+      - R21
+      - R03
+      - K99/R00
+      - F31
+      - F32
+      - T32
+      - U01
+  - name: DOE
+    programs:
+      - Early Career
+      - BES Core
+      - ARPA-E
+      - SCGSR
+
+# --- CN Agencies & Supported Programs ---
+cn_agencies:
+  - name: NSFC
+    programs:
+      - 青年科学基金 (Young Scientists Fund)
+      - 面上项目 (General Program)
+      - 重点项目 (Key Program)
+      - 优秀青年科学基金 (Excellent Young Scientists Fund)
+      - 杰出青年科学基金 (Distinguished Young Scientists Fund)
+      - 重大研究计划 (Major Research Plan)
+  # MOE and MOST are not yet supported (no reference files or templates).
+  # Add them here when support is implemented.
+
+# --- NSFC Golden Ratio ---
+# Recommended proportion of total page budget allocated to each section.
+golden_ratio:
+  nsfc:
+    justification: 0.30   # 立项依据与研究意义
+    content: 0.50          # 研究内容、方案、创新点、计划
+    foundation: 0.20       # 研究基础与条件
+
+# --- NSFC Length Targets ---
+length_targets:
+  nsfc:
+    total_chars: [12000, 15000]   # Chinese character range (excl. refs)
+    pages: [12, 15]               # approximate A4 page count
+    figures: [10, 20]             # recommended figure count
+
+# --- Quality & Review ---
+roi_threshold: 10                  # minimum "Return on Investment" score (0-15 scale)
+
+severity_levels:
+  - level: P0
+    description: "Fatal — proposal will be desk-rejected or triaged out (e.g., missing required section, over page limit)"
+  - level: P1
+    description: "Major — significantly weakens competitiveness (e.g., vague hypothesis, missing preliminary data)"
+  - level: P2
+    description: "Minor — cosmetic or stylistic issue that slightly lowers score (e.g., inconsistent formatting, typo)"
+
+# --- AI-Flavor Check ---
+# Flag sentences that match these patterns; rewrite before submission.
+ai_flavor_check:
+  enabled: true
+  patterns_en:
+    - "delve"
+    - "tapestry"
+    - "landscape"
+    - "realm"
+    - "cutting-edge"
+    - "groundbreaking"
+    - "pioneering"
+    - "leverag(e|ing)"
+    - "utilize"
+    - "in the realm of"
+    - "it is worth noting that"
+    - "it is important to note"
+    - "a testament to"
+    - "a paradigm shift"
+    - "in conclusion"
+    - "multifaceted"
+    - "furthermore"
+    - "moreover"
+    - "building on this"
+    - "in light of"
+  patterns_cn:
+    - "值得注意的是"
+    - "需要指出的是"
+    - "综上所述"
+    - "不可或缺"
+    - "至关重要"
+    - "具有重要的理论意义和实践价值"
+    - "取得了长足的进步"
+    - "日益受到广泛关注"
+    - "亟待解决"
+    - "应运而生"
+
+# --- State Persistence ---
+state_file: GRANT_STATE.json

@@ -8,9 +8,6 @@
  * Reference: dr-claw server/openai-codex.js
  */
 
-import fs from "fs/promises";
-import path from "path";
-
 import { Codex } from "@openai/codex-sdk";
 import { emit } from "../utils/ndjson.mjs";
 import {
@@ -198,20 +195,6 @@ function normalizeCodexError(error) {
   return raw;
 }
 
-async function readProjectAgentsPrompt(projectRoot) {
-  if (!projectRoot) {
-    return "";
-  }
-
-  const agentsPath = path.join(projectRoot, "AGENTS.md");
-  try {
-    const content = await fs.readFile(agentsPath, "utf8");
-    return content.trim();
-  } catch {
-    return "";
-  }
-}
-
 /**
  * Run an agent session using Codex SDK.
  * @param {object} request - The agent request payload from Rust
@@ -229,12 +212,8 @@ export async function runCodex(request) {
       ? request.userMessage.trim()
       : "Continue.";
 
-  const projectAgentsPrompt = await readProjectAgentsPrompt(workingDirectory);
   const promptSections = [];
 
-  if (projectAgentsPrompt) {
-    promptSections.push(projectAgentsPrompt);
-  }
   if (request.systemPrompt && request.systemPrompt.trim()) {
     promptSections.push(request.systemPrompt.trim());
   }

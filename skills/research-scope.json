@@ -1,0 +1,32 @@
+{
+  "schema": "viewerleaf-research-scope-v1",
+  "generatedAt": "2026-03-20T05:23:15.888Z",
+  "skills": [
+    "academic-researcher",
+    "biorxiv-database",
+    "bioinformatics-init-analysis",
+    "dataset-discovery",
+    "gemini-deep-research",
+    "inno-code-survey",
+    "inno-deep-research",
+    "inno-experiment-analysis",
+    "inno-experiment-dev",
+    "inno-figure-gen",
+    "inno-grant-proposal",
+    "inno-idea-eval",
+    "inno-idea-generation",
+    "inno-paper-reviewer",
+    "inno-paper-writing",
+    "inno-pipeline-planner",
+    "inno-prepare-resources",
+    "inno-rclone-to-overleaf",
+    "inno-reference-audit",
+    "making-academic-presentations",
+    "ml-paper-writing",
+    "paper-analyzer",
+    "paper-finder",
+    "paper-image-extractor",
+    "research-news",
+    "scientific-writing"
+  ]
+}

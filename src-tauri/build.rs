@@ -8,6 +8,8 @@ fn main() {
     stage_worker_template().expect("failed to stage worker template resources");
     println!("cargo:warning=staging sidecar resources");
     stage_sidecar().expect("failed to stage sidecar resources");
+    println!("cargo:warning=staging skills resources");
+    stage_skills().expect("failed to stage skills resources");
     println!("cargo:warning=staged bundle resources");
     tauri_build::build()
 }
@@ -64,6 +66,22 @@ fn stage_sidecar() -> io::Result<()> {
         copy_path(&source, &target)?;
     }
 
+    Ok(())
+}
+
+fn stage_skills() -> io::Result<()> {
+    let manifest_dir =
+        PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is missing"));
+    let source_root = manifest_dir.join("../skills");
+    let target_root = manifest_dir.join("resources/skills");
+
+    if target_root.exists() {
+        fs::remove_dir_all(&target_root)?;
+    }
+    fs::create_dir_all(&target_root)?;
+
+    emit_rerun_markers(&source_root)?;
+    copy_path(&source_root, &target_root)?;
     Ok(())
 }
 

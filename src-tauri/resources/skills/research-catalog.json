@@ -1,0 +1,1836 @@
+{
+  "schema": "viewerleaf-research-catalog-v1",
+  "generatedAt": "2026-03-20T05:23:15.888Z",
+  "upstream": {
+    "repo": "dr-claw",
+    "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+  },
+  "skills": [
+    {
+      "id": "academic-researcher",
+      "name": "academic-researcher",
+      "version": "1.0.0",
+      "description": "Academic research assistant for literature reviews, paper analysis, and scholarly writing.",
+      "summary": "Academic research assistant for literature reviews, paper analysis, and scholarly writing. Use when: reviewing academic papers, conducting literature reviews, writing research summaries, analyzing methodologies, formatting citations, or wh...",
+      "stages": [
+        "survey",
+        "ideation"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file"
+      ],
+      "primaryIntent": "research",
+      "intents": [
+        "research",
+        "writing"
+      ],
+      "capabilities": [
+        "search-retrieval"
+      ],
+      "domains": [
+        "cs-ai"
+      ],
+      "keywords": [
+        "academic-researcher",
+        "survey",
+        "search-retrieval",
+        "cs-ai",
+        "academic",
+        "researcher",
+        "research",
+        "assistant",
+        "literature",
+        "reviews",
+        "paper",
+        "analysis"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/academic-researcher",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": false,
+        "hasScripts": false,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "referenceCount": 0,
+        "scriptCount": 0,
+        "templateCount": 0,
+        "assetCount": 0,
+        "optionalScripts": false
+      },
+      "legacy": {
+        "dirPath": "academic-researcher",
+        "skillFile": "skills/academic-researcher/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Survey",
+        "domain": "cs"
+      }
+    },
+    {
+      "id": "biorxiv-database",
+      "name": "biorxiv-database",
+      "version": "1.0.0",
+      "description": "Efficient database search tool for bioRxiv preprint server.",
+      "summary": "Efficient database search tool for bioRxiv preprint server. Use this skill when searching for life sciences preprints by keywords, authors, date ranges, or categories, retrieving paper metadata, downloading PDFs, or conducting literature r...",
+      "stages": [
+        "survey",
+        "ideation",
+        "experiment"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file",
+        "run_terminal"
+      ],
+      "primaryIntent": "research",
+      "intents": [
+        "research",
+        "data"
+      ],
+      "capabilities": [
+        "search-retrieval",
+        "data-processing"
+      ],
+      "domains": [
+        "bioinformatics"
+      ],
+      "keywords": [
+        "biorxiv-database",
+        "resource prep",
+        "search-retrieval",
+        "data-processing",
+        "bioinformatics",
+        "biorxiv",
+        "database",
+        "efficient",
+        "search",
+        "tool",
+        "preprint",
+        "server"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/biorxiv-database",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": true,
+        "hasScripts": true,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "referenceCount": 1,
+        "scriptCount": 1,
+        "templateCount": 0,
+        "assetCount": 0,
+        "optionalScripts": true
+      },
+      "legacy": {
+        "dirPath": "biorxiv-database",
+        "skillFile": "skills/biorxiv-database/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Resource Prep",
+        "domain": "q-bio"
+      }
+    },
+    {
+      "id": "bioinformatics-init-analysis",
+      "name": "bioinformatics-init-analysis",
+      "version": "1.0.0",
+      "description": "# bioinformatics-init-analysis",
+      "summary": "# bioinformatics-init-analysis",
+      "stages": [
+        "experiment"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file",
+        "run_terminal"
+      ],
+      "primaryIntent": "research",
+      "intents": [
+        "research"
+      ],
+      "capabilities": [
+        "research-planning",
+        "data-processing"
+      ],
+      "domains": [
+        "bioinformatics"
+      ],
+      "keywords": [
+        "bioinformatics-init-analysis",
+        "experiment"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/bioinformatics-init-analysis",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": true,
+        "hasScripts": true,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "referenceCount": 4,
+        "scriptCount": 10,
+        "templateCount": 0,
+        "assetCount": 0,
+        "optionalScripts": true
+      },
+      "legacy": null
+    },
+    {
+      "id": "dataset-discovery",
+      "name": "dataset-discovery",
+      "version": "1.0.0",
+      "description": "Multi-source ML dataset discovery.",
+      "summary": "Multi-source ML dataset discovery. Search HuggingFace Hub, OpenML, GitHub, and paper cross-references for datasets relevant to a research task. Use when asked to \"find datasets for\", \"search ML datasets\", \"what datasets exist for\", or \"dis...",
+      "stages": [
+        "survey",
+        "ideation",
+        "experiment"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file",
+        "run_terminal"
+      ],
+      "primaryIntent": "data",
+      "intents": [
+        "data",
+        "research"
+      ],
+      "capabilities": [
+        "search-retrieval",
+        "data-processing"
+      ],
+      "domains": [
+        "data-engineering"
+      ],
+      "keywords": [
+        "dataset-discovery",
+        "resource prep",
+        "search-retrieval",
+        "data-processing",
+        "data-engineering",
+        "dataset",
+        "discovery",
+        "multi",
+        "source",
+        "ml",
+        "search",
+        "huggingface"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/dataset-discovery",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": false,
+        "hasScripts": true,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "referenceCount": 0,
+        "scriptCount": 1,
+        "templateCount": 0,
+        "assetCount": 0,
+        "optionalScripts": true
+      },
+      "legacy": {
+        "dirPath": "dataset-discovery",
+        "skillFile": "skills/dataset-discovery/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Resource Prep",
+        "domain": "Data"
+      }
+    },
+    {
+      "id": "gemini-deep-research",
+      "name": "gemini-deep-research",
+      "version": "1.0.0",
+      "description": "Perform complex, long-running research tasks using Gemini Deep Research Agent.",
+      "summary": "Perform complex, long-running research tasks using Gemini Deep Research Agent. Use when: asked to research topics requiring multi-source synthesis, competitive analysis, market research, literature review, or comprehensive technical invest...",
+      "stages": [
+        "survey"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file",
+        "run_terminal"
+      ],
+      "primaryIntent": "research",
+      "intents": [
+        "research"
+      ],
+      "capabilities": [
+        "search-retrieval",
+        "agent-workflow"
+      ],
+      "domains": [
+        "general"
+      ],
+      "keywords": [
+        "gemini-deep-research",
+        "survey",
+        "search-retrieval",
+        "agent-workflow",
+        "gemini",
+        "deep",
+        "research",
+        "perform",
+        "complex",
+        "long",
+        "running",
+        "tasks"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/gemini-deep-research",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": false,
+        "hasScripts": true,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "referenceCount": 0,
+        "scriptCount": 1,
+        "templateCount": 0,
+        "assetCount": 0,
+        "optionalScripts": true
+      },
+      "legacy": {
+        "dirPath": "gemini-deep-research",
+        "skillFile": "skills/gemini-deep-research/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Survey",
+        "domain": "General"
+      }
+    },
+    {
+      "id": "inno-code-survey",
+      "name": "inno-code-survey",
+      "version": "1.0.0",
+      "description": "Acquires missing code repositories for the selected idea (Phase A) and conducts comprehensive code survey mapping academic concepts to implementations (Phase B).",
+      "summary": "Acquires missing code repositories for the selected idea (Phase A) and conducts comprehensive code survey mapping academic concepts to implementations (Phase B). Outputs acquired_code_repos, updated_prepare_res, and model_survey for downst...",
+      "stages": [
+        "ideation",
+        "experiment"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file",
+        "run_terminal"
+      ],
+      "primaryIntent": "research",
+      "intents": [
+        "research"
+      ],
+      "capabilities": [
+        "search-retrieval"
+      ],
+      "domains": [
+        "general"
+      ],
+      "keywords": [
+        "inno-code-survey",
+        "survey",
+        "search-retrieval",
+        "inno",
+        "code",
+        "acquires",
+        "missing",
+        "repositories",
+        "selected",
+        "idea",
+        "phase",
+        "conducts"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/inno-code-survey",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": true,
+        "hasScripts": true,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "referenceCount": 2,
+        "scriptCount": 1,
+        "templateCount": 0,
+        "assetCount": 0,
+        "optionalScripts": true
+      },
+      "legacy": {
+        "dirPath": "inno-code-survey",
+        "skillFile": "skills/inno-code-survey/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Survey",
+        "domain": "General"
+      }
+    },
+    {
+      "id": "inno-deep-research",
+      "name": "inno-deep-research",
+      "version": "1.0.0",
+      "description": "Comprehensive research assistant that synthesizes information from multiple sources with citations.",
+      "summary": "Comprehensive research assistant that synthesizes information from multiple sources with citations. Use when: conducting in-depth research, gathering sources, writing research summaries, analyzing topics from multiple perspectives, or when...",
+      "stages": [
+        "survey",
+        "ideation",
+        "experiment",
+        "publication"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file"
+      ],
+      "primaryIntent": "research",
+      "intents": [
+        "research"
+      ],
+      "capabilities": [
+        "search-retrieval"
+      ],
+      "domains": [
+        "general"
+      ],
+      "keywords": [
+        "inno-deep-research",
+        "survey",
+        "search-retrieval",
+        "inno",
+        "deep",
+        "research",
+        "comprehensive",
+        "assistant",
+        "that",
+        "synthesizes",
+        "information",
+        "from"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/inno-deep-research",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": false,
+        "hasScripts": false,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "referenceCount": 0,
+        "scriptCount": 0,
+        "templateCount": 0,
+        "assetCount": 0,
+        "optionalScripts": false
+      },
+      "legacy": {
+        "dirPath": "inno-deep-research",
+        "skillFile": "skills/inno-deep-research/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Survey",
+        "domain": "General"
+      }
+    },
+    {
+      "id": "inno-experiment-analysis",
+      "name": "inno-experiment-analysis",
+      "version": "0.1.0",
+      "description": "This skill should be used when the user asks to \"analyze experimental results\", \"generate results section\", \"statistical analysis of experiments\", \"compare model performance\", \"create results visualization\", or mentions connecting experime...",
+      "summary": "This skill should be used when the user asks to \"analyze experimental results\", \"generate results section\", \"statistical analysis of experiments\", \"compare model performance\", \"create results visualization\", or mentions connecting experime...",
+      "stages": [
+        "experiment"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file"
+      ],
+      "primaryIntent": "evaluation",
+      "intents": [
+        "evaluation",
+        "experiment"
+      ],
+      "capabilities": [
+        "evaluation-benchmarking"
+      ],
+      "domains": [
+        "general"
+      ],
+      "keywords": [
+        "research",
+        "analysis",
+        "statistics",
+        "visualization",
+        "paper writing",
+        "inno-experiment-analysis",
+        "evaluation-benchmarking",
+        "inno",
+        "experiment",
+        "this",
+        "should",
+        "be"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/inno-experiment-analysis",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": true,
+        "hasScripts": false,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "referenceCount": 4,
+        "scriptCount": 0,
+        "templateCount": 0,
+        "assetCount": 0,
+        "optionalScripts": false
+      },
+      "legacy": {
+        "dirPath": "inno-experiment-analysis",
+        "skillFile": "skills/inno-experiment-analysis/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Analysis",
+        "domain": "General"
+      }
+    },
+    {
+      "id": "inno-experiment-dev",
+      "name": "inno-experiment-dev",
+      "version": "1.0.0",
+      "description": "Creates implementation plan, writes project code with judge feedback loop, and submits final experiment run.",
+      "summary": "Creates implementation plan, writes project code with judge feedback loop, and submits final experiment run. Use after code-survey in both Idea and Plan branches.",
+      "stages": [
+        "experiment"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file"
+      ],
+      "primaryIntent": "experiment",
+      "intents": [
+        "experiment"
+      ],
+      "capabilities": [
+        "research-planning"
+      ],
+      "domains": [
+        "general"
+      ],
+      "keywords": [
+        "inno-experiment-dev",
+        "experiment dev",
+        "research-planning",
+        "inno",
+        "experiment",
+        "dev",
+        "creates",
+        "implementation",
+        "plan",
+        "writes",
+        "project",
+        "code"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/inno-experiment-dev",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": true,
+        "hasScripts": false,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "referenceCount": 3,
+        "scriptCount": 0,
+        "templateCount": 0,
+        "assetCount": 0,
+        "optionalScripts": false
+      },
+      "legacy": {
+        "dirPath": "inno-experiment-dev",
+        "skillFile": "skills/inno-experiment-dev/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Experiment Dev",
+        "domain": "General"
+      }
+    },
+    {
+      "id": "inno-figure-gen",
+      "name": "inno-figure-gen",
+      "version": "1.0.0",
+      "description": "Generate/edit images with Nano Banana Pro (Gemini 3 Pro Image).",
+      "summary": "Generate/edit images with Nano Banana Pro (Gemini 3 Pro Image). Use for image create/modify requests incl. edits. Supports text-to-image + image-to-image; 1K/2K/4K; use --input-image.",
+      "stages": [
+        "publication"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file",
+        "run_terminal"
+      ],
+      "primaryIntent": "writing",
+      "intents": [
+        "writing"
+      ],
+      "capabilities": [
+        "visualization-reporting"
+      ],
+      "domains": [
+        "general"
+      ],
+      "keywords": [
+        "inno-figure-gen",
+        "paper writing",
+        "visualization-reporting",
+        "inno",
+        "figure",
+        "gen",
+        "generate",
+        "edit",
+        "images",
+        "nano",
+        "banana",
+        "pro"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/inno-figure-gen",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": false,
+        "hasScripts": true,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "referenceCount": 0,
+        "scriptCount": 1,
+        "templateCount": 0,
+        "assetCount": 0,
+        "optionalScripts": true
+      },
+      "legacy": {
+        "dirPath": "inno-figure-gen",
+        "skillFile": "skills/inno-figure-gen/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Paper Writing",
+        "domain": "Vision"
+      }
+    },
+    {
+      "id": "inno-grant-proposal",
+      "name": "inno-grant-proposal",
+      "version": "1.0.0",
+      "description": "Help professors and researchers write, revise, adapt, and polish grant proposals for US agencies (NSF, NIH, DOE, DARPA, NASA) and Chinese agencies (NSFC 国自然).",
+      "summary": "Help professors and researchers write, revise, adapt, and polish grant proposals for US agencies (NSF, NIH, DOE, DARPA, NASA) and Chinese agencies (NSFC 国自然). Use this skill whenever the user mentions grants, proposals, funding application...",
+      "stages": [
+        "publication"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file",
+        "run_terminal"
+      ],
+      "primaryIntent": "writing",
+      "intents": [
+        "writing",
+        "research"
+      ],
+      "capabilities": [
+        "visualization-reporting",
+        "research-planning"
+      ],
+      "domains": [
+        "general"
+      ],
+      "keywords": [
+        "inno-grant-proposal",
+        "grant writing",
+        "visualization-reporting",
+        "research-planning",
+        "inno",
+        "grant",
+        "proposal",
+        "help",
+        "professors",
+        "researchers",
+        "write",
+        "revise"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/inno-grant-proposal",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": true,
+        "hasScripts": true,
+        "hasTemplates": true,
+        "hasAssets": false,
+        "referenceCount": 14,
+        "scriptCount": 3,
+        "templateCount": 7,
+        "assetCount": 0,
+        "optionalScripts": true
+      },
+      "legacy": {
+        "dirPath": "inno-grant-proposal",
+        "skillFile": "skills/inno-grant-proposal/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Grant Writing",
+        "domain": "general"
+      }
+    },
+    {
+      "id": "inno-idea-eval",
+      "name": "inno-idea-eval",
+      "version": "1.0.0",
+      "description": "Multi-persona idea evaluation with quality gate.",
+      "summary": "Multi-persona idea evaluation with quality gate. Evaluates ideas across 5 InnoEval dimensions (Clarity, Novelty, Validity, Feasibility, Significance) using 3 reviewer personas and a meta-review. Sits between inno-idea-generation and inno-c...",
+      "stages": [
+        "ideation"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file"
+      ],
+      "primaryIntent": "ideation",
+      "intents": [
+        "ideation",
+        "evaluation"
+      ],
+      "capabilities": [
+        "research-planning"
+      ],
+      "domains": [
+        "general"
+      ],
+      "keywords": [
+        "inno-idea-eval",
+        "idea evaluation",
+        "research-planning",
+        "inno",
+        "idea",
+        "eval",
+        "multi",
+        "persona",
+        "evaluation",
+        "quality",
+        "gate",
+        "evaluates"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/inno-idea-eval",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": true,
+        "hasScripts": false,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "referenceCount": 3,
+        "scriptCount": 0,
+        "templateCount": 0,
+        "assetCount": 0,
+        "optionalScripts": false
+      },
+      "legacy": {
+        "dirPath": "inno-idea-eval",
+        "skillFile": "skills/inno-idea-eval/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Idea Evaluation",
+        "domain": "General"
+      }
+    },
+    {
+      "id": "inno-idea-generation",
+      "name": "inno-idea-generation",
+      "version": "1.0.0",
+      "description": "Facilitates structured brainstorming sessions, conducts comprehensive research, and generates creative solutions using proven frameworks.",
+      "summary": "Facilitates structured brainstorming sessions, conducts comprehensive research, and generates creative solutions using proven frameworks. Trigger keywords - brainstorm, ideate, research, SCAMPER, SWOT, mind map, creative, explore ideas, ma...",
+      "stages": [
+        "ideation"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file",
+        "run_terminal"
+      ],
+      "primaryIntent": "ideation",
+      "intents": [
+        "ideation",
+        "research"
+      ],
+      "capabilities": [
+        "research-planning"
+      ],
+      "domains": [
+        "general"
+      ],
+      "keywords": [
+        "inno-idea-generation",
+        "idea generation",
+        "research-planning",
+        "inno",
+        "idea",
+        "generation",
+        "facilitates",
+        "structured",
+        "brainstorming",
+        "sessions",
+        "conducts",
+        "comprehensive"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/inno-idea-generation",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": false,
+        "hasScripts": true,
+        "hasTemplates": true,
+        "hasAssets": false,
+        "referenceCount": 0,
+        "scriptCount": 3,
+        "templateCount": 2,
+        "assetCount": 0,
+        "optionalScripts": true
+      },
+      "legacy": {
+        "dirPath": "inno-idea-generation",
+        "skillFile": "skills/inno-idea-generation/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Idea Generation",
+        "domain": "General"
+      }
+    },
+    {
+      "id": "inno-paper-reviewer",
+      "name": "inno-paper-reviewer",
+      "version": "1.0.0",
+      "description": "Structured manuscript/grant review with checklist-based evaluation.",
+      "summary": "Structured manuscript/grant review with checklist-based evaluation. Use when writing formal peer reviews with specific criteria methodology assessment, statistical validity, reporting standards compliance (CONSORT/STROBE), and constructive...",
+      "stages": [
+        "publication"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file"
+      ],
+      "primaryIntent": "evaluation",
+      "intents": [
+        "evaluation",
+        "writing"
+      ],
+      "capabilities": [
+        "evaluation-benchmarking"
+      ],
+      "domains": [
+        "general"
+      ],
+      "keywords": [
+        "inno-paper-reviewer",
+        "paper review",
+        "evaluation-benchmarking",
+        "inno",
+        "paper",
+        "reviewer",
+        "structured",
+        "manuscript",
+        "grant",
+        "review",
+        "checklist",
+        "based"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/inno-paper-reviewer",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": true,
+        "hasScripts": false,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "referenceCount": 2,
+        "scriptCount": 0,
+        "templateCount": 0,
+        "assetCount": 0,
+        "optionalScripts": false
+      },
+      "legacy": {
+        "dirPath": "inno-paper-reviewer",
+        "skillFile": "skills/inno-paper-reviewer/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Paper Review",
+        "domain": "General"
+      }
+    },
+    {
+      "id": "inno-paper-writing",
+      "name": "inno-paper-writing",
+      "version": "1.0.0",
+      "description": "Creates formal academic research papers following IEEE/ACM formatting standards with proper structure, citations, and scholarly writing style.",
+      "summary": "Creates formal academic research papers following IEEE/ACM formatting standards with proper structure, citations, and scholarly writing style. Use when the user asks to write a research paper, academic paper, or conference paper on any top...",
+      "stages": [
+        "publication"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file"
+      ],
+      "primaryIntent": "writing",
+      "intents": [
+        "writing",
+        "research"
+      ],
+      "capabilities": [
+        "visualization-reporting"
+      ],
+      "domains": [
+        "general"
+      ],
+      "keywords": [
+        "inno-paper-writing",
+        "paper writing",
+        "visualization-reporting",
+        "inno",
+        "paper",
+        "writing",
+        "creates",
+        "formal",
+        "academic",
+        "research",
+        "papers",
+        "following"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/inno-paper-writing",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": true,
+        "hasScripts": false,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "referenceCount": 3,
+        "scriptCount": 0,
+        "templateCount": 0,
+        "assetCount": 0,
+        "optionalScripts": false
+      },
+      "legacy": {
+        "dirPath": "inno-paper-writing",
+        "skillFile": "skills/inno-paper-writing/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Paper Writing",
+        "domain": "General"
+      }
+    },
+    {
+      "id": "inno-pipeline-planner",
+      "name": "inno-pipeline-planner",
+      "version": "1.0.0",
+      "description": "Guides the user through an interactive conversation to define their research project, then generates research_brief.json and tasks.json.",
+      "summary": "Guides the user through an interactive conversation to define their research project, then generates research_brief.json and tasks.json. Use when starting a new project, when no research_brief.json exists, when the user wants to start from...",
+      "stages": [
+        "ideation"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file"
+      ],
+      "primaryIntent": "research",
+      "intents": [
+        "research",
+        "experiment"
+      ],
+      "capabilities": [
+        "research-planning",
+        "agent-workflow"
+      ],
+      "domains": [
+        "general"
+      ],
+      "keywords": [
+        "inno-pipeline-planner",
+        "research-planning",
+        "agent-workflow",
+        "inno",
+        "pipeline",
+        "planner",
+        "guides",
+        "user",
+        "through",
+        "interactive",
+        "conversation",
+        "define"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/inno-pipeline-planner",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": true,
+        "hasScripts": false,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "referenceCount": 4,
+        "scriptCount": 0,
+        "templateCount": 0,
+        "assetCount": 0,
+        "optionalScripts": false
+      },
+      "legacy": {
+        "dirPath": "inno-pipeline-planner",
+        "skillFile": "skills/inno-pipeline-planner/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Standalone",
+        "domain": "General"
+      }
+    },
+    {
+      "id": "inno-prepare-resources",
+      "name": "inno-prepare-resources",
+      "version": "1.0.0",
+      "description": "Loads the evaluation instance, searches GitHub for related repositories, builds a dataset description, queries the Prepare Agent for reference codebases, and downloads arXiv paper sources.",
+      "summary": "Loads the evaluation instance, searches GitHub for related repositories, builds a dataset description, queries the Prepare Agent for reference codebases, and downloads arXiv paper sources. Covers both Idea mode and Plan mode (the only diff...",
+      "stages": [
+        "ideation"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file"
+      ],
+      "primaryIntent": "data",
+      "intents": [
+        "data",
+        "research"
+      ],
+      "capabilities": [
+        "research-planning",
+        "data-processing"
+      ],
+      "domains": [
+        "general"
+      ],
+      "keywords": [
+        "inno-prepare-resources",
+        "resource prep",
+        "research-planning",
+        "data-processing",
+        "inno",
+        "prepare",
+        "resources",
+        "loads",
+        "evaluation",
+        "instance",
+        "searches",
+        "github"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/inno-prepare-resources",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": false,
+        "hasScripts": false,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "referenceCount": 0,
+        "scriptCount": 0,
+        "templateCount": 0,
+        "assetCount": 0,
+        "optionalScripts": false
+      },
+      "legacy": {
+        "dirPath": "inno-prepare-resources",
+        "skillFile": "skills/inno-prepare-resources/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Resource Prep",
+        "domain": "Data"
+      }
+    },
+    {
+      "id": "inno-rclone-to-overleaf",
+      "name": "inno-rclone-to-overleaf",
+      "version": "1.0.0",
+      "description": "Access Overleaf projects via CLI.",
+      "summary": "Access Overleaf projects via CLI. Use for reading/writing LaTeX files, syncing local .tex files to Overleaf, downloading projects, and managing Overleaf project structure. Triggers on Overleaf, LaTeX sync, or tex file uploads to Overleaf.",
+      "stages": [
+        "publication"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file",
+        "run_terminal"
+      ],
+      "primaryIntent": "writing",
+      "intents": [
+        "writing",
+        "deployment"
+      ],
+      "capabilities": [
+        "infrastructure-ops",
+        "visualization-reporting"
+      ],
+      "domains": [
+        "general"
+      ],
+      "keywords": [
+        "inno-rclone-to-overleaf",
+        "publication sync",
+        "infrastructure-ops",
+        "visualization-reporting",
+        "inno",
+        "rclone",
+        "overleaf",
+        "access",
+        "projects",
+        "via",
+        "cli",
+        "reading"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/inno-rclone-to-overleaf",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": false,
+        "hasScripts": true,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "referenceCount": 0,
+        "scriptCount": 1,
+        "templateCount": 0,
+        "assetCount": 0,
+        "optionalScripts": true
+      },
+      "legacy": {
+        "dirPath": "inno-rclone-to-overleaf",
+        "skillFile": "skills/inno-rclone-to-overleaf/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Publication Sync",
+        "domain": "General"
+      }
+    },
+    {
+      "id": "inno-reference-audit",
+      "name": "inno-reference-audit",
+      "version": "0.1.0",
+      "description": "This skill provides reference guidance for citation verification in academic writing.",
+      "summary": "This skill provides reference guidance for citation verification in academic writing. Use when the user asks about \"citation verification best practices\", \"how to verify references\", \"preventing fake citations\", or needs guidance on citati...",
+      "stages": [
+        "publication"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file",
+        "run_terminal"
+      ],
+      "primaryIntent": "evaluation",
+      "intents": [
+        "evaluation",
+        "writing"
+      ],
+      "capabilities": [
+        "evaluation-benchmarking",
+        "search-retrieval"
+      ],
+      "domains": [
+        "general"
+      ],
+      "keywords": [
+        "research",
+        "academic",
+        "citation",
+        "reference",
+        "inno-reference-audit",
+        "paper review",
+        "evaluation-benchmarking",
+        "search-retrieval",
+        "inno",
+        "audit",
+        "this",
+        "provides"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/inno-reference-audit",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": true,
+        "hasScripts": true,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "referenceCount": 4,
+        "scriptCount": 4,
+        "templateCount": 0,
+        "assetCount": 0,
+        "optionalScripts": true
+      },
+      "legacy": {
+        "dirPath": "inno-reference-audit",
+        "skillFile": "skills/inno-reference-audit/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Paper Review",
+        "domain": "General"
+      }
+    },
+    {
+      "id": "making-academic-presentations",
+      "name": "making-academic-presentations",
+      "version": "1.0.0",
+      "description": "Create academic presentation slide decks and optionally demo videos from research papers.",
+      "summary": "Create academic presentation slide decks and optionally demo videos from research papers. Use when the user asks to \"make slides\", \"create a deck\", \"make a presentation\", \"demo video\", \"paper slides\", \"conference talk slides\", or wants to...",
+      "stages": [
+        "promotion"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file",
+        "run_terminal"
+      ],
+      "primaryIntent": "writing",
+      "intents": [
+        "writing"
+      ],
+      "capabilities": [
+        "visualization-reporting"
+      ],
+      "domains": [
+        "general"
+      ],
+      "keywords": [
+        "making-academic-presentations",
+        "promotion",
+        "visualization-reporting",
+        "making",
+        "academic",
+        "presentations",
+        "create",
+        "presentation",
+        "slide",
+        "decks",
+        "optionally",
+        "demo"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/making-academic-presentations",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": true,
+        "hasScripts": true,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "referenceCount": 3,
+        "scriptCount": 2,
+        "templateCount": 0,
+        "assetCount": 0,
+        "optionalScripts": true
+      },
+      "legacy": {
+        "dirPath": "making-academic-presentations",
+        "skillFile": "skills/making-academic-presentations/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Promotion",
+        "domain": "General"
+      }
+    },
+    {
+      "id": "ml-paper-writing",
+      "name": "ml-paper-writing",
+      "version": "1.0.0",
+      "description": "Write publication-ready ML/AI papers for NeurIPS, ICML, ICLR, ACL, AAAI, COLM.",
+      "summary": "Write publication-ready ML/AI papers for NeurIPS, ICML, ICLR, ACL, AAAI, COLM. Use when drafting papers from research repos, structuring arguments, verifying citations, or preparing camera-ready submissions. Includes LaTeX templates, revie...",
+      "stages": [
+        "publication"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file"
+      ],
+      "primaryIntent": "writing",
+      "intents": [
+        "writing",
+        "research"
+      ],
+      "capabilities": [
+        "visualization-reporting"
+      ],
+      "domains": [
+        "cs-ai"
+      ],
+      "keywords": [
+        "academic writing",
+        "neurips",
+        "icml",
+        "iclr",
+        "acl",
+        "aaai",
+        "colm",
+        "latex",
+        "paper writing",
+        "citations",
+        "research",
+        "ml-paper-writing"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/ml-paper-writing",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": true,
+        "hasScripts": false,
+        "hasTemplates": true,
+        "hasAssets": false,
+        "referenceCount": 5,
+        "scriptCount": 0,
+        "templateCount": 50,
+        "assetCount": 0,
+        "optionalScripts": false
+      },
+      "legacy": {
+        "dirPath": "ml-paper-writing",
+        "skillFile": "skills/ml-paper-writing/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Model & Research",
+        "domain": "cs"
+      }
+    },
+    {
+      "id": "paper-analyzer",
+      "name": "paper-analyzer",
+      "version": "1.0.0",
+      "description": "Deep analysis of a single paper — generate structured notes with figures, evaluation, and knowledge graph updates",
+      "summary": "Deep analysis of a single paper — generate structured notes with figures, evaluation, and knowledge graph updates",
+      "stages": [
+        "survey",
+        "publication"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file",
+        "run_terminal"
+      ],
+      "primaryIntent": "research",
+      "intents": [
+        "research"
+      ],
+      "capabilities": [
+        "evaluation-benchmarking"
+      ],
+      "domains": [
+        "cs-ai"
+      ],
+      "keywords": [
+        "paper-analyzer",
+        "paper analysis",
+        "evaluation-benchmarking",
+        "cs-ai",
+        "paper",
+        "analyzer",
+        "deep",
+        "analysis",
+        "single",
+        "generate",
+        "structured",
+        "notes"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/paper-analyzer",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": false,
+        "hasScripts": true,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "referenceCount": 0,
+        "scriptCount": 2,
+        "templateCount": 0,
+        "assetCount": 0,
+        "optionalScripts": true
+      },
+      "legacy": {
+        "dirPath": "paper-analyzer",
+        "skillFile": "skills/paper-analyzer/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Paper Analysis",
+        "domain": "cs"
+      }
+    },
+    {
+      "id": "paper-finder",
+      "name": "paper-finder",
+      "version": "1.0.0",
+      "description": "Search existing paper notes by title, author, keyword, or research domain",
+      "summary": "Search existing paper notes by title, author, keyword, or research domain",
+      "stages": [
+        "survey"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file"
+      ],
+      "primaryIntent": "research",
+      "intents": [
+        "research"
+      ],
+      "capabilities": [
+        "search-retrieval"
+      ],
+      "domains": [
+        "cs-ai"
+      ],
+      "keywords": [
+        "paper-finder",
+        "paper search",
+        "search-retrieval",
+        "cs-ai",
+        "paper",
+        "finder",
+        "search",
+        "existing",
+        "notes",
+        "by",
+        "title",
+        "author"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/paper-finder",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": false,
+        "hasScripts": false,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "referenceCount": 0,
+        "scriptCount": 0,
+        "templateCount": 0,
+        "assetCount": 0,
+        "optionalScripts": false
+      },
+      "legacy": {
+        "dirPath": "paper-finder",
+        "skillFile": "skills/paper-finder/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Paper Search",
+        "domain": "cs"
+      }
+    },
+    {
+      "id": "paper-image-extractor",
+      "name": "paper-image-extractor",
+      "version": "1.0.0",
+      "description": "Extract figures from papers — prioritizes arXiv source package for high-quality images",
+      "summary": "Extract figures from papers — prioritizes arXiv source package for high-quality images",
+      "stages": [
+        "publication"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file",
+        "run_terminal"
+      ],
+      "primaryIntent": "research",
+      "intents": [
+        "research"
+      ],
+      "capabilities": [
+        "multimodal"
+      ],
+      "domains": [
+        "cs-ai",
+        "vision"
+      ],
+      "keywords": [
+        "paper-image-extractor",
+        "image extraction",
+        "multimodal",
+        "cs-ai",
+        "vision",
+        "paper",
+        "image",
+        "extractor",
+        "extract",
+        "figures",
+        "from",
+        "papers"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/paper-image-extractor",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": false,
+        "hasScripts": true,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "referenceCount": 0,
+        "scriptCount": 1,
+        "templateCount": 0,
+        "assetCount": 0,
+        "optionalScripts": true
+      },
+      "legacy": {
+        "dirPath": "paper-image-extractor",
+        "skillFile": "skills/paper-image-extractor/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Image Extraction",
+        "domain": "cs"
+      }
+    },
+    {
+      "id": "research-news",
+      "name": "research-news",
+      "version": "1.0.0",
+      "description": "Daily paper recommendation workflow — search arXiv and Semantic Scholar, score and recommend papers",
+      "summary": "Daily paper recommendation workflow — search arXiv and Semantic Scholar, score and recommend papers",
+      "stages": [
+        "survey"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file"
+      ],
+      "primaryIntent": "research",
+      "intents": [
+        "research"
+      ],
+      "capabilities": [
+        "agent-workflow",
+        "search-retrieval"
+      ],
+      "domains": [
+        "cs-ai"
+      ],
+      "keywords": [
+        "research-news",
+        "paper discovery",
+        "agent-workflow",
+        "search-retrieval",
+        "cs-ai",
+        "research",
+        "news",
+        "daily",
+        "paper",
+        "recommendation",
+        "workflow",
+        "search"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/research-news",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": false,
+        "hasScripts": false,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "referenceCount": 0,
+        "scriptCount": 0,
+        "templateCount": 0,
+        "assetCount": 0,
+        "optionalScripts": false
+      },
+      "legacy": {
+        "dirPath": "research-news",
+        "skillFile": "skills/research-news/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Paper Discovery",
+        "domain": "cs"
+      }
+    },
+    {
+      "id": "scientific-writing",
+      "name": "scientific-writing",
+      "version": "1.0.0",
+      "description": "Core skill for the deep research and writing tool.",
+      "summary": "Core skill for the deep research and writing tool. Write scientific manuscripts in full paragraphs (never bullet points). Use two-stage process: (1) create section outlines with key points using research-lookup, (2) convert to flowing pros...",
+      "stages": [
+        "publication"
+      ],
+      "tools": [
+        "read_file",
+        "search_project",
+        "write_file"
+      ],
+      "primaryIntent": "writing",
+      "intents": [
+        "writing",
+        "research"
+      ],
+      "capabilities": [
+        "visualization-reporting"
+      ],
+      "domains": [
+        "general"
+      ],
+      "keywords": [
+        "scientific-writing",
+        "paper writing",
+        "visualization-reporting",
+        "scientific",
+        "writing",
+        "core",
+        "deep",
+        "research",
+        "tool",
+        "write",
+        "manuscripts",
+        "full"
+      ],
+      "source": "builtin",
+      "status": "verified",
+      "upstream": {
+        "repo": "dr-claw",
+        "path": "skills/scientific-writing",
+        "revision": "8322dc4ef575affaa374aa7922c0a0971c6db7d7"
+      },
+      "resourceFlags": {
+        "hasReferences": true,
+        "hasScripts": false,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "referenceCount": 5,
+        "scriptCount": 0,
+        "templateCount": 0,
+        "assetCount": 0,
+        "optionalScripts": false
+      },
+      "legacy": {
+        "dirPath": "scientific-writing",
+        "skillFile": "skills/scientific-writing/SKILL.md",
+        "topLevelGroup": "Standalone",
+        "collection": "Paper Writing",
+        "domain": "cs"
+      }
+    }
+  ],
+  "stageSkillMap": {
+    "survey": {
+      "base": [
+        "inno-deep-research",
+        "gemini-deep-research",
+        "academic-researcher",
+        "dataset-discovery",
+        "biorxiv-database"
+      ],
+      "byTaskType": {
+        "analysis": [
+          "inno-deep-research",
+          "gemini-deep-research",
+          "academic-researcher"
+        ],
+        "exploration": [
+          "inno-deep-research",
+          "gemini-deep-research",
+          "dataset-discovery",
+          "biorxiv-database",
+          "academic-researcher"
+        ]
+      }
+    },
+    "ideation": {
+      "base": [
+        "inno-pipeline-planner",
+        "inno-prepare-resources",
+        "inno-deep-research",
+        "dataset-discovery",
+        "inno-idea-generation",
+        "inno-idea-eval",
+        "biorxiv-database",
+        "academic-researcher"
+      ],
+      "byTaskType": {
+        "analysis": [
+          "inno-idea-generation",
+          "inno-idea-eval",
+          "inno-deep-research",
+          "academic-researcher"
+        ],
+        "exploration": [
+          "inno-idea-generation",
+          "inno-code-survey",
+          "inno-deep-research",
+          "dataset-discovery",
+          "biorxiv-database",
+          "academic-researcher"
+        ],
+        "implementation": [
+          "inno-prepare-resources"
+        ]
+      }
+    },
+    "experiment": {
+      "base": [
+        "inno-code-survey",
+        "dataset-discovery",
+        "inno-experiment-dev",
+        "inno-experiment-analysis",
+        "bioinformatics-init-analysis"
+      ],
+      "byTaskType": {
+        "implementation": [
+          "inno-experiment-dev",
+          "bioinformatics-init-analysis"
+        ],
+        "analysis": [
+          "inno-experiment-analysis",
+          "bioinformatics-init-analysis"
+        ],
+        "exploration": [
+          "inno-code-survey",
+          "dataset-discovery",
+          "inno-deep-research",
+          "biorxiv-database"
+        ]
+      }
+    },
+    "publication": {
+      "base": [
+        "inno-paper-writing",
+        "inno-figure-gen",
+        "inno-paper-reviewer",
+        "inno-reference-audit",
+        "inno-rclone-to-overleaf",
+        "scientific-writing",
+        "ml-paper-writing",
+        "inno-grant-proposal"
+      ],
+      "byTaskType": {
+        "writing": [
+          "inno-paper-writing",
+          "inno-figure-gen",
+          "scientific-writing",
+          "ml-paper-writing",
+          "inno-grant-proposal"
+        ],
+        "analysis": [
+          "inno-paper-reviewer",
+          "inno-reference-audit",
+          "inno-deep-research"
+        ],
+        "delivery": [
+          "inno-rclone-to-overleaf"
+        ]
+      }
+    },
+    "promotion": {
+      "base": [
+        "making-academic-presentations"
+      ],
+      "byTaskType": {
+        "scripting": [
+          "making-academic-presentations"
+        ],
+        "rendering": [
+          "making-academic-presentations"
+        ],
+        "narration": [
+          "making-academic-presentations"
+        ],
+        "delivery": [
+          "making-academic-presentations"
+        ]
+      }
+    }
+  }
+}

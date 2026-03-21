@@ -47,16 +47,12 @@ pub fn run() {
                 .map(|root| load_project_config(root))
                 .unwrap_or_else(empty_project_config);
 
-            services::skill::discover_skills(&conn, &[app_root.join("skills")], "builtin")
-                .expect("failed to discover builtin skills");
-            if let Some(workspace_root) = workspace_root.as_ref() {
-                services::skill::discover_skills(
-                    &conn,
-                    &services::research::project_skill_roots(workspace_root),
-                    "project",
-                )
-                .expect("failed to discover project skills");
-            }
+            services::skill::refresh_skill_registry(
+                &conn,
+                &app_root,
+                workspace_root.as_deref(),
+            )
+            .expect("failed to refresh skills");
 
             let last_compile = workspace_root
                 .as_ref()
@@ -70,6 +66,7 @@ pub fn run() {
                 project_config: RwLock::new(project_config),
                 last_compile: RwLock::new(last_compile),
                 terminals: Mutex::new(HashMap::new()),
+                app_root,
                 sidecar_dir,
                 app_data_dir,
                 active_sidecar: Mutex::new(None),

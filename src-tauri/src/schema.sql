@@ -27,15 +27,25 @@ CREATE TABLE IF NOT EXISTS profiles (
 );
 
 CREATE TABLE IF NOT EXISTS skills (
-    id          TEXT PRIMARY KEY,
-    name        TEXT NOT NULL,
-    version     TEXT NOT NULL DEFAULT '1.0.0',
-    stages_json TEXT NOT NULL DEFAULT '[]',
-    tools_json  TEXT NOT NULL DEFAULT '[]',
-    source      TEXT NOT NULL CHECK(source IN ('builtin','local','project','git')),
-    dir_path    TEXT NOT NULL DEFAULT '',
-    is_enabled  INTEGER NOT NULL DEFAULT 1,
-    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    id                  TEXT PRIMARY KEY,
+    name                TEXT NOT NULL,
+    version             TEXT NOT NULL DEFAULT '1.0.0',
+    stages_json         TEXT NOT NULL DEFAULT '[]',
+    tools_json          TEXT NOT NULL DEFAULT '[]',
+    description         TEXT NOT NULL DEFAULT '',
+    summary             TEXT NOT NULL DEFAULT '',
+    primary_intent      TEXT NOT NULL DEFAULT '',
+    intents_json        TEXT NOT NULL DEFAULT '[]',
+    capabilities_json   TEXT NOT NULL DEFAULT '[]',
+    domains_json        TEXT NOT NULL DEFAULT '[]',
+    keywords_json       TEXT NOT NULL DEFAULT '[]',
+    source              TEXT NOT NULL CHECK(source IN ('builtin','local','project','git','zip')),
+    status              TEXT NOT NULL DEFAULT '',
+    upstream_json       TEXT NOT NULL DEFAULT '{}',
+    resource_flags_json TEXT NOT NULL DEFAULT '{}',
+    dir_path            TEXT NOT NULL DEFAULT '',
+    is_enabled          INTEGER NOT NULL DEFAULT 1,
+    created_at          TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS sessions (

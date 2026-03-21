@@ -1,0 +1,253 @@
+{
+  "rubric_id": "nih_r01_2026",
+  "agency": "NIH",
+  "description": "National Institutes of Health R01-style proposal scoring rubric. Uses an inverted 1-9 scale where 1 is exceptional and 9 is poor, consistent with NIH Center for Scientific Review guidelines.",
+  "version": "1.0",
+  "last_updated": "2026-03-19",
+  "fundable_threshold": 3.0,
+  "scoring_scale_note": "Inverted scale: lower scores indicate higher quality. 1 = best, 9 = worst.",
+  "overall_impact_score": {
+    "method": "weighted_average_of_criteria",
+    "formula": "overall = 0.25 * significance + 0.20 * investigator + 0.20 * innovation + 0.25 * approach + 0.10 * environment",
+    "description": "For simulation purposes, a weighted average is used as an approximation. In actual NIH review, the Overall Impact score is a holistic judgment informed by, but not mechanically derived from, the five criterion scores. Scores are rounded to the nearest tenth."
+  },
+  "scored_criteria": {
+    "significance": {
+      "name": "Significance",
+      "description": "Does the project address an important problem or a critical barrier to progress in the field? Is there a strong scientific premise for the project?",
+      "weight": 0.25,
+      "scoring_scale": {
+        "min": 1,
+        "max": 9
+      },
+      "sub_criteria": [
+        {
+          "id": "importance_of_problem",
+          "name": "Importance of the Problem",
+          "description": "The significance of the health problem or scientific question being addressed."
+        },
+        {
+          "id": "scientific_premise",
+          "name": "Scientific Premise",
+          "description": "Strength of the existing evidence and rigor of prior research that forms the basis for the proposed project."
+        },
+        {
+          "id": "impact_on_field",
+          "name": "Impact on the Field",
+          "description": "The potential for the project to shift current research or clinical practice paradigms."
+        }
+      ],
+      "score_descriptors": {
+        "1": "Exceptional. Addresses a critically important problem with overwhelming scientific premise. Potential to fundamentally change the field.",
+        "2": "Outstanding. Addresses a highly significant problem with very strong scientific premise and clear potential for major impact.",
+        "3": "Excellent. Addresses a significant problem with strong premise. High potential to advance the field substantially.",
+        "4": "Very Good. Addresses a meaningful problem with solid premise. Good potential for advancing knowledge.",
+        "5": "Good. Addresses a relevant problem with adequate premise. Moderate potential impact.",
+        "6": "Satisfactory. Problem is of some importance but premise has gaps. Limited potential for major impact.",
+        "7": "Fair. Problem significance is questionable. Premise has notable weaknesses.",
+        "8": "Marginal. Problem is of low significance or premise is weak. Unlikely to advance the field meaningfully.",
+        "9": "Poor. Problem is trivial, irrelevant, or premise is fundamentally flawed."
+      }
+    },
+    "investigator": {
+      "name": "Investigator(s)",
+      "description": "Are the PD/PIs, collaborators, and other researchers well suited to the project? Do they have appropriate experience and training? Have they demonstrated ongoing productivity and an ability to lead the project?",
+      "weight": 0.20,
+      "scoring_scale": {
+        "min": 1,
+        "max": 9
+      },
+      "sub_criteria": [
+        {
+          "id": "pi_qualifications",
+          "name": "PI Qualifications",
+          "description": "Training, expertise, and track record of the principal investigator."
+        },
+        {
+          "id": "team_complementarity",
+          "name": "Team Complementarity",
+          "description": "Whether the team collectively has the necessary breadth and depth of expertise."
+        },
+        {
+          "id": "leadership_and_management",
+          "name": "Leadership and Management",
+          "description": "Evidence of ability to lead, manage, and coordinate the proposed research effort."
+        }
+      ],
+      "score_descriptors": {
+        "1": "Exceptional. World-leading investigators with extraordinary track records perfectly matched to the project.",
+        "2": "Outstanding. Highly accomplished team with excellent qualifications and demonstrated leadership.",
+        "3": "Excellent. Very well-qualified team with strong relevant expertise and productivity.",
+        "4": "Very Good. Well-qualified investigators with solid experience and good complementarity.",
+        "5": "Good. Adequately qualified team. Some relevant experience, though minor gaps exist.",
+        "6": "Satisfactory. Team qualifications are acceptable but not particularly strong for this project.",
+        "7": "Fair. Notable gaps in investigator expertise or track record. Concerns about capacity.",
+        "8": "Marginal. Investigators lack key qualifications. Significant concerns about ability to execute.",
+        "9": "Poor. Investigators are unqualified or have no relevant track record."
+      }
+    },
+    "innovation": {
+      "name": "Innovation",
+      "description": "Does the application challenge and seek to shift current research or clinical practice paradigms? Does the project employ novel concepts, approaches, methodologies, or technologies?",
+      "weight": 0.20,
+      "scoring_scale": {
+        "min": 1,
+        "max": 9
+      },
+      "sub_criteria": [
+        {
+          "id": "conceptual_novelty",
+          "name": "Conceptual Novelty",
+          "description": "Whether the project introduces new theoretical frameworks or challenges prevailing paradigms."
+        },
+        {
+          "id": "methodological_novelty",
+          "name": "Methodological Novelty",
+          "description": "Use of novel techniques, tools, or technologies not commonly applied in this area."
+        },
+        {
+          "id": "refinement_over_existing",
+          "name": "Refinement Over Existing Approaches",
+          "description": "How the proposed approach improves upon current methods or fills gaps in existing solutions."
+        }
+      ],
+      "score_descriptors": {
+        "1": "Exceptional. Paradigm-shifting innovation with the potential to create entirely new directions in the field.",
+        "2": "Outstanding. Highly novel concepts and methods that could substantially transform current approaches.",
+        "3": "Excellent. Strong innovation in concepts or methods with clear advantages over existing approaches.",
+        "4": "Very Good. Notable novelty in one or more aspects. Meaningful improvements over the state of the art.",
+        "5": "Good. Some innovative elements, though the work is largely based on established approaches.",
+        "6": "Satisfactory. Limited novelty. Mostly applies known methods to a somewhat new context.",
+        "7": "Fair. Minimal innovation. Largely replicates existing work with only trivial modifications.",
+        "8": "Marginal. No meaningful innovation. The approach is well-established with no new contribution.",
+        "9": "Poor. Entirely derivative. No novel ideas, methods, or applications."
+      }
+    },
+    "approach": {
+      "name": "Approach",
+      "description": "Are the overall strategy, methodology, and analyses well-reasoned and appropriate to accomplish the specific aims? Have the investigators presented strategies to ensure a robust and unbiased approach?",
+      "weight": 0.25,
+      "scoring_scale": {
+        "min": 1,
+        "max": 9
+      },
+      "sub_criteria": [
+        {
+          "id": "study_design",
+          "name": "Study Design",
+          "description": "Appropriateness and rigor of the overall experimental or analytical design."
+        },
+        {
+          "id": "methods_and_analyses",
+          "name": "Methods and Analyses",
+          "description": "Soundness of proposed methods, statistical approaches, and analytical frameworks."
+        },
+        {
+          "id": "potential_problems",
+          "name": "Potential Problems and Alternatives",
+          "description": "Identification of potential pitfalls and presentation of alternative strategies."
+        },
+        {
+          "id": "timeline_and_milestones",
+          "name": "Timeline and Milestones",
+          "description": "Realism and clarity of the proposed timeline, benchmarks, and deliverables."
+        }
+      ],
+      "score_descriptors": {
+        "1": "Exceptional. Flawless experimental design with comprehensive alternative strategies. Methods represent gold-standard rigor.",
+        "2": "Outstanding. Excellent design with robust methods and well-considered alternatives for all major risks.",
+        "3": "Excellent. Very strong approach with sound methods. Most potential problems are addressed with alternatives.",
+        "4": "Very Good. Solid approach with appropriate methods. Some risks are identified with reasonable alternatives.",
+        "5": "Good. Generally sound approach but some methods need refinement. Alternatives are limited.",
+        "6": "Satisfactory. Approach is acceptable but has gaps in rigor. Key pitfalls are not addressed.",
+        "7": "Fair. Significant methodological weaknesses. Study design has notable flaws.",
+        "8": "Marginal. Approach is poorly conceived with fundamental design flaws. Unlikely to yield valid results.",
+        "9": "Poor. Approach is fatally flawed, incoherent, or absent."
+      }
+    },
+    "environment": {
+      "name": "Environment",
+      "description": "Will the scientific environment in which the work will be done contribute to the probability of success? Do the proposed studies benefit from unique features of the environment or subject populations?",
+      "weight": 0.10,
+      "scoring_scale": {
+        "min": 1,
+        "max": 9
+      },
+      "sub_criteria": [
+        {
+          "id": "institutional_support",
+          "name": "Institutional Support",
+          "description": "Level of institutional commitment including space, resources, and administrative support."
+        },
+        {
+          "id": "facilities_and_equipment",
+          "name": "Facilities and Equipment",
+          "description": "Availability of necessary equipment, core facilities, and technical infrastructure."
+        },
+        {
+          "id": "collaborative_environment",
+          "name": "Collaborative Environment",
+          "description": "Access to collaborators, subject populations, datasets, or other unique resources."
+        }
+      ],
+      "score_descriptors": {
+        "1": "Exceptional. World-class environment with unparalleled resources, facilities, and institutional commitment.",
+        "2": "Outstanding. Excellent environment with strong institutional support and unique resources critical to the project.",
+        "3": "Excellent. Very supportive environment with high-quality facilities and good collaborative networks.",
+        "4": "Very Good. Good environment with adequate resources and solid institutional backing.",
+        "5": "Good. Acceptable environment. Most necessary resources are available.",
+        "6": "Satisfactory. Environment is adequate but lacks some desirable resources or support.",
+        "7": "Fair. Environment has notable limitations that could hinder the project.",
+        "8": "Marginal. Environment is poorly suited to the proposed work. Key resources are missing.",
+        "9": "Poor. Environment is entirely inadequate for the proposed research."
+      }
+    }
+  },
+  "additional_considerations": {
+    "description": "These factors are evaluated but do not receive individual numerical scores. They may affect the overall impact assessment or result in administrative holds.",
+    "items": [
+      {
+        "id": "human_subjects",
+        "name": "Protections for Human Subjects",
+        "description": "Adequacy of plans to protect human research participants, including informed consent, risk minimization, privacy protections, and data safety monitoring.",
+        "scored": false,
+        "flags": ["acceptable", "concerns_noted", "unacceptable"]
+      },
+      {
+        "id": "inclusion",
+        "name": "Inclusion of Women, Minorities, and Children",
+        "description": "Adequacy of plans for including both sexes/genders, minorities, and children (or justification for exclusion) as appropriate for the scientific goals.",
+        "scored": false,
+        "flags": ["acceptable", "concerns_noted", "unacceptable"]
+      },
+      {
+        "id": "vertebrate_animals",
+        "name": "Vertebrate Animals",
+        "description": "Adequacy of justification for use of animals, minimization of pain and distress, and appropriateness of species and numbers.",
+        "scored": false,
+        "flags": ["acceptable", "concerns_noted", "unacceptable", "not_applicable"]
+      },
+      {
+        "id": "biohazards",
+        "name": "Biohazards",
+        "description": "Adequacy of plans to manage biohazardous materials including infectious agents, recombinant DNA, and select agents.",
+        "scored": false,
+        "flags": ["acceptable", "concerns_noted", "unacceptable", "not_applicable"]
+      },
+      {
+        "id": "resubmission",
+        "name": "Resubmission",
+        "description": "For resubmission applications, adequacy of the response to previous reviewer critiques and the degree to which concerns have been addressed.",
+        "scored": false,
+        "flags": ["addressed", "partially_addressed", "not_addressed", "not_applicable"]
+      },
+      {
+        "id": "budget",
+        "name": "Budget and Period of Support",
+        "description": "Whether the requested budget and period of support are appropriate and well-justified for the scope of work proposed.",
+        "scored": false,
+        "flags": ["appropriate", "excessive", "insufficient", "not_justified"]
+      }
+    ]
+  }
+}

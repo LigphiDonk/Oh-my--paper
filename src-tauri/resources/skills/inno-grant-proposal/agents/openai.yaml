@@ -1,0 +1,4 @@
+interface:
+  display_name: "Inno Grant Proposal"
+  short_description: "Draft, revise, and resubmit faculty grant proposals"
+  default_prompt: "Use $inno-grant-proposal to help me plan, draft, revise, or resubmit a grant proposal."

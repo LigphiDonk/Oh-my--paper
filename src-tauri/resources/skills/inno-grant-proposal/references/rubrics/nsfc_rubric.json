@@ -1,0 +1,301 @@
+{
+  "rubric_id": "nsfc_general_2026",
+  "agency": "NSFC",
+  "agency_cn": "国家自然科学基金委员会",
+  "description": "National Natural Science Foundation of China proposal scoring rubric. NOTE: NSFC does not publish official numerical weights — these weights are estimated based on common reviewer practice and should be treated as approximate guidelines. Evaluates proposals across four dimensions: innovation, feasibility, PI capability, and value. Bilingual (Chinese/English) sub-criteria.",
+  "version": "1.0",
+  "last_updated": "2026-03-19",
+  "funding_constraint_awareness": true,
+  "funding_constraint_note": "NSFC funding rates are highly competitive. Reviewers should be aware of annual budget constraints and prioritize proposals with the highest combined innovation and value scores.",
+  "overall_scoring": {
+    "method": "weighted_average",
+    "formula": "overall = 0.30 * innovation + 0.25 * feasibility + 0.20 * pi_capability + 0.25 * value",
+    "pass_threshold": 3.5,
+    "pass_fail_rule": "Proposals scoring below 3.5 overall or below 3.0 on any single dimension are not recommended for funding.",
+    "description": "Overall score is the weighted average of the four dimension scores. Both the overall threshold and per-dimension minimum must be met."
+  },
+  "dimensions": {
+    "innovation": {
+      "name": "Innovation",
+      "name_cn": "创新性",
+      "description": "The originality and novelty of the proposed research in terms of concepts, methods, and cross-disciplinary integration.",
+      "weight": 0.30,
+      "scoring_scale": {
+        "min": 1,
+        "max": 5
+      },
+      "sub_criteria": [
+        {
+          "id": "concept_novelty",
+          "name": "Concept Novelty",
+          "name_cn": "概念新颖性",
+          "description": "The originality of the core scientific ideas, hypotheses, or theoretical framework proposed.",
+          "weight": 0.40,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "No novelty. Ideas are entirely derivative or previously published by others.",
+            "2": "Minimal novelty. Minor variations on well-established concepts with little original thought.",
+            "3": "Moderate novelty. Some original ideas but largely rooted in existing frameworks.",
+            "4": "High novelty. Clearly original concepts that offer new perspectives or challenge existing views.",
+            "5": "Exceptional novelty. Groundbreaking ideas with the potential to open entirely new research directions."
+          }
+        },
+        {
+          "id": "approach_novelty",
+          "name": "Approach Novelty",
+          "name_cn": "方法新颖性",
+          "description": "The originality and inventiveness of the proposed research methods, techniques, or experimental designs.",
+          "weight": 0.35,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "Standard methods only. No methodological contribution whatsoever.",
+            "2": "Mostly standard methods with trivial modifications.",
+            "3": "Some novel methodological elements combined with established techniques.",
+            "4": "Innovative methods that represent clear advances over current practice.",
+            "5": "Pioneering methodology that could become a new standard in the field."
+          }
+        },
+        {
+          "id": "cross_discipline",
+          "name": "Cross-Disciplinary Integration",
+          "name_cn": "学科交叉融合",
+          "description": "The degree to which the proposal meaningfully integrates knowledge, methods, or perspectives from multiple disciplines.",
+          "weight": 0.25,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "No cross-disciplinary elements. Work is confined to a single narrow sub-field.",
+            "2": "Superficial mention of other fields without meaningful integration.",
+            "3": "Some cross-disciplinary elements that add modest value to the research design.",
+            "4": "Strong interdisciplinary integration that substantively enriches the research approach.",
+            "5": "Exceptional cross-disciplinary synthesis that creates transformative synergies and could not be achieved within a single discipline."
+          }
+        }
+      ]
+    },
+    "feasibility": {
+      "name": "Feasibility",
+      "name_cn": "可行性",
+      "description": "The likelihood that the proposed research can be successfully completed as designed, considering methodology, data, timeline, and risk management.",
+      "weight": 0.25,
+      "scoring_scale": {
+        "min": 1,
+        "max": 5
+      },
+      "sub_criteria": [
+        {
+          "id": "methodology_rigor",
+          "name": "Methodology Rigor",
+          "name_cn": "方法严谨性",
+          "description": "The soundness, appropriateness, and rigor of the proposed research methodology and analytical framework.",
+          "weight": 0.30,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "Methods are absent or fundamentally flawed. Cannot produce valid results.",
+            "2": "Methods have major weaknesses. Key steps are poorly justified or missing.",
+            "3": "Methods are generally appropriate but have notable gaps or insufficient justification.",
+            "4": "Methods are rigorous and well-justified with only minor areas needing refinement.",
+            "5": "Methods are exemplary, representing best-in-class rigor with thorough justification for all choices."
+          }
+        },
+        {
+          "id": "preliminary_data",
+          "name": "Preliminary Data",
+          "name_cn": "前期研究基础",
+          "description": "The quality, relevance, and completeness of preliminary results or pilot studies that support the proposed research.",
+          "weight": 0.25,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "No preliminary data. No evidence of prior work in this direction.",
+            "2": "Weak or tangentially related preliminary data. Does not convincingly support the proposal.",
+            "3": "Some relevant preliminary data but with gaps. Partially supports the feasibility.",
+            "4": "Strong preliminary data that clearly demonstrates the viability of the proposed approach.",
+            "5": "Comprehensive and compelling preliminary data providing robust evidence for feasibility and likely success."
+          }
+        },
+        {
+          "id": "timeline_realism",
+          "name": "Timeline Realism",
+          "name_cn": "时间计划合理性",
+          "description": "Whether the proposed project timeline and milestones are realistic given the scope of work and available resources.",
+          "weight": 0.25,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "Timeline is completely unrealistic. Impossible to complete as described.",
+            "2": "Timeline is overly optimistic with critical tasks underestimated.",
+            "3": "Timeline is somewhat realistic but key phases may be too compressed.",
+            "4": "Timeline is realistic with well-defined milestones and reasonable buffer time.",
+            "5": "Timeline is carefully planned with clear milestones, dependencies, and appropriate contingency margins."
+          }
+        },
+        {
+          "id": "risk_mitigation",
+          "name": "Risk Mitigation",
+          "name_cn": "风险应对措施",
+          "description": "The identification of potential risks and the quality of proposed mitigation strategies and alternative plans.",
+          "weight": 0.20,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "No risk assessment. Potential problems are entirely ignored.",
+            "2": "Risks are acknowledged superficially with no concrete mitigation strategies.",
+            "3": "Some risks identified with partial mitigation plans. Key risks may be overlooked.",
+            "4": "Good risk assessment with concrete and credible mitigation strategies for most identified risks.",
+            "5": "Thorough risk analysis with well-developed contingency plans and alternative approaches for all significant risks."
+          }
+        }
+      ]
+    },
+    "pi_capability": {
+      "name": "PI Capability",
+      "name_cn": "主持人能力",
+      "description": "The qualifications, experience, and leadership ability of the principal investigator and the research team.",
+      "weight": 0.20,
+      "scoring_scale": {
+        "min": 1,
+        "max": 5
+      },
+      "sub_criteria": [
+        {
+          "id": "track_record",
+          "name": "Track Record",
+          "name_cn": "研究业绩",
+          "description": "The PI's past research accomplishments, including publications, grants, awards, and demonstrated ability to complete funded projects.",
+          "weight": 0.40,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "No relevant track record. PI has not demonstrated ability in this research area.",
+            "2": "Limited track record. Few relevant publications or completed projects.",
+            "3": "Moderate track record. Some relevant publications and completed projects but not leading the field.",
+            "4": "Strong track record. Substantial publications in relevant venues and successful project completion.",
+            "5": "Outstanding track record. Leading researcher with high-impact publications, successful prior grants, and recognized expertise."
+          }
+        },
+        {
+          "id": "team_composition",
+          "name": "Team Composition",
+          "name_cn": "团队构成",
+          "description": "The appropriateness of the research team's composition, including complementary expertise, roles, and collaborative arrangements.",
+          "weight": 0.30,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "Team is missing critical expertise. Roles are undefined or inappropriate.",
+            "2": "Team has significant gaps in expertise. Collaboration structure is poorly defined.",
+            "3": "Team is adequate but could benefit from additional expertise. Roles are generally clear.",
+            "4": "Well-composed team with complementary skills and clearly defined roles and responsibilities.",
+            "5": "Exceptional team with optimal expertise coverage, strong collaborative history, and well-structured roles."
+          }
+        },
+        {
+          "id": "publication_quality",
+          "name": "Publication Quality",
+          "name_cn": "论文质量",
+          "description": "The quality and impact of the PI's and team's publication record, assessed by venue prestige, citation impact, and relevance.",
+          "weight": 0.30,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "No relevant publications or only publications in non-peer-reviewed outlets.",
+            "2": "Few relevant publications, mostly in lower-tier journals with limited citations.",
+            "3": "Reasonable publication record in solid peer-reviewed journals. Moderate citation impact.",
+            "4": "Strong publication record in high-quality journals with good citation impact.",
+            "5": "Exceptional publications in top-tier journals with high citation impact and field-defining contributions."
+          }
+        }
+      ]
+    },
+    "value": {
+      "name": "Value",
+      "name_cn": "价值",
+      "description": "The potential academic, societal, and talent development contributions of the proposed research.",
+      "weight": 0.25,
+      "scoring_scale": {
+        "min": 1,
+        "max": 5
+      },
+      "sub_criteria": [
+        {
+          "id": "academic_contribution",
+          "name": "Academic Contribution",
+          "name_cn": "学术贡献",
+          "description": "The potential for the research to advance scientific knowledge, create new theories, or resolve important open questions.",
+          "weight": 0.40,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "No discernible academic contribution. Results would not advance the field.",
+            "2": "Minimal academic contribution. Incremental results unlikely to attract significant attention.",
+            "3": "Moderate academic contribution. Useful results that would be of interest to specialists.",
+            "4": "Significant academic contribution. Results would advance the field and attract broad interest.",
+            "5": "Major academic contribution. Results could redefine understanding in the field and generate widespread impact."
+          }
+        },
+        {
+          "id": "societal_impact",
+          "name": "Societal Impact",
+          "name_cn": "社会影响",
+          "description": "The potential for the research to produce practical benefits for society, economy, public health, or national development.",
+          "weight": 0.30,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "No societal impact. Research is purely academic with no foreseeable application.",
+            "2": "Negligible societal impact. Potential applications are speculative or very distant.",
+            "3": "Some societal relevance. Potential for practical application in the medium to long term.",
+            "4": "Clear societal impact. Research addresses real-world problems with a credible path to application.",
+            "5": "High societal impact. Research directly addresses urgent national or global challenges with strong application potential."
+          }
+        },
+        {
+          "id": "talent_development",
+          "name": "Talent Development",
+          "name_cn": "人才培养",
+          "description": "The project's potential to train and develop the next generation of researchers, including graduate students and postdoctoral fellows.",
+          "weight": 0.30,
+          "scoring_scale": {
+            "min": 1,
+            "max": 5
+          },
+          "score_descriptors": {
+            "1": "No talent development component. No students or junior researchers involved.",
+            "2": "Minimal talent development. Students are involved but with no structured training plan.",
+            "3": "Moderate talent development. Some training activities planned for students and junior researchers.",
+            "4": "Strong talent development. Clear training plan with meaningful research experience for students and postdocs.",
+            "5": "Exceptional talent development. Comprehensive mentoring program with structured career development and multiple training opportunities."
+          }
+        }
+      ]
+    }
+  }
+}

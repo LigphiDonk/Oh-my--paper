@@ -92,8 +92,13 @@ pub fn run_agent(
     let prov = provider::get_provider(&conn, &profile.provider_id).map_err(anyhow::Error::msg)?;
     let remote_session_id = read_remote_session_id(&conn, session_id)?;
     // Load skill prompts for injection (CLI runners use them as appendSystemPrompt)
-    let system_prompt =
-        skill::load_skill_prompts(&conn, &profile.skill_ids).map_err(anyhow::Error::msg)?;
+    let system_prompt = skill::load_skill_prompts(
+        &conn,
+        &prov.vendor,
+        Path::new(&project_root),
+        &profile.skill_ids,
+    )
+    .map_err(anyhow::Error::msg)?;
     drop(conn);
 
     let user_message = user_message

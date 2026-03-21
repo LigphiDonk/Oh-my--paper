@@ -69,13 +69,67 @@ pub struct ProfileConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct SkillUpstream {
+    #[serde(default)]
+    pub repo: String,
+    #[serde(default)]
+    pub path: String,
+    #[serde(default)]
+    pub revision: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillResourceFlags {
+    #[serde(default)]
+    pub has_references: bool,
+    #[serde(default)]
+    pub has_scripts: bool,
+    #[serde(default)]
+    pub has_templates: bool,
+    #[serde(default)]
+    pub has_assets: bool,
+    #[serde(default)]
+    pub reference_count: usize,
+    #[serde(default)]
+    pub script_count: usize,
+    #[serde(default)]
+    pub template_count: usize,
+    #[serde(default)]
+    pub asset_count: usize,
+    #[serde(default)]
+    pub optional_scripts: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct SkillManifest {
     pub id: String,
     pub name: String,
     pub version: String,
     pub stages: Vec<String>,
     pub tools: Vec<String>,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub summary: String,
+    #[serde(default)]
+    pub primary_intent: String,
+    #[serde(default)]
+    pub intents: Vec<String>,
+    #[serde(default)]
+    pub capabilities: Vec<String>,
+    #[serde(default)]
+    pub domains: Vec<String>,
+    #[serde(default)]
+    pub keywords: Vec<String>,
     pub source: String,
+    #[serde(default)]
+    pub status: String,
+    #[serde(default)]
+    pub upstream: Option<SkillUpstream>,
+    #[serde(default)]
+    pub resource_flags: SkillResourceFlags,
     pub dir_path: String,
     pub is_enabled: bool,
 }

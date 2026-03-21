@@ -20,27 +20,10 @@ const STAGE_ORDER: [&str; 5] = [
     "promotion",
 ];
 
-const RESEARCH_SKILL_FIXTURES: [(&str, &str); 4] = [
-    (
-        "research-pipeline-planner",
-        include_str!("../../../skills/research-pipeline-planner/SKILL.md"),
-    ),
-    (
-        "research-literature-trace",
-        include_str!("../../../skills/research-literature-trace/SKILL.md"),
-    ),
-    (
-        "research-experiment-driver",
-        include_str!("../../../skills/research-experiment-driver/SKILL.md"),
-    ),
-    (
-        "research-paper-handoff",
-        include_str!("../../../skills/research-paper-handoff/SKILL.md"),
-    ),
-];
-
 const AGENTS_TEMPLATE: &str = include_str!("../../../templates/research/AGENTS.md");
 const CLAUDE_TEMPLATE: &str = include_str!("../../../templates/research/CLAUDE.md");
+const RESEARCH_SCOPE_FIXTURE: &str = include_str!("../../../skills/research-scope.json");
+const RESEARCH_STAGE_MAP_FIXTURE: &str = include_str!("../../../skills/research-stage-map.json");
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -61,6 +44,19 @@ struct BriefMeta {
 #[serde(rename_all = "camelCase")]
 struct TasksEnvelope {
     tasks: Vec<ResearchTask>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ResearchScopeManifest {
+    skills: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Clone, Default)]
+struct StageSkillConfig {
+    #[serde(default)]
+    base: Vec<String>,
+    #[serde(default, rename = "byTaskType")]
+    by_task_type: HashMap<String, Vec<String>>,
 }
 
 fn normalize_stage(stage: Option<&str>) -> String {
@@ -152,6 +148,10 @@ fn pipeline_root(root: &Path) -> PathBuf {
     root.join(".pipeline")
 }
 
+fn bundled_skills_root(app_root: &Path) -> PathBuf {
+    app_root.join("skills")
+}
+
 fn write_if_missing(path: &Path, contents: &str) -> Result<()> {
     if path.exists() {
         return Ok(());
@@ -171,6 +171,37 @@ fn write_json_if_missing(path: &Path, value: &Value) -> Result<()> {
         fs::create_dir_all(parent)?;
     }
     fs::write(path, serde_json::to_string_pretty(value)?)?;
+    Ok(())
+}
+
+fn copy_dir_contents(source: &Path, target: &Path) -> Result<()> {
+    if !source.exists() {
+        return Ok(());
+    }
+    if target.exists() {
+        fs::remove_dir_all(target)?;
+    }
+    fs::create_dir_all(target)?;
+
+    for entry in WalkDir::new(source).into_iter().filter_map(|entry| entry.ok()) {
+        let relative = match entry.path().strip_prefix(source) {
+            Ok(path) => path,
+            Err(_) => continue,
+        };
+        if relative.as_os_str().is_empty() {
+            continue;
+        }
+        let destination = target.join(relative);
+        if entry.file_type().is_dir() {
+            fs::create_dir_all(&destination)?;
+            continue;
+        }
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::copy(entry.path(), &destination)?;
+    }
+
     Ok(())
 }
 
@@ -244,6 +275,48 @@ fn default_research_brief(project_title: &str, start_stage: &str) -> Value {
     })
 }
 
+fn research_scope_skill_ids() -> Vec<String> {
+    serde_json::from_str::<ResearchScopeManifest>(RESEARCH_SCOPE_FIXTURE)
+        .map(|manifest| manifest.skills)
+        .unwrap_or_default()
+}
+
+fn research_stage_map() -> HashMap<String, StageSkillConfig> {
+    serde_json::from_str::<HashMap<String, StageSkillConfig>>(RESEARCH_STAGE_MAP_FIXTURE)
+        .unwrap_or_default()
+}
+
+fn recommended_skills(stage: &str, task_type: &str) -> Vec<String> {
+    let stage_map = research_stage_map();
+    let Some(config) = stage_map.get(stage) else {
+        return Vec::new();
+    };
+
+    let mut skills = config.base.clone();
+    if let Some(by_task_type) = config.by_task_type.get(task_type) {
+        skills.extend(by_task_type.clone());
+    }
+    skills.sort();
+    skills.dedup();
+    skills
+}
+
+fn build_next_action_prompt(stage: &str, task_type: &str, suggested_skills: &[String]) -> String {
+    if suggested_skills.is_empty() {
+        return "Review the current research state, update the project artifacts, and keep outputs traceable.".into();
+    }
+
+    let skill_list = suggested_skills
+        .iter()
+        .take(3)
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!(
+        "Use the suggested research skills ({skill_list}) to advance the {stage} stage with a {task_type} task, update the project artifacts, and keep outputs traceable."
+    )
+}
+
 fn default_tasks(start_stage: &str) -> Vec<ResearchTask> {
     let all_tasks = vec![
         ResearchTask {
@@ -254,13 +327,14 @@ fn default_tasks(start_stage: &str) -> Vec<ResearchTask> {
             stage: "survey".into(),
             priority: "high".into(),
             dependencies: vec![],
-            task_type: "planning".into(),
+            task_type: "exploration".into(),
             inputs_needed: vec!["topic boundary".into(), "target venue".into()],
-            suggested_skills: vec![
-                "research-pipeline-planner".into(),
-                "research-literature-trace".into(),
-            ],
-            next_action_prompt: "Use the research-pipeline-planner and research-literature-trace skills to define the survey scope, collect seed papers, and update the research brief.".into(),
+            suggested_skills: recommended_skills("survey", "exploration"),
+            next_action_prompt: build_next_action_prompt(
+                "survey",
+                "exploration",
+                &recommended_skills("survey", "exploration"),
+            ),
             artifact_paths: vec![],
         },
         ResearchTask {
@@ -271,10 +345,14 @@ fn default_tasks(start_stage: &str) -> Vec<ResearchTask> {
             stage: "survey".into(),
             priority: "high".into(),
             dependencies: vec!["survey-1".into()],
-            task_type: "screening".into(),
+            task_type: "analysis".into(),
             inputs_needed: vec!["seed paper list".into()],
-            suggested_skills: vec!["research-literature-trace".into()],
-            next_action_prompt: "Use the research-literature-trace skill to screen the collected literature, keep traceable links, and summarize the main gaps.".into(),
+            suggested_skills: recommended_skills("survey", "analysis"),
+            next_action_prompt: build_next_action_prompt(
+                "survey",
+                "analysis",
+                &recommended_skills("survey", "analysis"),
+            ),
             artifact_paths: vec![],
         },
         ResearchTask {
@@ -285,13 +363,14 @@ fn default_tasks(start_stage: &str) -> Vec<ResearchTask> {
             stage: "ideation".into(),
             priority: "high".into(),
             dependencies: vec!["survey-2".into()],
-            task_type: "ideation".into(),
+            task_type: "analysis".into(),
             inputs_needed: vec!["gap summary".into()],
-            suggested_skills: vec![
-                "research-pipeline-planner".into(),
-                "research-literature-trace".into(),
-            ],
-            next_action_prompt: "Use the research-pipeline-planner skill to convert the survey findings into a concrete research angle, update the brief, and refine the downstream tasks.".into(),
+            suggested_skills: recommended_skills("ideation", "analysis"),
+            next_action_prompt: build_next_action_prompt(
+                "ideation",
+                "analysis",
+                &recommended_skills("ideation", "analysis"),
+            ),
             artifact_paths: vec![],
         },
         ResearchTask {
@@ -302,10 +381,14 @@ fn default_tasks(start_stage: &str) -> Vec<ResearchTask> {
             stage: "experiment".into(),
             priority: "high".into(),
             dependencies: vec!["ideation-1".into()],
-            task_type: "planning".into(),
+            task_type: "implementation".into(),
             inputs_needed: vec!["chosen idea".into()],
-            suggested_skills: vec!["research-experiment-driver".into()],
-            next_action_prompt: "Use the research-experiment-driver skill to write an implementation plan with datasets, metrics, ablations, and analysis checkpoints.".into(),
+            suggested_skills: recommended_skills("experiment", "implementation"),
+            next_action_prompt: build_next_action_prompt(
+                "experiment",
+                "implementation",
+                &recommended_skills("experiment", "implementation"),
+            ),
             artifact_paths: vec![],
         },
         ResearchTask {
@@ -316,10 +399,14 @@ fn default_tasks(start_stage: &str) -> Vec<ResearchTask> {
             stage: "experiment".into(),
             priority: "medium".into(),
             dependencies: vec!["experiment-1".into()],
-            task_type: "execution".into(),
+            task_type: "analysis".into(),
             inputs_needed: vec!["experiment plan".into()],
-            suggested_skills: vec!["research-experiment-driver".into()],
-            next_action_prompt: "Use the research-experiment-driver skill to turn the plan into execution tasks and analysis notes that can be tracked alongside the paper claims.".into(),
+            suggested_skills: recommended_skills("experiment", "analysis"),
+            next_action_prompt: build_next_action_prompt(
+                "experiment",
+                "analysis",
+                &recommended_skills("experiment", "analysis"),
+            ),
             artifact_paths: vec![],
         },
         ResearchTask {
@@ -330,10 +417,14 @@ fn default_tasks(start_stage: &str) -> Vec<ResearchTask> {
             stage: "publication".into(),
             priority: "high".into(),
             dependencies: vec!["experiment-2".into()],
-            task_type: "handoff".into(),
+            task_type: "writing".into(),
             inputs_needed: vec!["validated claims".into(), "figures".into()],
-            suggested_skills: vec!["research-paper-handoff".into()],
-            next_action_prompt: "Use the research-paper-handoff skill to build a publication checklist for the current LaTeX workspace, map claims to sections, and identify missing figures or references.".into(),
+            suggested_skills: recommended_skills("publication", "writing"),
+            next_action_prompt: build_next_action_prompt(
+                "publication",
+                "writing",
+                &recommended_skills("publication", "writing"),
+            ),
             artifact_paths: vec!["main.tex".into()],
         },
         ResearchTask {
@@ -346,8 +437,12 @@ fn default_tasks(start_stage: &str) -> Vec<ResearchTask> {
             dependencies: vec!["publication-1".into()],
             task_type: "delivery".into(),
             inputs_needed: vec!["paper draft".into()],
-            suggested_skills: vec!["research-paper-handoff".into()],
-            next_action_prompt: "Use the research-paper-handoff skill to prepare slide or summary tasks from the current manuscript state.".into(),
+            suggested_skills: recommended_skills("promotion", "delivery"),
+            next_action_prompt: build_next_action_prompt(
+                "promotion",
+                "delivery",
+                &recommended_skills("promotion", "delivery"),
+            ),
             artifact_paths: vec![],
         },
     ];
@@ -398,22 +493,20 @@ fn default_instance(root: &Path) -> Value {
     })
 }
 
-fn write_embedded_skills(root: &Path) -> Result<()> {
-    let skills_root = root.join("skills");
-    fs::create_dir_all(&skills_root)?;
-
-    for (skill_id, contents) in RESEARCH_SKILL_FIXTURES {
-        write_if_missing(&skills_root.join(skill_id).join("SKILL.md"), contents)?;
+fn copy_bundled_skill_set(app_root: &Path, target_root: &Path) -> Result<()> {
+    fs::create_dir_all(target_root)?;
+    for skill_id in research_scope_skill_ids() {
+        let source_dir = bundled_skills_root(app_root).join(&skill_id);
+        if !source_dir.exists() {
+            continue;
+        }
+        copy_dir_contents(&source_dir, &target_root.join(&skill_id))?;
     }
-
     Ok(())
 }
 
-fn write_skill_views(root: &Path) -> Result<()> {
-    let skill_dirs = RESEARCH_SKILL_FIXTURES
-        .iter()
-        .map(|(skill_id, _)| *skill_id)
-        .collect::<Vec<_>>();
+fn write_skill_views(app_root: &Path, root: &Path) -> Result<()> {
+    let skill_dirs = research_scope_skill_ids();
 
     let skills_index = {
         let mut lines = vec![
@@ -428,13 +521,14 @@ fn write_skill_views(root: &Path) -> Result<()> {
         lines.join("\n")
     };
 
-    for base in [root.join(".agents").join("skills"), root.join(".claude").join("skills")] {
+    for base in [
+        root.join(".agents").join("skills"),
+        root.join(".claude").join("skills"),
+        root.join(".codex").join("skills"),
+    ] {
         fs::create_dir_all(&base)?;
-        write_if_missing(&base.join("skills-index.md"), &skills_index)?;
-
-        for (skill_id, contents) in RESEARCH_SKILL_FIXTURES {
-            write_if_missing(&base.join(skill_id).join("SKILL.md"), contents)?;
-        }
+        fs::write(base.join("skills-index.md"), &skills_index)?;
+        copy_bundled_skill_set(app_root, &base)?;
     }
 
     Ok(())
@@ -454,7 +548,7 @@ pub fn project_skill_roots(root: &Path) -> Vec<PathBuf> {
     ]
 }
 
-pub fn ensure_research_scaffold(root: &Path, start_stage: Option<&str>) -> Result<()> {
+pub fn ensure_research_scaffold(app_root: &Path, root: &Path, start_stage: Option<&str>) -> Result<()> {
     let start_stage = normalize_stage(start_stage);
 
     fs::create_dir_all(survey_root(root).join("references"))?;
@@ -473,8 +567,8 @@ pub fn ensure_research_scaffold(root: &Path, start_stage: Option<&str>) -> Resul
     fs::create_dir_all(pipeline_root(root).join("tasks"))?;
 
     write_templates(root)?;
-    write_embedded_skills(root)?;
-    write_skill_views(root)?;
+    copy_bundled_skill_set(app_root, &root.join("skills"))?;
+    write_skill_views(app_root, root)?;
 
     let project_title = root
         .file_name()
@@ -767,14 +861,32 @@ mod tests {
         dir
     }
 
+    fn make_app_root() -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("viewerleaf-app-root-{}", iso_now()));
+        fs::create_dir_all(dir.join("skills")).expect("failed to create app skills dir");
+        for skill_id in research_scope_skill_ids() {
+            let skill_dir = dir.join("skills").join(&skill_id);
+            fs::create_dir_all(&skill_dir).expect("failed to create skill dir");
+            fs::write(
+                skill_dir.join("SKILL.md"),
+                format!(
+                    "---\nid: {skill_id}\nname: {skill_id}\nsummary: summary\nstages: [\"survey\"]\n---\n\n# {skill_id}\n"
+                ),
+            )
+            .expect("failed to write skill");
+        }
+        dir
+    }
+
     #[test]
     fn scaffold_is_idempotent_and_preserves_main_tex() {
         let root = make_temp_project("research-idempotent");
+        let app_root = make_app_root();
         fs::create_dir_all(root.join(".viewerleaf")).expect("viewerleaf dir");
         fs::write(root.join("main.tex"), "% existing main tex").expect("main tex");
 
-        ensure_research_scaffold(&root, Some("survey")).expect("first scaffold");
-        ensure_research_scaffold(&root, Some("publication")).expect("second scaffold");
+        ensure_research_scaffold(&app_root, &root, Some("survey")).expect("first scaffold");
+        ensure_research_scaffold(&app_root, &root, Some("publication")).expect("second scaffold");
 
         let main_tex = fs::read_to_string(root.join("main.tex")).expect("read main tex");
         assert_eq!(main_tex, "% existing main tex");
@@ -789,7 +901,8 @@ mod tests {
     #[test]
     fn publication_points_to_project_root() {
         let root = make_temp_project("research-instance");
-        ensure_research_scaffold(&root, Some("publication")).expect("scaffold");
+        let app_root = make_app_root();
+        ensure_research_scaffold(&app_root, &root, Some("publication")).expect("scaffold");
 
         let instance = read_json_file(&root.join("instance.json")).expect("instance json");
         let publication = instance
@@ -804,12 +917,20 @@ mod tests {
     #[test]
     fn snapshot_derives_ready_state_and_stage_summary() {
         let root = make_temp_project("research-snapshot");
-        ensure_research_scaffold(&root, Some("publication")).expect("scaffold");
+        let app_root = make_app_root();
+        ensure_research_scaffold(&app_root, &root, Some("publication")).expect("scaffold");
 
         let snapshot = load_research_snapshot(&root).expect("research snapshot");
         assert_eq!(snapshot.bootstrap.status, "ready");
         assert_eq!(snapshot.current_stage, "publication");
         assert!(snapshot.handoff_to_writing);
         assert_eq!(snapshot.stage_summaries.len(), STAGE_ORDER.len());
+    }
+
+    #[test]
+    fn recommendations_use_stage_map() {
+        let skills = recommended_skills("publication", "writing");
+        assert!(skills.iter().any(|skill| skill == "inno-paper-writing"));
+        assert!(skills.iter().any(|skill| skill == "ml-paper-writing"));
     }
 }

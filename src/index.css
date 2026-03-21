@@ -5757,6 +5757,26 @@ div.ve-tok-math-rendered .katex { font-size: 1.15em; }
 .arsenal-desc {
   font-size: 11px; color: var(--text-secondary); margin-bottom: 10px; line-height: 1.5;
 }
+.arsenal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.arsenal-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--arsenal-primary, var(--accent-primary)) 16%, transparent);
+  color: var(--arsenal-primary, var(--accent-primary));
+  font-size: 10px;
+  line-height: 1.2;
+}
+.arsenal-tag--soft {
+  background: var(--bg-surface-hover);
+  color: var(--text-secondary);
+}
 .arsenal-action-btn {
   width: 100%; padding: 5px 0; font-size: 11px; font-weight: 500;
   border: 1px solid var(--arsenal-primary, var(--accent-primary));
@@ -5793,6 +5813,7 @@ div.ve-tok-math-rendered .katex { font-size: 1.15em; }
 }
 .arsenal--compact .arsenal-card-header { margin-bottom: 0; }
 .arsenal--compact .arsenal-desc { display: none; }
+.arsenal--compact .arsenal-meta { display: none; }
 .arsenal--compact .arsenal-action-btn { display: none; }
 .arsenal--compact .arsenal-name { font-size: 12px; }
 .arsenal--compact .arsenal-icon svg { width: 24px; height: 24px; }

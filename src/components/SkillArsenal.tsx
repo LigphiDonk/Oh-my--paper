@@ -20,11 +20,17 @@ export function SkillArsenal({ skills, onToggleSkill, onSkillAction, onSkillsCha
   const mappedSkills: AcademicSkill[] = skills.map((manifest) => {
     const enabled = manifest.isEnabled ?? manifest.enabled ?? false;
     const builtin = BUILTIN_SKILLS.find((b) => b.id === manifest.id);
-    if (builtin) return { ...builtin, enabled };
+    if (builtin) {
+      return {
+        ...builtin,
+        description: manifest.summary || manifest.description || builtin.description,
+        enabled,
+      };
+    }
     return {
       id: manifest.id,
       name: manifest.name ?? manifest.id,
-      description: "",
+      description: manifest.summary || manifest.description || "",
       weaponType: "blade" as const,
       themeColors: { primary: "#7c6f9f", secondary: "#3a3550", accent: "#c9b8ff" },
       actionLabel: "Use",
@@ -127,6 +133,29 @@ export function SkillArsenal({ skills, onToggleSkill, onSkillAction, onSkillsCha
               <div className="arsenal-icon" dangerouslySetInnerHTML={{ __html: svg }} />
               <span className="arsenal-name">{skill.name}</span>
               {!compact && <span className="arsenal-desc">{skill.description}</span>}
+              {!compact && manifest ? (
+                <div className="arsenal-meta">
+                  {manifest.stages?.slice(0, 2).map((stage) => (
+                    <span key={`${skill.id}-stage-${stage}`} className="arsenal-tag">
+                      {stage}
+                    </span>
+                  ))}
+                  {manifest.domains?.slice(0, 2).map((domain) => (
+                    <span key={`${skill.id}-domain-${domain}`} className="arsenal-tag arsenal-tag--soft">
+                      {domain}
+                    </span>
+                  ))}
+                  {manifest.resourceFlags?.hasScripts ? (
+                    <span className="arsenal-tag arsenal-tag--soft">scripts</span>
+                  ) : null}
+                  {manifest.resourceFlags?.hasTemplates ? (
+                    <span className="arsenal-tag arsenal-tag--soft">templates</span>
+                  ) : null}
+                  {manifest.status ? (
+                    <span className="arsenal-tag arsenal-tag--soft">{manifest.status}</span>
+                  ) : null}
+                </div>
+              ) : null}
               <button
                 className="arsenal-action-btn"
                 onClick={(e) => handleAction(e, skill)}

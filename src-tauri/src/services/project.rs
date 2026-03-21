@@ -353,6 +353,7 @@ pub fn load_project_snapshot(state: &AppState) -> Result<WorkspaceSnapshot> {
     file_nodes.sort_by(|left, right| left.path.cmp(&right.path));
 
     let conn = state.db.lock().expect("db lock poisoned");
+    skill::refresh_skill_registry(&conn, &state.app_root, Some(root)).map_err(anyhow::Error::msg)?;
     let providers = provider::list_providers(&conn).map_err(anyhow::Error::msg)?;
     let profiles = profile::list_profiles(&conn).map_err(anyhow::Error::msg)?;
     let skills = skill::list_skills(&conn).map_err(anyhow::Error::msg)?;
@@ -383,6 +384,7 @@ pub fn load_project_snapshot(state: &AppState) -> Result<WorkspaceSnapshot> {
 
 fn empty_snapshot(state: &AppState) -> Result<WorkspaceSnapshot> {
     let conn = state.db.lock().expect("db lock poisoned");
+    skill::refresh_skill_registry(&conn, &state.app_root, None).map_err(anyhow::Error::msg)?;
     let providers = provider::list_providers(&conn).map_err(anyhow::Error::msg)?;
     let profiles = profile::list_profiles(&conn).map_err(anyhow::Error::msg)?;
     let skills = skill::list_skills(&conn).map_err(anyhow::Error::msg)?;
@@ -490,7 +492,7 @@ pub fn switch_project(state: &AppState, root: &Path) -> Result<WorkspaceSnapshot
         .context("failed to persist recent workspace")?;
 
     let conn = state.db.lock().expect("db lock poisoned");
-    skill::discover_skills(&conn, &research::project_skill_roots(&root), "project")
+    skill::refresh_skill_registry(&conn, &state.app_root, Some(&root))
         .map_err(anyhow::Error::msg)?;
     drop(conn);
 
@@ -509,7 +511,7 @@ pub fn create_project(
     };
     let root = parent_dir.join(folder_name);
     initialize_project(&root, folder_name).context("failed to initialize project")?;
-    research::ensure_research_scaffold(&root, Some("survey"))
+    research::ensure_research_scaffold(&state.app_root, &root, Some("survey"))
         .context("failed to initialize research scaffold")?;
     switch_project(state, &root)
 }

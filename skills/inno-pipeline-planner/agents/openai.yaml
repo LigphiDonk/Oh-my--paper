@@ -1,0 +1,4 @@
+interface:
+  display_name: "Inno Pipeline Planner"
+  short_description: "Plan research brief and staged task pipeline"
+  default_prompt: "Use $inno-pipeline-planner to interview me and generate research_brief.json plus staged tasks.json."

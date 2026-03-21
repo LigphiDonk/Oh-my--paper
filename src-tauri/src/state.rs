@@ -12,6 +12,7 @@ pub struct AppState {
     pub project_config: RwLock<ProjectConfig>,
     pub last_compile: RwLock<CompileResult>,
     pub terminals: Mutex<HashMap<String, Arc<crate::services::terminal::TerminalSessionHandle>>>,
+    pub app_root: PathBuf,
     pub sidecar_dir: PathBuf,
     pub app_data_dir: PathBuf,
     pub active_sidecar: Mutex<Option<u32>>,

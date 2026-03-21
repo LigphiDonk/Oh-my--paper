@@ -122,7 +122,31 @@ export interface SkillManifest {
   version: string;
   stages: string[];
   tools?: string[];
+  description?: string;
+  summary?: string;
+  primaryIntent?: string;
+  intents?: string[];
+  capabilities?: string[];
+  domains?: string[];
+  keywords?: string[];
   source: "builtin" | "local" | "project" | "git" | "zip";
+  status?: string;
+  upstream?: {
+    repo?: string;
+    path?: string;
+    revision?: string;
+  } | null;
+  resourceFlags?: {
+    hasReferences?: boolean;
+    hasScripts?: boolean;
+    hasTemplates?: boolean;
+    hasAssets?: boolean;
+    referenceCount?: number;
+    scriptCount?: number;
+    templateCount?: number;
+    assetCount?: number;
+    optionalScripts?: boolean;
+  };
   dirPath?: string;
   isEnabled?: boolean;
   promptFiles?: string[];
