@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 
 import { ChatPanel } from "./ChatPanel";
 import { CommentPanel } from "./CommentPanel";
-import { ProviderCard, ProviderEditModal } from "./ProviderCard";
+import { ProviderCard, ProviderEditModal, AgentSelector } from "./ProviderCard";
 import { SkillArsenal } from "./SkillArsenal";
 import type { CollabAuthSession } from "../lib/collaboration/auth";
 import type { CollabConfig } from "../lib/collaboration/collab-config";
@@ -226,16 +226,6 @@ export function Sidebar({
   onDeleteComment,
   onJumpToCommentLine,
 }: SidebarProps) {
-  // Provider form state (defaults to claude-code)
-  const [providerForm, setProviderForm] = useState({
-    name: "Claude Code",
-    baseUrl: "",
-    apiKey: "",
-    defaultModel: "",
-    vendor: "claude-code" as string,
-  });
-  const [providerActionState, setProviderActionState] = useState<Record<string, string>>({});
-  const [isSubmittingProvider, setIsSubmittingProvider] = useState(false);
   const [editingProviderId, setEditingProviderId] = useState<string | null>(null);
   const [collabConfigForm, setCollabConfigForm] = useState({
     httpBaseUrl: collabConfigProp?.httpBaseUrl ?? "",
@@ -260,44 +250,7 @@ export function Sidebar({
     });
   }, [collabConfigProp]);
 
-  async function handleAddProvider() {
-    if (!providerForm.name.trim() || !providerForm.defaultModel.trim()) return;
-    setIsSubmittingProvider(true);
-    try {
-      await onAddProvider({
-        id: `${providerForm.vendor}-${Date.now()}`,
-        name: providerForm.name.trim(),
-        vendor: providerForm.vendor,
-        baseUrl: providerForm.baseUrl.trim(),
-        apiKey: providerForm.apiKey,
-        defaultModel: providerForm.defaultModel.trim(),
-        isEnabled: true,
-        sortOrder: providers.length,
-        metaJson: "{}",
-      });
-      setProviderForm({ name: "Claude Code", baseUrl: "", apiKey: "", defaultModel: "", vendor: "claude-code" });
-    } finally {
-      setIsSubmittingProvider(false);
-    }
-  }
 
-  async function handleTestProvider(providerId: string) {
-    setProviderActionState((current) => ({ ...current, [providerId]: "测试中..." }));
-    try {
-      const result = await onTestProvider(providerId);
-      setProviderActionState((current) => ({
-        ...current,
-        [providerId]: result.success
-          ? `连接正常 · ${result.latencyMs}ms`
-          : `失败: ${result.error ?? "unknown error"}`,
-      }));
-    } catch (error) {
-      setProviderActionState((current) => ({
-        ...current,
-        [providerId]: error instanceof Error ? error.message : String(error),
-      }));
-    }
-  }
 
   return (
     <div className="primary-sidebar">
@@ -557,68 +510,27 @@ curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh`}</pre>
 
       {tab === "providers" && (
         <>
-          <div className="sidebar-header">API 配置</div>
+          <div className="sidebar-header">Agent 配置</div>
           <div className="sidebar-content sidebar-stack">
-            {/* Add provider form */}
-            <div className="card">
-              <div className="card-header">添加 Agent Provider</div>
-              <div className="sidebar-stack-compact">
-                <select
-                  className="sidebar-input"
-                  value={providerForm.vendor}
-                  onChange={(event) => setProviderForm((current) => {
-                    const v = event.target.value;
-                    const name = v === "claude-code" ? "Claude Code" : v === "codex" ? "Codex" : current.name;
-                    return { ...current, vendor: v, name };
-                  })}
-                >
-                  <option value="claude-code">Claude Code（本机 CLI）</option>
-                  <option value="codex">Codex（本机 CLI）</option>
-                </select>
-                <input
-                  className="sidebar-input"
-                  value={providerForm.name}
-                  onChange={(event) => setProviderForm((current) => ({ ...current, name: event.target.value }))}
-                  placeholder="名称"
-                />
-                <input
-                  className="sidebar-input"
-                  value={providerForm.defaultModel}
-                  onChange={(event) => setProviderForm((current) => ({ ...current, defaultModel: event.target.value }))}
-                  placeholder={providerForm.vendor === "codex" ? "模型（如 codex-mini）" : "模型（如 claude-sonnet-4）"}
-                />
-                <div className="text-subtle text-xs" style={{ padding: "4px 0" }}>
-                  CLI Agent 使用本机已安装的命令行工具，无需配置 API Key。
-                </div>
-                <button
-                  className="btn-primary"
-                  type="button"
-                  onClick={() => void handleAddProvider()}
-                  disabled={isSubmittingProvider || !providerForm.name.trim() || !providerForm.defaultModel.trim()}
-                >
-                  {isSubmittingProvider ? "保存中…" : "+ 添加 Provider"}
-                </button>
-              </div>
-            </div>
+            {/* Agent selector */}
+            <AgentSelector onAdd={onAddProvider} existingCount={providers.length} />
 
-            {/* Provider cards */}
-            <div className="pcard-list">
-              {providers.map((provider) => (
-                <ProviderCard
-                  key={provider.id}
-                  provider={provider}
-                  isActive={provider.id === activeProviderId}
-                  testState={providerActionState[provider.id]}
-                  onActivate={onActivateProvider}
-                  onTest={(id) => void handleTestProvider(id)}
-                  onDelete={(id) => void onDeleteProvider(id)}
-                  onEdit={(id) => setEditingProviderId(id)}
-                />
-              ))}
-              {providers.length === 0 && (
-                <div className="sidebar-empty-state">暂无 Provider，在上方添加第一个</div>
-              )}
-            </div>
+            {/* Active provider cards */}
+            {providers.length > 0 && (
+              <div className="pcard-list">
+                {providers.map((provider) => (
+                  <ProviderCard
+                    key={provider.id}
+                    provider={provider}
+                    isActive={provider.id === activeProviderId}
+                    onActivate={onActivateProvider}
+                    onTest={() => {}}
+                    onDelete={(id) => void onDeleteProvider(id)}
+                    onEdit={(id) => setEditingProviderId(id)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Edit modal */}

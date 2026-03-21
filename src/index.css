@@ -3782,6 +3782,373 @@ button {
   max-width: 110px;
   word-break: break-all;
 }
+/* ───────────────────────────────────────────────────────────
+   Agent Selector (add new CLI agent)
+   ─────────────────────────────────────────────────────────── */
+.agent-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.agent-selector-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.agent-selector-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.agent-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 12px;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--border-light);
+  background: var(--bg-surface);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  text-align: left;
+}
+
+.agent-option:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+.agent-option--selected {
+  border-width: 2px;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.agent-option-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  background: rgba(255, 255, 255, 0.7);
+  flex-shrink: 0;
+}
+
+.agent-option--selected .agent-option-icon {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.agent-option-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.agent-option-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.agent-option-desc {
+  font-size: 10px;
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
+/* Version badge on agent cards */
+.agent-version-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-left: 6px;
+  vertical-align: middle;
+  letter-spacing: 0.02em;
+}
+.agent-version-ok {
+  /* color & background set inline via brand accent */
+}
+.agent-version-loading {
+  color: #92400e;
+  background: rgba(146, 64, 14, 0.08);
+}
+.agent-version-missing {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.08);
+}
+
+/* Dim unavailable agent cards */
+.agent-option--unavailable {
+  opacity: 0.55;
+  filter: grayscale(0.3);
+}
+
+/* Model Selection Section */
+.agent-model-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+  background: var(--bg-surface);
+}
+
+.agent-model-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.agent-model-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.agent-model-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.model-chip {
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-light);
+  background: var(--bg-surface-hover);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-family: var(--mono);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+}
+
+.model-chip:hover {
+  border-color: rgba(0, 0, 0, 0.15);
+  background: var(--bg-surface-active);
+  transform: scale(1.02);
+}
+
+.model-chip--active {
+  font-weight: 600;
+  border-width: 1.5px;
+}
+
+.agent-custom-model {
+  margin-top: 2px;
+}
+
+.agent-model-input {
+  font-family: var(--mono) !important;
+  font-size: 12px !important;
+}
+
+.agent-add-btn {
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  border: none;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.agent-add-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.agent-add-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.agent-add-btn:disabled {
+  cursor: not-allowed;
+}
+
+/* ───────────────────────────────────────────────────────────
+   Agent Card (active provider display)
+   ─────────────────────────────────────────────────────────── */
+.acard {
+  position: relative;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--border-light);
+  background: var(--bg-surface);
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.acard:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.acard-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.acard-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  background: rgba(255, 255, 255, 0.7);
+  flex-shrink: 0;
+}
+
+.acard-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.acard-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.acard-desc {
+  font-size: 10px;
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.acard-badge-area {
+  flex-shrink: 0;
+}
+
+.acard-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.acard-badge--active {
+  cursor: default;
+}
+
+.acard-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  animation: pcard-pulse 1.8s ease-in-out infinite;
+}
+
+.acard-badge--enable {
+  background: var(--bg-surface-hover);
+  color: var(--text-secondary);
+  border-color: var(--border-light);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.acard-badge--enable:hover {
+  background: var(--accent-bg);
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  transform: scale(1.04);
+}
+
+.acard-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px 10px;
+  border-top: 1px solid rgba(0, 0, 0, 0.04);
+  gap: 8px;
+}
+
+.acard-model-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.acard-model-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+
+.acard-model-value {
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.acard-toolbar {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.acard-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.acard-action-btn:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.acard-action-btn--danger:hover {
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+}
 
 /* ───────────────────────────────────────────────────────────
    Modal (provider edit)

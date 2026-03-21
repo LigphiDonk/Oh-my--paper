@@ -1,34 +1,74 @@
-import { useState } from "react";
-import type { ProviderConfig } from "../types";
+import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import type { ProviderConfig, CliAgentStatus } from "../types";
 
-const MASKED_API_KEY = "••••••••";
+/* ── Brand definitions for each CLI agent ──────────────────── */
+const AGENT_BRANDS: Record<string, {
+  label: string;
+  icon: string;
+  gradient: string;
+  accentColor: string;
+  accentBg: string;
+  borderActive: string;
+  description: string;
+  models: { value: string; label: string }[];
+  defaultModel: string;
+}> = {
+  "claude-code": {
+    label: "Claude Code",
+    icon: "⚡",
+    gradient: "linear-gradient(135deg, #fef3e2 0%, #fde8c9 50%, #fce4bb 100%)",
+    accentColor: "#c2410c",
+    accentBg: "rgba(194, 65, 12, 0.08)",
+    borderActive: "#ea580c",
+    description: "Anthropic 本机 CLI Agent",
+    defaultModel: "claude-opus-4-6",
+    models: [
+      { value: "claude-opus-4-6", label: "Opus 4.6" },
+      { value: "sonnet", label: "Sonnet" },
+      { value: "opus", label: "Opus" },
+      { value: "haiku", label: "Haiku" },
+      { value: "sonnet[1m]", label: "Sonnet [1M]" },
+    ],
+  },
+  codex: {
+    label: "Codex",
+    icon: "🧠",
+    gradient: "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 50%, #a7f3d0 100%)",
+    accentColor: "#047857",
+    accentBg: "rgba(4, 120, 87, 0.08)",
+    borderActive: "#059669",
+    description: "OpenAI 本机 CLI Agent",
+    defaultModel: "gpt-5.4",
+    models: [
+      { value: "gpt-5.4", label: "GPT-5.4" },
+      { value: "gpt-5.3-codex", label: "GPT-5.3 Codex" },
+      { value: "gpt-5.2-codex", label: "GPT-5.2 Codex" },
+      { value: "gpt-5.2", label: "GPT-5.2" },
+      { value: "gpt-5.1-codex-max", label: "GPT-5.1 Codex Max" },
+      { value: "o3", label: "O3" },
+      { value: "o4-mini", label: "O4 Mini" },
+    ],
+  },
+};
 
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .slice(0, 2)
-    .join("") || "?";
+const FALLBACK_BRAND = {
+  label: "Agent",
+  icon: "🤖",
+  gradient: "linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%)",
+  accentColor: "#475569",
+  accentBg: "rgba(71, 85, 105, 0.08)",
+  borderActive: "#64748b",
+  description: "CLI Agent",
+  models: [],
+  defaultModel: "",
+};
+
+function getBrand(vendor: string) {
+  return AGENT_BRANDS[vendor] ?? FALLBACK_BRAND;
 }
 
-function nameHue(name: string) {
-  let h = 0;
-  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) & 0xffffffff;
-  return Math.abs(h) % 360;
-}
-
-function ProviderAvatar({ name }: { name: string }) {
-  const hue = nameHue(name);
-  return (
-    <div
-      className="pcard-avatar"
-      style={{ background: `hsl(${hue},50%,88%)`, color: `hsl(${hue},55%,32%)` }}
-    >
-      {initials(name)}
-    </div>
-  );
-}
-
+/* ── Provider Card (active provider display) ───────────────── */
 interface CardProps {
   provider: ProviderConfig;
   isActive: boolean;
@@ -39,58 +79,211 @@ interface CardProps {
   onEdit: (id: string) => void;
 }
 
-export function ProviderCard({ provider, isActive, testState, onActivate, onTest, onDelete, onEdit }: CardProps) {
-  const name = provider.name || provider.vendor;
-  const hue = nameHue(name);
+export function ProviderCard({ provider, isActive, onActivate, onDelete, onEdit }: CardProps) {
+  const brand = getBrand(provider.vendor);
+  const name = provider.name || brand.label;
 
   return (
-    <div className={`pcard ${isActive ? "pcard--active" : ""}`}>
-      {/* background glow */}
-      <div
-        className="pcard-glow"
-        style={{ opacity: isActive ? 1 : 0, background: `linear-gradient(135deg, hsl(${hue},50%,95%), transparent)` }}
-      />
-
-      <div className="pcard-row">
-        <ProviderAvatar name={name} />
-
-        <div className="pcard-info">
-          <div className="pcard-name">{name}</div>
-          <div className="pcard-sub">
-            {provider.baseUrl
-              ? provider.baseUrl.replace(/^https?:\/\//, "")
-              : <span style={{ opacity: 0.45 }}>未配置 Base URL</span>}
-          </div>
-          <div className="pcard-model">{provider.defaultModel || "—"}</div>
+    <div className="acard" style={{
+      borderColor: isActive ? brand.borderActive : undefined,
+      boxShadow: isActive ? `0 0 0 1px ${brand.borderActive}, 0 4px 20px ${brand.accentBg}` : undefined,
+    }}>
+      <div className="acard-header" style={{ background: brand.gradient }}>
+        <div className="acard-icon">{brand.icon}</div>
+        <div className="acard-meta">
+          <div className="acard-name">{name}</div>
+          <div className="acard-desc">{brand.description}</div>
         </div>
-
-        <div className="pcard-actions">
+        <div className="acard-badge-area">
           {isActive ? (
-            <div className="pcard-in-use">
-              <span className="pcard-dot" />
+            <div className="acard-badge acard-badge--active" style={{ 
+              background: brand.accentBg, 
+              color: brand.accentColor,
+              borderColor: `${brand.accentColor}22`,
+            }}>
+              <span className="acard-badge-dot" style={{ background: brand.accentColor }} />
               使用中
             </div>
           ) : (
-            <button className="pcard-enable-btn" type="button" onClick={() => onActivate(provider.id)}>
-              ▶ 启用
+            <button 
+              className="acard-badge acard-badge--enable" 
+              type="button" 
+              onClick={() => onActivate(provider.id)}
+            >
+              启用
             </button>
           )}
-
-          <div className="pcard-icon-row">
-            <button className="pcard-icon-btn" type="button" title="编辑名称/配置" onClick={() => onEdit(provider.id)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13"><path d="M11 4H4a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </button>
-            <button className="pcard-icon-btn" type="button" title="测试连接" onClick={() => onTest(provider.id)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-            </button>
-            <button className="pcard-icon-btn pcard-icon-btn--danger" type="button" title="删除" onClick={() => onDelete(provider.id)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-            </button>
-          </div>
-
-          {testState && <div className="pcard-test-state">{testState}</div>}
         </div>
       </div>
+
+      <div className="acard-body">
+        <div className="acard-model-row">
+          <span className="acard-model-label">模型</span>
+          <span className="acard-model-value">{provider.defaultModel || "未选择"}</span>
+        </div>
+        <div className="acard-toolbar">
+          <button 
+            className="acard-action-btn" 
+            type="button" 
+            title="编辑" 
+            onClick={() => onEdit(provider.id)}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span>编辑</span>
+          </button>
+          <button 
+            className="acard-action-btn acard-action-btn--danger" 
+            type="button" 
+            title="删除" 
+            onClick={() => onDelete(provider.id)}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+            <span>删除</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Agent Selector (add new provider) ─────────────────────── */
+interface AgentSelectorProps {
+  onAdd: (provider: ProviderConfig) => Promise<void>;
+  existingCount: number;
+}
+
+export function AgentSelector({ onAdd, existingCount }: AgentSelectorProps) {
+  const [selectedVendor, setSelectedVendor] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [cliStatus, setCliStatus] = useState<Record<string, CliAgentStatus>>({});
+  const [detectingCli, setDetectingCli] = useState(true);
+
+  useEffect(() => {
+    invoke<CliAgentStatus[]>("detect_cli_agents")
+      .then((agents) => {
+        const map: Record<string, CliAgentStatus> = {};
+        for (const a of agents) map[a.name] = a;
+        setCliStatus(map);
+      })
+      .catch(() => {})
+      .finally(() => setDetectingCli(false));
+  }, []);
+
+  const brand = selectedVendor ? getBrand(selectedVendor) : null;
+
+  async function handleAdd() {
+    if (!selectedVendor || !selectedModel) return;
+    setIsSubmitting(true);
+    try {
+      const b = getBrand(selectedVendor);
+      await onAdd({
+        id: `${selectedVendor}-${Date.now()}`,
+        name: b.label,
+        vendor: selectedVendor,
+        baseUrl: "",
+        defaultModel: selectedModel,
+        isEnabled: true,
+        sortOrder: existingCount,
+        metaJson: "{}",
+      });
+      setSelectedVendor(null);
+      setSelectedModel("");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="agent-selector">
+      <div className="agent-selector-title">选择 Agent</div>
+      <div className="agent-selector-grid">
+        {Object.entries(AGENT_BRANDS).map(([vendor, brand]) => {
+          const status = cliStatus[vendor];
+          const isAvailable = status?.available ?? false;
+          const version = status?.version;
+          return (
+            <button
+              key={vendor}
+              type="button"
+              className={`agent-option ${selectedVendor === vendor ? "agent-option--selected" : ""} ${!detectingCli && !isAvailable ? "agent-option--unavailable" : ""}`}
+              style={{
+                background: selectedVendor === vendor ? brand.gradient : undefined,
+                borderColor: selectedVendor === vendor ? brand.borderActive : undefined,
+                boxShadow: selectedVendor === vendor ? `0 0 0 1px ${brand.borderActive}20` : undefined,
+              }}
+              onClick={() => { 
+                setSelectedVendor(vendor); 
+                setSelectedModel(brand.defaultModel || brand.models[0]?.value || ""); 
+              }}
+            >
+              <div className="agent-option-icon">{brand.icon}</div>
+              <div className="agent-option-text">
+                <div className="agent-option-name">
+                  {brand.label}
+                  {detectingCli ? (
+                    <span className="agent-version-badge agent-version-loading">检测中…</span>
+                  ) : isAvailable && version ? (
+                    <span className="agent-version-badge agent-version-ok" style={{ color: brand.accentColor, background: brand.accentBg }}>v{version}</span>
+                  ) : (
+                    <span className="agent-version-badge agent-version-missing">未安装</span>
+                  )}
+                </div>
+                <div className="agent-option-desc">{brand.description}</div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {selectedVendor && brand && (
+        <div className="agent-model-section fade-in">
+          <div className="agent-model-header">
+            <span className="agent-model-title">选择模型</span>
+          </div>
+          <div className="agent-model-chips">
+            {brand.models.map((model) => (
+              <button
+                key={model.value}
+                type="button"
+                className={`model-chip ${selectedModel === model.value ? "model-chip--active" : ""}`}
+                style={{
+                  ...(selectedModel === model.value ? { 
+                    background: brand.accentBg, 
+                    color: brand.accentColor,
+                    borderColor: brand.borderActive,
+                  } : {}),
+                }}
+                onClick={() => setSelectedModel(model.value)}
+              >
+                {model.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="agent-custom-model">
+            <input
+              className="sidebar-input agent-model-input"
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              placeholder="或输入自定义模型名"
+            />
+          </div>
+
+          <button
+            className="agent-add-btn"
+            type="button"
+            style={{ 
+              background: brand.accentColor,
+              opacity: (!selectedModel.trim() || isSubmitting) ? 0.5 : 1,
+            }}
+            disabled={isSubmitting || !selectedModel.trim()}
+            onClick={() => void handleAdd()}
+          >
+            {isSubmitting ? "添加中…" : `+ 添加 ${brand.label}`}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -103,23 +296,19 @@ interface EditModalProps {
 }
 
 export function ProviderEditModal({ provider, onSave, onClose }: EditModalProps) {
+  const brand = getBrand(provider.vendor);
   const [form, setForm] = useState({
     name: provider.name ?? "",
-    baseUrl: provider.baseUrl ?? "",
     defaultModel: provider.defaultModel ?? "",
-    apiKey: provider.apiKey ? MASKED_API_KEY : "",
   });
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
     setSaving(true);
     try {
-      const apiKey = form.apiKey.trim();
       await onSave({
-        name: form.name.trim() || provider.vendor,
-        baseUrl: form.baseUrl.trim(),
+        name: form.name.trim() || brand.label,
         defaultModel: form.defaultModel.trim(),
-        ...(apiKey && apiKey !== MASKED_API_KEY ? { apiKey } : {}),
       });
       onClose();
     } finally {
@@ -131,37 +320,37 @@ export function ProviderEditModal({ provider, onSave, onClose }: EditModalProps)
     <div className="modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal-box">
         <div className="modal-header">
-          <span>编辑 Provider</span>
+          <span>{brand.icon} 编辑 {brand.label}</span>
           <button className="modal-close" type="button" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
           <label className="modal-label">
             自定义名称
-            <input className="sidebar-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Fastcode · 88code · 我的Key" autoFocus />
+            <input className="sidebar-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder={brand.label} autoFocus />
           </label>
           <label className="modal-label">
-            Base URL
-            <input className="sidebar-input" value={form.baseUrl} onChange={e => setForm(f => ({ ...f, baseUrl: e.target.value }))} placeholder="https://api.openai.com/v1" />
+            模型
+            <input className="sidebar-input" value={form.defaultModel} onChange={e => setForm(f => ({ ...f, defaultModel: e.target.value }))} placeholder={brand.models[0]?.value || "model-name"} />
           </label>
-          <label className="modal-label">
-            默认模型
-            <input className="sidebar-input" value={form.defaultModel} onChange={e => setForm(f => ({ ...f, defaultModel: e.target.value }))} placeholder="claude-sonnet-4" />
-          </label>
-          <label className="modal-label">
-            API Key <span style={{ opacity: 0.5, fontSize: 11 }}>（留空不修改）</span>
-            <input
-              className="sidebar-input"
-              type="password"
-              value={form.apiKey}
-              onFocus={() => {
-                if (form.apiKey === MASKED_API_KEY) {
-                  setForm((current) => ({ ...current, apiKey: "" }));
-                }
-              }}
-              onChange={e => setForm(f => ({ ...f, apiKey: e.target.value }))}
-              placeholder={provider.apiKey ? MASKED_API_KEY : "sk-…"}
-            />
-          </label>
+          <div className="agent-model-chips" style={{ marginTop: 8 }}>
+            {brand.models.map((model) => (
+              <button
+                key={model.value}
+                type="button"
+                className={`model-chip ${form.defaultModel === model.value ? "model-chip--active" : ""}`}
+                style={{
+                  ...(form.defaultModel === model.value ? { 
+                    background: brand.accentBg, 
+                    color: brand.accentColor,
+                    borderColor: brand.borderActive,
+                  } : {}),
+                }}
+                onClick={() => setForm(f => ({ ...f, defaultModel: model.value }))}
+              >
+                {model.label}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="modal-footer">
           <button className="btn-secondary" type="button" onClick={onClose}>取消</button>
