@@ -101,12 +101,7 @@ pub struct AgentSessionSummary {
     pub last_message_preview: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct AgentConversationMessage {
-    pub role: String,
-    pub content: String,
-}
+
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -233,10 +228,9 @@ pub struct AgentRequest {
     pub session_id: String,
     pub profile_id: String,
     pub provider: AgentProvider,
+    #[serde(default)]
     pub system_prompt: String,
-    pub tools: Vec<String>,
     pub user_message: String,
-    pub history: Vec<AgentConversationMessage>,
     pub context: AgentContext,
 }
 
@@ -244,9 +238,10 @@ pub struct AgentRequest {
 #[serde(rename_all = "camelCase")]
 pub struct AgentProvider {
     pub vendor: String,
-    pub base_url: String,
-    pub api_key: String,
+    #[serde(default)]
     pub model: String,
+    #[serde(default)]
+    pub permission_mode: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -255,8 +250,15 @@ pub struct AgentContext {
     pub project_root: String,
     pub active_file_path: String,
     pub selected_text: String,
-    pub full_file_content: String,
-    pub cursor_line: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CliAgentStatus {
+    pub name: String,
+    pub available: bool,
+    pub path: Option<String>,
+    pub version: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

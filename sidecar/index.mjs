@@ -1,7 +1,5 @@
 import process from "node:process";
 
-import { runAgent } from "./agent.mjs";
-
 async function parsePayload() {
   const raw = process.argv[3];
   if (raw && raw !== "--stdin-payload") {
@@ -33,12 +31,24 @@ async function main() {
   switch (command) {
     case "agent": {
       const payload = await parsePayload();
-      await runAgent(payload);
+      const vendor = payload.provider?.vendor;
+
+      if (vendor === "codex") {
+        const { runCodex } = await import("./runners/codex-runner.mjs");
+        await runCodex(payload);
+      } else {
+        // Default to Claude Code for "claude-code" or any other vendor
+        const { runClaudeCode } = await import(
+          "./runners/claude-code-runner.mjs"
+        );
+        await runClaudeCode(payload);
+      }
       break;
     }
-    case "test-provider": {
-      const payload = await parsePayload();
-      await testProvider(payload);
+    case "detect-cli": {
+      const { detectAllCliAgents } = await import("./utils/detect-cli.mjs");
+      const result = await detectAllCliAgents();
+      process.stdout.write(JSON.stringify(result));
       break;
     }
     case "figure-skill": {
@@ -54,22 +64,6 @@ async function main() {
     default:
       process.stderr.write(`Unknown sidecar command: ${command}\n`);
       process.exitCode = 1;
-  }
-}
-
-async function testProvider(config) {
-  const { loadProvider } = await import("./providers/index.mjs");
-  const provider = loadProvider(config);
-
-  try {
-    const messages = [{ role: "user", content: "Say 'ok' and nothing else." }];
-    for await (const _chunk of provider.chat({ messages, tools: [] })) {
-      // Streaming success is enough.
-    }
-    process.stdout.write(JSON.stringify({ success: true }));
-  } catch (error) {
-    process.stderr.write(error?.message || String(error));
-    process.exitCode = 1;
   }
 }
 
@@ -90,7 +84,15 @@ async function runBanana(payload) {
   const { writeFileSync, mkdirSync } = await import("node:fs");
   const { resolve } = await import("node:path");
 
-  const { apiKey, baseUrl, prompt, aspectRatio, resolution, projectRoot, briefId } = payload;
+  const {
+    apiKey,
+    baseUrl,
+    prompt,
+    aspectRatio,
+    resolution,
+    projectRoot,
+    briefId,
+  } = payload;
   const url = `${baseUrl || "https://api.ikuncode.cc/v1"}/images/generations`;
 
   const response = await fetch(url, {

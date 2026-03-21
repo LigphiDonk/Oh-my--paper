@@ -6,9 +6,9 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::desktop_menu;
 use crate::models::{
-    AgentMessage, AgentRunResult, AgentSessionSummary, AssetResource, FigureBriefDraft,
-    GeneratedAsset, ProfileConfig, ProjectConfig, ProjectFile, ProviderConfig, SkillManifest,
-    TerminalSessionInfo, TestResult, UsageRecord, WorkspaceSnapshot,
+    AgentMessage, AgentRunResult, AgentSessionSummary, AssetResource, CliAgentStatus,
+    FigureBriefDraft, GeneratedAsset, ProfileConfig, ProjectConfig, ProjectFile, ProviderConfig,
+    SkillManifest, TerminalSessionInfo, TestResult, UsageRecord, WorkspaceSnapshot,
 };
 use crate::services::{
     agent, compile, figure, profile, project, provider, sidecar, skill, sync, terminal, worker,
@@ -634,6 +634,23 @@ pub fn remove_skill(
 ) -> Result<(), String> {
     let conn = state.db.lock().map_err(|err| err.to_string())?;
     skill::remove_skill(&conn, &skill_id, delete_files.unwrap_or(true))
+}
+
+#[tauri::command]
+pub async fn detect_cli_agents(app_handle: AppHandle) -> Result<Vec<CliAgentStatus>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app_handle.state::<AppState>();
+        let output = sidecar::run_sidecar(&state, "detect-cli", "")
+            .map_err(|err| err.to_string())?;
+        if !output.status.success() {
+            return Err(String::from_utf8_lossy(&output.stderr).to_string());
+        }
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        serde_json::from_str::<Vec<CliAgentStatus>>(&stdout)
+            .map_err(|err| format!("failed to parse CLI agent status: {err}"))
+    })
+    .await
+    .map_err(|err| err.to_string())?
 }
 
 #[tauri::command]

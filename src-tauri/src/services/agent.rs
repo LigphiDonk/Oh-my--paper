@@ -7,30 +7,13 @@ use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
 
 use crate::models::{
-    AgentContext, AgentConversationMessage, AgentMessage, AgentProvider, AgentRequest,
+    AgentContext, AgentMessage, AgentProvider, AgentRequest,
     AgentRunResult, AgentSessionSummary, StreamChunk, UsageInfo,
 };
 use crate::services::{profile, provider, sidecar, skill};
 use crate::state::AppState;
 
-const DEFAULT_AGENT_SYSTEM_PROMPT: &str = r#"You are ViewerLeaf, an AI assistant for LaTeX and project workspaces.
 
-When the user asks about the current project, files, paper structure, or document content, inspect the workspace directly with tools instead of merely saying that you will inspect it.
-
-Use this rough order:
-1. If you are unsure which tool to use, call `tool_search` first
-2. `list` for project structure
-3. `glob` or `grep` for discovery and lookup
-4. `read` for exact file content
-5. `list_sections` or `read_section` when working with LaTeX structure
-6. `read_bib_entries` for bibliography lookup
-7. `edit`, `write`, or `apply_patch` only when editing is requested
-
-After `tool_search`, use the returned tool ids in the next round instead of repeating planning text.
-
-Do not repeat the same planning sentence across tool rounds.
-After enough tool results are available, answer directly and stop.
-If a tool fails or the required information is unavailable, explain that once and move on."#;
 
 /// Insert the user message and ensure the session exists in the DB.
 /// Called synchronously from the command handler *before* spawning the
@@ -90,11 +73,9 @@ pub fn run_agent(
     let conn = state.db.lock().expect("db lock poisoned");
     let profile = profile::get_profile(&conn, profile_id).map_err(anyhow::Error::msg)?;
     let prov = provider::get_provider(&conn, &profile.provider_id).map_err(anyhow::Error::msg)?;
-    let mut system_prompt =
+    // Load skill prompts for injection (CLI runners use them as appendSystemPrompt)
+    let system_prompt =
         skill::load_skill_prompts(&conn, &profile.skill_ids).map_err(anyhow::Error::msg)?;
-    if system_prompt.trim().is_empty() {
-        system_prompt = DEFAULT_AGENT_SYSTEM_PROMPT.to_string();
-    }
     drop(conn);
 
     let user_message = user_message
@@ -113,37 +94,24 @@ pub fn run_agent(
         .map(ToOwned::to_owned)
         .unwrap_or_else(|| Uuid::new_v4().to_string());
 
-    let history = {
-        let conn = state.db.lock().expect("db lock poisoned");
-        load_session_history(&conn, &session_id)?
-    };
-
     let request = AgentRequest {
         session_id: session_id.clone(),
         profile_id: profile_id.to_string(),
         provider: AgentProvider {
             vendor: prov.vendor.clone(),
-            base_url: prov.base_url.clone(),
-            api_key: prov.api_key.clone(),
-            // Always use provider's current default_model so that changing
-            // the model in provider settings takes effect immediately.
             model: if prov.default_model.trim().is_empty() {
                 profile.model.clone()
             } else {
                 prov.default_model.clone()
             },
+            permission_mode: String::from("default"),
         },
         system_prompt,
-        tools: profile.tool_allowlist.clone(),
         user_message: user_message.clone(),
-        history,
         context: AgentContext {
             project_root: project_root.clone(),
             active_file_path: file_path.to_string(),
             selected_text: selected_text.to_string(),
-            // Keep schema compatibility, but avoid eager full-file injection into prompts.
-            full_file_content: String::new(),
-            cursor_line: 1,
         },
     };
     let payload = serde_json::to_string(&request)?;
@@ -484,29 +452,7 @@ pub fn list_agent_sessions(state: &AppState) -> Result<Vec<AgentSessionSummary>>
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
-fn load_session_history(
-    conn: &rusqlite::Connection,
-    session_id: &str,
-) -> Result<Vec<AgentConversationMessage>> {
-    let mut stmt = conn.prepare(
-        "SELECT role, content FROM messages WHERE session_id=?1 AND role IN ('user','assistant') ORDER BY created_at LIMIT 40",
-    )?;
-    let rows = stmt.query_map(params![session_id], |row| {
-        let role: String = row.get(0)?;
-        let content: String = row.get(1)?;
-        let sanitized = if role == "assistant" {
-            sanitize_agent_message_for_history(&content)
-        } else {
-            content
-        };
-        Ok(AgentConversationMessage {
-            role,
-            content: sanitized,
-        })
-    })?;
 
-    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
-}
 
 fn ensure_session(
     conn: &rusqlite::Connection,
@@ -607,9 +553,8 @@ fn sanitize_agent_message_for_display(content: &str) -> String {
         .to_string()
 }
 
-fn sanitize_agent_message_for_history(content: &str) -> String {
-    sanitize_agent_message_for_display(content)
-}
+
+
 
 fn strip_tagged_block(content: &str, open_tag: &str, close_tag: &str) -> String {
     let mut output = content.to_string();

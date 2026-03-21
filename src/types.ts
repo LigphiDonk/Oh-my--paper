@@ -131,7 +131,7 @@ export interface SkillManifest {
 
 export interface ProviderConfig {
   id: string;
-  vendor: "openai" | "anthropic" | "openrouter" | "deepseek" | "google" | "banana" | "custom" | string;
+  vendor: "claude-code" | "codex" | string;
   baseUrl: string;
   defaultModel: string;
   name?: string;
@@ -140,6 +140,13 @@ export interface ProviderConfig {
   sortOrder?: number;
   metaJson?: string;
   authRef?: string;
+}
+
+export interface CliAgentStatus {
+  name: string;
+  available: boolean;
+  path?: string;
+  version?: string;
 }
 
 export interface ProviderPreset {

@@ -226,13 +226,13 @@ export function Sidebar({
   onDeleteComment,
   onJumpToCommentLine,
 }: SidebarProps) {
-  // Provider form state (blank by default — no presets)
+  // Provider form state (defaults to claude-code)
   const [providerForm, setProviderForm] = useState({
-    name: "",
+    name: "Claude Code",
     baseUrl: "",
     apiKey: "",
     defaultModel: "",
-    vendor: "custom" as string,
+    vendor: "claude-code" as string,
   });
   const [providerActionState, setProviderActionState] = useState<Record<string, string>>({});
   const [isSubmittingProvider, setIsSubmittingProvider] = useState(false);
@@ -261,13 +261,13 @@ export function Sidebar({
   }, [collabConfigProp]);
 
   async function handleAddProvider() {
-    if (!providerForm.name.trim() || !providerForm.baseUrl.trim() || !providerForm.defaultModel.trim()) return;
+    if (!providerForm.name.trim() || !providerForm.defaultModel.trim()) return;
     setIsSubmittingProvider(true);
     try {
       await onAddProvider({
-        id: `custom-${Date.now()}`,
+        id: `${providerForm.vendor}-${Date.now()}`,
         name: providerForm.name.trim(),
-        vendor: "custom",
+        vendor: providerForm.vendor,
         baseUrl: providerForm.baseUrl.trim(),
         apiKey: providerForm.apiKey,
         defaultModel: providerForm.defaultModel.trim(),
@@ -275,7 +275,7 @@ export function Sidebar({
         sortOrder: providers.length,
         metaJson: "{}",
       });
-      setProviderForm({ name: "", baseUrl: "", apiKey: "", defaultModel: "", vendor: "custom" });
+      setProviderForm({ name: "Claude Code", baseUrl: "", apiKey: "", defaultModel: "", vendor: "claude-code" });
     } finally {
       setIsSubmittingProvider(false);
     }
@@ -561,39 +561,40 @@ curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh`}</pre>
           <div className="sidebar-content sidebar-stack">
             {/* Add provider form */}
             <div className="card">
-              <div className="card-header">添加 Provider</div>
+              <div className="card-header">添加 Agent Provider</div>
               <div className="sidebar-stack-compact">
+                <select
+                  className="sidebar-input"
+                  value={providerForm.vendor}
+                  onChange={(event) => setProviderForm((current) => {
+                    const v = event.target.value;
+                    const name = v === "claude-code" ? "Claude Code" : v === "codex" ? "Codex" : current.name;
+                    return { ...current, vendor: v, name };
+                  })}
+                >
+                  <option value="claude-code">Claude Code（本机 CLI）</option>
+                  <option value="codex">Codex（本机 CLI）</option>
+                </select>
                 <input
                   className="sidebar-input"
                   value={providerForm.name}
                   onChange={(event) => setProviderForm((current) => ({ ...current, name: event.target.value }))}
-                  placeholder="名称（如：Fastcode、88code、我的Key）"
-                  autoFocus
-                />
-                <input
-                  className="sidebar-input"
-                  value={providerForm.baseUrl}
-                  onChange={(event) => setProviderForm((current) => ({ ...current, baseUrl: event.target.value }))}
-                  placeholder="Base URL（如：https://api.openai.com/v1）"
+                  placeholder="名称"
                 />
                 <input
                   className="sidebar-input"
                   value={providerForm.defaultModel}
                   onChange={(event) => setProviderForm((current) => ({ ...current, defaultModel: event.target.value }))}
-                  placeholder="默认模型（如：claude-sonnet-4）"
+                  placeholder={providerForm.vendor === "codex" ? "模型（如 codex-mini）" : "模型（如 claude-sonnet-4）"}
                 />
-                <input
-                  className="sidebar-input"
-                  type="password"
-                  value={providerForm.apiKey}
-                  onChange={(event) => setProviderForm((current) => ({ ...current, apiKey: event.target.value }))}
-                  placeholder="API Key（如：sk-…）"
-                />
+                <div className="text-subtle text-xs" style={{ padding: "4px 0" }}>
+                  CLI Agent 使用本机已安装的命令行工具，无需配置 API Key。
+                </div>
                 <button
                   className="btn-primary"
                   type="button"
                   onClick={() => void handleAddProvider()}
-                  disabled={isSubmittingProvider || !providerForm.name.trim() || !providerForm.baseUrl.trim() || !providerForm.defaultModel.trim()}
+                  disabled={isSubmittingProvider || !providerForm.name.trim() || !providerForm.defaultModel.trim()}
                 >
                   {isSubmittingProvider ? "保存中…" : "+ 添加 Provider"}
                 </button>
