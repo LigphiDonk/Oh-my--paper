@@ -183,6 +183,7 @@ export function AgentSelector({ onAdd, existingCount }: AgentSelectorProps) {
         vendor: selectedVendor,
         baseUrl: "",
         defaultModel: selectedModel,
+        apiKey: "",
         isEnabled: true,
         sortOrder: existingCount,
         metaJson: "{}",

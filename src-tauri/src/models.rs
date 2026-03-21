@@ -40,10 +40,12 @@ pub struct ProviderConfig {
     pub name: String,
     pub vendor: String,
     pub base_url: String,
+    #[serde(default)]
     pub api_key: String,
     pub default_model: String,
     pub is_enabled: bool,
     pub sort_order: i32,
+    #[serde(default)]
     pub meta_json: String,
 }
 
