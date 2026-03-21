@@ -187,7 +187,6 @@ export function Sidebar({
   onAddProvider,
   onUpdateProvider,
   onDeleteProvider,
-  onTestProvider,
   onActivateProvider,
   onToggleSkill,
   onSkillsChanged,
