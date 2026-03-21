@@ -5,6 +5,7 @@ import type { ResearchCanvasSnapshot, ResearchStage, ResearchStageSummary, Resea
 export interface ResearchStageNodeData extends Record<string, unknown> {
   kind: "stage";
   stage: ResearchStageSummary;
+  onInitializeStage?: (stage: ResearchStage) => void;
 }
 
 export interface ResearchTaskNodeData extends Record<string, unknown> {

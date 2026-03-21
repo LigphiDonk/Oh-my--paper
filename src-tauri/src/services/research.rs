@@ -31,6 +31,7 @@ const RESEARCH_STAGE_MAP_FIXTURE: &str = include_str!("../../../skills/research-
 struct PipelineMeta {
     start_stage: Option<String>,
     current_stage: Option<String>,
+    initialized_stages: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -42,6 +43,19 @@ struct BriefMeta {
     system_prompt: Option<String>,
     working_memory: Option<String>,
     interaction_rules: Option<Vec<String>>,
+}
+
+#[derive(Clone, Copy)]
+struct TaskBlueprint {
+    id: &'static str,
+    title: &'static str,
+    description: &'static str,
+    stage: &'static str,
+    priority: &'static str,
+    task_type: &'static str,
+    dependencies: &'static [&'static str],
+    inputs_needed: &'static [&'static str],
+    artifact_paths: &'static [&'static str],
 }
 
 #[derive(Debug, Deserialize)]
@@ -95,12 +109,34 @@ fn stage_label(stage: &str) -> &'static str {
 
 fn stage_description(stage: &str) -> &'static str {
     match stage {
-        "survey" => "Collect traceable literature, screen the field, and stabilize the problem boundary.",
-        "ideation" => "Turn the survey into a concrete angle, hypothesis, or position worth testing.",
+        "survey" => "Map the field, collect traceable literature, and stabilize the research boundary.",
+        "ideation" => "Turn the survey into a concrete angle, candidate ideas, and a lead hypothesis worth testing.",
         "experiment" => "Define implementation, datasets, metrics, ablations, and analysis checkpoints.",
         "publication" => "Move the validated state into the main LaTeX workspace and draft the paper.",
         "promotion" => "Prepare follow-up deliverables such as slides, summaries, and release notes.",
         _ => "Research workflow stage.",
+    }
+}
+
+fn stage_bundle_label(stage: &str) -> &'static str {
+    match stage {
+        "survey" => "Domain & Literature",
+        "ideation" => "Idea Generation",
+        "experiment" => "Experiment Driver",
+        "publication" => "Paper Handoff",
+        "promotion" => "Research Delivery",
+        _ => "Research Bundle",
+    }
+}
+
+fn stage_bundle_description(stage: &str) -> &'static str {
+    match stage {
+        "survey" => "Use this bundle to map the field, collect real papers, and keep screening notes traceable.",
+        "ideation" => "Use this bundle to generate, compare, and refine candidate research directions.",
+        "experiment" => "Use this bundle to plan implementation, metrics, ablations, and analysis checkpoints.",
+        "publication" => "Use this bundle to draft the paper, audit references, and keep claims aligned with evidence.",
+        "promotion" => "Use this bundle to prepare slides, summaries, and release-facing downstream materials.",
+        _ => "Research bundle.",
     }
 }
 
@@ -126,6 +162,18 @@ fn task_is_done(task: &ResearchTask) -> bool {
 
 fn dependency_satisfied(task: &ResearchTask, done_ids: &BTreeSet<String>) -> bool {
     task.dependencies.iter().all(|dependency| done_ids.contains(dependency))
+}
+
+fn normalize_stage_list(values: Option<&[String]>) -> Vec<String> {
+    let mut stages = values
+        .unwrap_or(&[])
+        .iter()
+        .map(|value| normalize_stage(Some(value)))
+        .filter(|stage| !stage.is_empty())
+        .collect::<Vec<_>>();
+    stages.sort_by_key(|stage| stage_index(stage));
+    stages.dedup();
+    stages
 }
 
 fn research_root(root: &Path) -> PathBuf {
@@ -277,11 +325,12 @@ fn default_research_brief(project_title: &str, start_stage: &str) -> Value {
         ],
         "pipeline": {
             "startStage": start_stage,
-            "currentStage": start_stage
+            "currentStage": start_stage,
+            "initializedStages": []
         },
         "stageNotes": {
-            "survey": "Collect traceable papers and define the research boundary.",
-            "ideation": "Extract gaps, candidate contributions, and a viable angle.",
+            "survey": "Map the field, collect traceable papers, and define the research boundary.",
+            "ideation": "Extract gaps, generate candidate ideas, and converge on a viable angle.",
             "experiment": "Plan implementation, metrics, ablations, and analysis.",
             "publication": "Draft the paper in the main LaTeX workspace.",
             "promotion": "Prepare slides, summaries, and follow-up deliverables."
@@ -310,6 +359,17 @@ fn recommended_skills(stage: &str, task_type: &str) -> Vec<String> {
     if let Some(by_task_type) = config.by_task_type.get(task_type) {
         skills.extend(by_task_type.clone());
     }
+    skills.sort();
+    skills.dedup();
+    skills
+}
+
+fn stage_bundle_skill_ids(stage: &str) -> Vec<String> {
+    let stage_map = research_stage_map();
+    let Some(config) = stage_map.get(stage) else {
+        return Vec::new();
+    };
+    let mut skills = config.base.clone();
     skills.sort();
     skills.dedup();
     skills
@@ -355,33 +415,27 @@ fn dedup_strings(values: &[String]) -> Vec<String> {
 }
 
 fn default_tasks(start_stage: &str) -> Vec<ResearchTask> {
-    let make_task = |
-        id: &str,
-        title: &str,
-        description: &str,
-        stage: &str,
-        priority: &str,
-        dependencies: Vec<String>,
-        task_type: &str,
-        inputs_needed: Vec<String>,
-        artifact_paths: Vec<String>,
-    | {
+    let make_task = |blueprint: TaskBlueprint| {
+        let stage = blueprint.stage;
+        let title = blueprint.title;
+        let description = blueprint.description;
+        let task_type = blueprint.task_type;
         let suggested_skills = recommended_skills(stage, task_type);
         let next_action_prompt = build_next_action_prompt(stage, task_type, &suggested_skills);
         let task_prompt = default_task_prompt(stage, title, description, &next_action_prompt);
         ResearchTask {
-            id: id.into(),
+            id: blueprint.id.into(),
             title: title.into(),
             description: description.into(),
             status: "pending".into(),
             stage: stage.into(),
-            priority: priority.into(),
-            dependencies,
+            priority: blueprint.priority.into(),
+            dependencies: blueprint.dependencies.iter().map(|value| (*value).to_string()).collect(),
             task_type: task_type.into(),
-            inputs_needed,
+            inputs_needed: blueprint.inputs_needed.iter().map(|value| (*value).to_string()).collect(),
             suggested_skills,
             next_action_prompt,
-            artifact_paths,
+            artifact_paths: blueprint.artifact_paths.iter().map(|value| (*value).to_string()).collect(),
             task_prompt,
             context_notes: String::new(),
             last_updated_at: String::new(),
@@ -389,91 +443,217 @@ fn default_tasks(start_stage: &str) -> Vec<ResearchTask> {
         }
     };
 
-    let all_tasks = vec![
-        make_task(
-            "survey-1",
-            "Define the survey boundary",
-            "Clarify topic scope, target venue, and screening criteria.",
-            "survey",
-            "high",
-            vec![],
-            "exploration",
-            vec!["topic boundary".into(), "target venue".into()],
-            vec![],
-        ),
-        make_task(
-            "survey-2",
-            "Screen core literature",
-            "Keep traceable papers, baseline methods, and open gaps.",
-            "survey",
-            "high",
-            vec!["survey-1".into()],
-            "analysis",
-            vec!["seed paper list".into()],
-            vec![],
-        ),
-        make_task(
-            "ideation-1",
-            "Extract a publishable angle",
-            "Turn the survey into a concrete hypothesis or contribution.",
-            "ideation",
-            "high",
-            vec!["survey-2".into()],
-            "analysis",
-            vec!["gap summary".into()],
-            vec![],
-        ),
-        make_task(
-            "experiment-1",
-            "Design the experiment plan",
-            "Define implementation scope, datasets, metrics, and ablations.",
-            "experiment",
-            "high",
-            vec!["ideation-1".into()],
-            "implementation",
-            vec!["chosen idea".into()],
-            vec![],
-        ),
-        make_task(
-            "experiment-2",
-            "Prepare implementation and analysis notes",
-            "Break the experiment plan into build and analysis checkpoints.",
-            "experiment",
-            "medium",
-            vec!["experiment-1".into()],
-            "analysis",
-            vec!["experiment plan".into()],
-            vec![],
-        ),
-        make_task(
-            "publication-1",
-            "Move into the paper workspace",
-            "Translate the validated research state into a paper-writing checklist.",
-            "publication",
-            "high",
-            vec!["experiment-2".into()],
-            "writing",
-            vec!["validated claims".into(), "figures".into()],
-            vec!["main.tex".into()],
-        ),
-        make_task(
-            "promotion-1",
-            "Prepare downstream deliverables",
-            "Create slides, summaries, or release notes after the paper draft is stable.",
-            "promotion",
-            "medium",
-            vec!["publication-1".into()],
-            "delivery",
-            vec!["paper draft".into()],
-            vec![],
-        ),
-    ];
+    let all_tasks = STAGE_ORDER
+        .iter()
+        .flat_map(|stage| default_stage_blueprints(stage).into_iter().map(make_task))
+        .collect::<Vec<_>>();
 
     let start_index = stage_index(start_stage);
     all_tasks
         .into_iter()
         .filter(|task| stage_index(&task.stage) >= start_index)
         .collect()
+}
+
+fn default_stage_blueprints(stage: &str) -> Vec<TaskBlueprint> {
+    match stage {
+        "survey" => vec![
+            TaskBlueprint {
+                id: "survey-1",
+                title: "Define the research boundary",
+                description: "Clarify the topic scope, target venue, review criteria, and key research questions.",
+                stage: "survey",
+                priority: "high",
+                task_type: "exploration",
+                dependencies: &[],
+                inputs_needed: &["topic boundary", "target venue"],
+                artifact_paths: &[
+                    ".viewerleaf/research/Survey/reports/domain-map.md",
+                    ".pipeline/docs/domain_map.md",
+                ],
+            },
+            TaskBlueprint {
+                id: "survey-2",
+                title: "Build a traceable literature shortlist",
+                description: "Collect real papers, canonical links, and screening notes for the core problem area.",
+                stage: "survey",
+                priority: "high",
+                task_type: "analysis",
+                dependencies: &["survey-1"],
+                inputs_needed: &["seed query list"],
+                artifact_paths: &[
+                    ".viewerleaf/research/Survey/reports/screening-notes.md",
+                    ".pipeline/docs/paper_bank.json",
+                ],
+            },
+            TaskBlueprint {
+                id: "survey-3",
+                title: "Extract baseline methods and gaps",
+                description: "Summarize representative baselines, benchmark patterns, and unresolved gaps.",
+                stage: "survey",
+                priority: "high",
+                task_type: "analysis",
+                dependencies: &["survey-2"],
+                inputs_needed: &["screened paper list"],
+                artifact_paths: &[
+                    ".viewerleaf/research/Survey/reports/gap-summary.md",
+                    ".pipeline/docs/gap_matrix.md",
+                ],
+            },
+        ],
+        "ideation" => vec![
+            TaskBlueprint {
+                id: "ideation-1",
+                title: "Generate candidate ideas",
+                description: "Turn the survey and gap map into several candidate directions with clear hypotheses.",
+                stage: "ideation",
+                priority: "high",
+                task_type: "analysis",
+                dependencies: &["survey-3"],
+                inputs_needed: &["gap summary"],
+                artifact_paths: &[
+                    ".viewerleaf/research/Ideation/ideas/candidate-ideas.md",
+                    ".pipeline/docs/idea_board.json",
+                ],
+            },
+            TaskBlueprint {
+                id: "ideation-2",
+                title: "Check novelty and feasibility",
+                description: "Stress-test the candidates against prior work, resource constraints, and implementation risk.",
+                stage: "ideation",
+                priority: "high",
+                task_type: "exploration",
+                dependencies: &["ideation-1"],
+                inputs_needed: &["candidate ideas"],
+                artifact_paths: &[
+                    ".viewerleaf/research/Ideation/ideas/novelty-check.md",
+                    ".pipeline/docs/idea_eval.md",
+                ],
+            },
+            TaskBlueprint {
+                id: "ideation-3",
+                title: "Select the lead idea",
+                description: "Choose the main angle, define the contribution story, and lock the experiment commitments.",
+                stage: "ideation",
+                priority: "high",
+                task_type: "analysis",
+                dependencies: &["ideation-2"],
+                inputs_needed: &["novelty review"],
+                artifact_paths: &[
+                    ".viewerleaf/research/Ideation/ideas/selected-idea.md",
+                    ".pipeline/docs/selected_idea.md",
+                ],
+            },
+        ],
+        "experiment" => vec![
+            TaskBlueprint {
+                id: "experiment-1",
+                title: "Design the experiment plan",
+                description: "Define implementation scope, datasets, metrics, baselines, and ablations.",
+                stage: "experiment",
+                priority: "high",
+                task_type: "implementation",
+                dependencies: &["ideation-3"],
+                inputs_needed: &["selected idea"],
+                artifact_paths: &[
+                    ".viewerleaf/research/Experiment/analysis/experiment-plan.md",
+                    ".pipeline/docs/experiment_plan.md",
+                ],
+            },
+            TaskBlueprint {
+                id: "experiment-2",
+                title: "Prepare execution checkpoints",
+                description: "Break the experiment plan into build tasks, logging checkpoints, and analysis milestones.",
+                stage: "experiment",
+                priority: "medium",
+                task_type: "analysis",
+                dependencies: &["experiment-1"],
+                inputs_needed: &["experiment plan"],
+                artifact_paths: &[
+                    ".viewerleaf/research/Experiment/analysis/checkpoints.md",
+                ],
+            },
+            TaskBlueprint {
+                id: "experiment-3",
+                title: "Summarize validated claims",
+                description: "Organize results, caveats, and claim-evidence links for the writing stage.",
+                stage: "experiment",
+                priority: "high",
+                task_type: "analysis",
+                dependencies: &["experiment-2"],
+                inputs_needed: &["run logs", "analysis notes"],
+                artifact_paths: &[
+                    ".viewerleaf/research/Experiment/analysis/result-summary.md",
+                    ".pipeline/docs/result_summary.md",
+                ],
+            },
+        ],
+        "publication" => vec![
+            TaskBlueprint {
+                id: "publication-1",
+                title: "Draft the paper outline",
+                description: "Translate the validated research state into a section plan and writing checklist.",
+                stage: "publication",
+                priority: "high",
+                task_type: "writing",
+                dependencies: &["experiment-3"],
+                inputs_needed: &["validated claims", "figures"],
+                artifact_paths: &["main.tex", "sections/introduction.tex"],
+            },
+            TaskBlueprint {
+                id: "publication-2",
+                title: "Audit references and evidence links",
+                description: "Check citations, claims, and reference formatting before the manuscript hardens.",
+                stage: "publication",
+                priority: "high",
+                task_type: "analysis",
+                dependencies: &["publication-1"],
+                inputs_needed: &["draft outline", "reference list"],
+                artifact_paths: &["refs/references.bib"],
+            },
+            TaskBlueprint {
+                id: "publication-3",
+                title: "Prepare submission assets",
+                description: "Finalize checklist items, figures, appendix needs, and submission-facing notes.",
+                stage: "publication",
+                priority: "medium",
+                task_type: "writing",
+                dependencies: &["publication-2"],
+                inputs_needed: &["stable draft"],
+                artifact_paths: &["main.tex"],
+            },
+        ],
+        "promotion" => vec![
+            TaskBlueprint {
+                id: "promotion-1",
+                title: "Prepare slides and talk track",
+                description: "Turn the stable manuscript into slides, a talk narrative, and summary framing.",
+                stage: "promotion",
+                priority: "medium",
+                task_type: "delivery",
+                dependencies: &["publication-3"],
+                inputs_needed: &["paper draft"],
+                artifact_paths: &[
+                    ".viewerleaf/research/Promotion/slides",
+                    ".pipeline/docs/promo_plan.md",
+                ],
+            },
+            TaskBlueprint {
+                id: "promotion-2",
+                title: "Prepare release-facing assets",
+                description: "Draft release notes, project summary text, and downstream communication materials.",
+                stage: "promotion",
+                priority: "low",
+                task_type: "delivery",
+                dependencies: &["promotion-1"],
+                inputs_needed: &["slides", "paper summary"],
+                artifact_paths: &[
+                    ".viewerleaf/research/Promotion/homepage",
+                ],
+            },
+        ],
+        _ => Vec::new(),
+    }
 }
 
 fn default_pipeline_config(start_stage: &str) -> Value {
@@ -562,6 +742,46 @@ fn write_templates(root: &Path) -> Result<()> {
     Ok(())
 }
 
+fn write_default_research_docs(root: &Path) -> Result<()> {
+    write_if_missing(
+        &pipeline_root(root).join("docs").join("domain_map.md"),
+        "# Domain Map\n\nUse this file to summarize the field boundary, core venues, benchmark patterns, and open questions.\n",
+    )?;
+    write_if_missing(
+        &pipeline_root(root).join("docs").join("paper_bank.json"),
+        "{\n  \"papers\": []\n}\n",
+    )?;
+    write_if_missing(
+        &pipeline_root(root).join("docs").join("gap_matrix.md"),
+        "# Gap Matrix\n\nTrack representative baselines, their limitations, and the gaps that matter.\n",
+    )?;
+    write_if_missing(
+        &pipeline_root(root).join("docs").join("idea_board.json"),
+        "{\n  \"ideas\": []\n}\n",
+    )?;
+    write_if_missing(
+        &pipeline_root(root).join("docs").join("idea_eval.md"),
+        "# Idea Evaluation\n\nCompare candidate ideas by novelty, feasibility, risk, and experimental leverage.\n",
+    )?;
+    write_if_missing(
+        &pipeline_root(root).join("docs").join("selected_idea.md"),
+        "# Selected Idea\n\nRecord the chosen angle, novelty claim, and first experiment commitments.\n",
+    )?;
+    write_if_missing(
+        &pipeline_root(root).join("docs").join("experiment_plan.md"),
+        "# Experiment Plan\n\nDocument datasets, metrics, baselines, ablations, and execution checkpoints.\n",
+    )?;
+    write_if_missing(
+        &pipeline_root(root).join("docs").join("result_summary.md"),
+        "# Result Summary\n\nLink each claim to supporting evidence, caveats, and remaining questions.\n",
+    )?;
+    write_if_missing(
+        &pipeline_root(root).join("docs").join("promo_plan.md"),
+        "# Promotion Plan\n\nCapture slide structure, release notes, and downstream communication tasks.\n",
+    )?;
+    Ok(())
+}
+
 pub fn project_skill_roots(root: &Path) -> Vec<PathBuf> {
     vec![
         root.join(".agents").join("skills"),
@@ -606,11 +826,12 @@ pub fn ensure_research_scaffold(app_root: &Path, root: &Path, start_stage: Optio
         &pipeline_root(root).join("docs").join("research_brief.json"),
         &default_research_brief(project_title, &start_stage),
     )?;
+    write_default_research_docs(root)?;
     write_json_if_missing(
         &pipeline_root(root).join("tasks").join("tasks.json"),
         &json!({
             "version": 1,
-            "tasks": default_tasks(&start_stage),
+            "tasks": [],
         }),
     )?;
 
@@ -640,6 +861,85 @@ fn read_tasks(path: &Path) -> Vec<ResearchTask> {
     }
 
     serde_json::from_str::<Vec<ResearchTask>>(&raw).unwrap_or_default()
+}
+
+fn write_tasks(path: &Path, tasks: &[ResearchTask]) -> Result<()> {
+    fs::write(
+        path,
+        serde_json::to_string_pretty(&json!({
+            "version": 1,
+            "tasks": tasks,
+        }))?,
+    )?;
+    Ok(())
+}
+
+fn set_pipeline_stage_state(
+    brief_json: &mut Value,
+    current_stage: &str,
+    initialized_stages: &[String],
+) {
+    if !brief_json.get("pipeline").map(Value::is_object).unwrap_or(false) {
+        brief_json["pipeline"] = json!({});
+    }
+    brief_json["pipeline"]["currentStage"] = Value::String(current_stage.to_string());
+    brief_json["pipeline"]["initializedStages"] =
+        Value::Array(initialized_stages.iter().cloned().map(Value::String).collect());
+}
+
+pub fn initialize_research_stage(root: &Path, stage: &str) -> Result<()> {
+    let normalized_stage = normalize_stage(Some(stage));
+    let brief_path = pipeline_root(root).join("docs").join("research_brief.json");
+    let tasks_path = pipeline_root(root).join("tasks").join("tasks.json");
+    let mut tasks = read_tasks(&tasks_path);
+    if tasks.iter().any(|task| task.stage == normalized_stage) {
+        return Ok(());
+    }
+
+    let stage_tasks = default_stage_blueprints(&normalized_stage)
+        .into_iter()
+        .map(|blueprint| {
+            let stage_tasks = default_tasks(&normalized_stage);
+            stage_tasks
+                .into_iter()
+                .find(|task| task.id == blueprint.id)
+                .expect("stage blueprint task should exist")
+        })
+        .collect::<Vec<_>>();
+    tasks.extend(stage_tasks);
+    tasks.sort_by(|left, right| {
+        stage_index(&left.stage)
+            .cmp(&stage_index(&right.stage))
+            .then(status_rank(&left.status).cmp(&status_rank(&right.status)))
+            .then(left.id.cmp(&right.id))
+    });
+    write_tasks(&tasks_path, &tasks)?;
+
+    let raw_brief = fs::read_to_string(&brief_path)?;
+    let mut brief_json = serde_json::from_str::<Value>(&raw_brief)?;
+    let initialized_stages = normalize_stage_list(
+        brief_json
+            .get("pipeline")
+            .and_then(|pipeline| pipeline.get("initializedStages"))
+            .and_then(|value| value.as_array())
+            .map(|values| {
+                values
+                    .iter()
+                    .filter_map(|value| value.as_str().map(ToOwned::to_owned))
+                    .collect::<Vec<_>>()
+            })
+            .as_deref(),
+    );
+    let mut next_initialized = initialized_stages;
+    if !next_initialized.iter().any(|value| value == &normalized_stage) {
+        next_initialized.push(normalized_stage.clone());
+    }
+    next_initialized.sort_by_key(|value| stage_index(value));
+    next_initialized.dedup();
+    set_pipeline_stage_state(&mut brief_json, &normalized_stage, &next_initialized);
+    fs::write(&brief_path, serde_json::to_string_pretty(&brief_json)?)?;
+
+    Ok(())
 }
 
 pub fn load_research_snapshot(root: &Path) -> Result<ResearchCanvasSnapshot> {
@@ -718,6 +1018,12 @@ pub fn load_research_snapshot(root: &Path) -> Result<ResearchCanvasSnapshot> {
         .map(Some)
         .map(normalize_stage)
         .unwrap_or_else(|| "survey".into());
+    let initialized_stages = normalize_stage_list(
+        brief
+            .as_ref()
+            .and_then(|(_, meta)| meta.pipeline.as_ref())
+            .and_then(|pipeline| pipeline.initialized_stages.as_deref()),
+    );
 
     let mut tasks = read_tasks(&tasks_path)
         .into_iter()
@@ -783,6 +1089,12 @@ pub fn load_research_snapshot(root: &Path) -> Result<ResearchCanvasSnapshot> {
         .as_ref()
         .map(|task| task.stage.clone())
         .or_else(|| {
+            STAGE_ORDER
+                .iter()
+                .find(|stage| !initialized_stages.iter().any(|value| value == *stage))
+                .map(|stage| (*stage).to_string())
+        })
+        .or_else(|| {
             brief.as_ref()
                 .and_then(|(_, meta)| meta.pipeline.as_ref())
                 .and_then(|pipeline| pipeline.current_stage.as_deref())
@@ -817,12 +1129,16 @@ pub fn load_research_snapshot(root: &Path) -> Result<ResearchCanvasSnapshot> {
                 .collect::<BTreeSet<_>>()
                 .into_iter()
                 .collect::<Vec<_>>();
-            let suggested_skills = stage_tasks
+            let mut suggested_skills = stage_tasks
                 .iter()
                 .flat_map(|task| task.suggested_skills.iter().cloned())
                 .collect::<BTreeSet<_>>()
                 .into_iter()
                 .collect::<Vec<_>>();
+            let bundle_skill_ids = stage_bundle_skill_ids(stage);
+            if suggested_skills.is_empty() {
+                suggested_skills = bundle_skill_ids.clone();
+            }
             let stage_artifacts = artifact_paths
                 .get(*stage)
                 .cloned()
@@ -831,13 +1147,15 @@ pub fn load_research_snapshot(root: &Path) -> Result<ResearchCanvasSnapshot> {
                 .iter()
                 .find(|task| task_is_open(task))
                 .map(|task| task.id.clone());
+            let is_initialized = initialized_stages.iter().any(|value| value == *stage)
+                || !stage_tasks.is_empty();
             let stage_status = if counts.total > 0 && counts.done == counts.total {
                 "complete"
             } else if *stage == current_stage {
                 "active"
             } else if stage_index(stage) < current_stage_index {
                 "complete"
-            } else if counts.total > 0 {
+            } else if is_initialized || counts.total > 0 {
                 "queued"
             } else {
                 "idle"
@@ -848,6 +1166,12 @@ pub fn load_research_snapshot(root: &Path) -> Result<ResearchCanvasSnapshot> {
                 label: stage_label(stage).into(),
                 description: stage_description(stage).into(),
                 status: stage_status.into(),
+                bundle_id: (*stage).into(),
+                bundle_label: stage_bundle_label(stage).into(),
+                bundle_description: stage_bundle_description(stage).into(),
+                bundle_skill_ids: bundle_skill_ids.clone(),
+                is_initialized,
+                can_initialize: !is_initialized && *stage == current_stage,
                 total_tasks: counts.total,
                 done_tasks: counts.done,
                 artifact_count: stage_artifacts.len(),
@@ -865,6 +1189,7 @@ pub fn load_research_snapshot(root: &Path) -> Result<ResearchCanvasSnapshot> {
         brief: brief_value,
         tasks,
         current_stage: current_stage.clone(),
+        initialized_stages,
         next_task: next_task.clone(),
         stage_summaries,
         artifact_paths,

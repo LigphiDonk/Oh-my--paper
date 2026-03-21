@@ -5941,6 +5941,45 @@ div.ve-tok-math-rendered .katex { font-size: 1.15em; }
 
 /* ─── Skill Arsenal ──────────────────────────── */
 .arsenal { padding: 0; }
+.arsenal-bundle {
+  margin-bottom: 14px;
+}
+.arsenal-bundle__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.arsenal-bundle__header h4 {
+  margin: 0 0 3px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.arsenal-bundle__header p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+.arsenal-bundle__count,
+.arsenal-bundle__compact-title {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg-surface-hover);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+.arsenal-bundle__compact-title {
+  margin: 6px 0 4px;
+  justify-content: flex-start;
+  min-width: 0;
+}
 .arsenal-grid {
   display: grid; grid-template-columns: 1fr; gap: 8px;
 }
@@ -6022,6 +6061,9 @@ div.ve-tok-math-rendered .katex { font-size: 1.15em; }
 /* Compact mode (ChatPanel flyout) */
 .arsenal--compact .arsenal-grid {
   display: flex; flex-direction: column; gap: 2px;
+}
+.arsenal--compact .arsenal-bundle {
+  margin-bottom: 8px;
 }
 .arsenal--compact .arsenal-card {
   display: flex; align-items: center; gap: 8px; padding: 6px 10px;

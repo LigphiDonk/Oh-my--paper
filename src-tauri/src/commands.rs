@@ -109,6 +109,31 @@ pub async fn ensure_research_scaffold(
 }
 
 #[tauri::command]
+pub async fn initialize_research_stage(
+    app_handle: AppHandle,
+    stage: String,
+) -> Result<WorkspaceSnapshot, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app_handle.state::<AppState>();
+        let root_path = state
+            .project_config
+            .read()
+            .map_err(|err| err.to_string())?
+            .root_path
+            .clone();
+        if root_path.trim().is_empty() {
+            return Err("no active project".into());
+        }
+
+        research::initialize_research_stage(Path::new(&root_path), &stage)
+            .map_err(|err| err.to_string())?;
+        project::load_project_snapshot(&state).map_err(|err| err.to_string())
+    })
+    .await
+    .map_err(|err| err.to_string())?
+}
+
+#[tauri::command]
 pub fn launch_workspace_window(root_path: Option<String>) -> Result<bool, String> {
     desktop_menu::launch_workspace_window(root_path.as_deref())
         .map(|_| true)

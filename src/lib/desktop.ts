@@ -20,6 +20,7 @@ import type {
   ProjectFile,
   ProfileConfig,
   ProviderConfig,
+  ResearchStage,
   ResearchTaskUpdateChanges,
   SkillManifest,
   StreamChunk,
@@ -158,6 +159,11 @@ export const desktop = {
   ensureResearchScaffold(startStage?: string) {
     return runOrMock<WorkspaceSnapshot>("ensure_research_scaffold", { startStage }, () =>
       mockRuntime.ensureResearchScaffold?.(startStage) ?? mockRuntime.openProject(),
+    );
+  },
+  initializeResearchStage(stage: ResearchStage) {
+    return runOrMock<WorkspaceSnapshot>("initialize_research_stage", { stage }, () =>
+      mockRuntime.initializeResearchStage?.(stage) ?? mockRuntime.openProject(),
     );
   },
   launchWorkspaceWindow(rootPath?: string) {

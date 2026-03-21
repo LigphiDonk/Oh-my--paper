@@ -22,6 +22,7 @@ import { localizeResearchSnapshot } from "../lib/researchLocale";
 import type {
   AppLocale,
   ResearchCanvasSnapshot,
+  ResearchStage,
   ResearchStageSummary,
   ResearchTask,
 } from "../types";
@@ -32,6 +33,7 @@ interface ResearchCanvasProps {
   activeTaskId?: string | null;
   isBusy?: boolean;
   onBootstrap: () => Promise<void> | void;
+  onInitializeStage: (stage: ResearchStage) => Promise<void> | void;
   onOpenArtifact: (path: string) => void;
   onUseTaskInChat: (task: ResearchTask) => Promise<void> | void;
   onEnterTask: (task: ResearchTask) => Promise<void> | void;
@@ -88,6 +90,20 @@ function StageNode({ data, selected }: NodeProps<ResearchStageNode>) {
           {stage.suggestedSkills.slice(0, 2).map((skill) => (
             <span key={skill} className="research-node-chip">{skill}</span>
           ))}
+        </div>
+      ) : null}
+      {stage.canInitialize ? (
+        <div className="research-task-node__actions">
+          <button
+            type="button"
+            className="research-task-node__agent-btn"
+            onClick={(event) => {
+              event.stopPropagation();
+              void data.onInitializeStage?.(stage.stage as ResearchStage);
+            }}
+          >
+            {/[\u4e00-\u9fff]/.test(stage.label) ? "开始本阶段" : "Start Stage"}
+          </button>
         </div>
       ) : null}
       <Handle type="source" position={Position.Bottom} className="research-node-handle" />
@@ -257,11 +273,13 @@ function TaskInspector({
 function StageInspector({
   locale,
   stage,
+  onInitializeStage,
   onOpenArtifact,
   onOpenWriting,
 }: {
   locale: AppLocale;
   stage: ResearchStageSummary;
+  onInitializeStage: (stage: ResearchStage) => Promise<void> | void;
   onOpenArtifact: (path: string) => void;
   onOpenWriting: () => void;
 }) {
@@ -286,11 +304,25 @@ function StageInspector({
       ) : null}
       {stage.suggestedSkills.length > 0 ? (
         <>
-          <div className="research-inspector__label">{isZh ? "推荐技能" : "Suggested skills"}</div>
+          <div className="research-inspector__label">
+            {stage.bundleLabel || (isZh ? "推荐技能" : "Suggested skills")}
+          </div>
+          {stage.bundleDescription ? <p>{stage.bundleDescription}</p> : null}
           <div className="research-inspector__list">
             {stage.suggestedSkills.map((item) => <span key={item}>{item}</span>)}
           </div>
         </>
+      ) : null}
+      {stage.canInitialize ? (
+        <div className="research-inspector__actions">
+          <button
+            type="button"
+            className="research-primary-btn"
+            onClick={() => void onInitializeStage(stage.stage)}
+          >
+            {isZh ? "开始本阶段" : "Start Stage"}
+          </button>
+        </div>
       ) : null}
       {stage.stage === "publication" ? (
         <div className="research-inspector__actions">
@@ -357,6 +389,7 @@ export function ResearchCanvas({
   activeTaskId = null,
   isBusy = false,
   onBootstrap,
+  onInitializeStage,
   onOpenArtifact,
   onUseTaskInChat,
   onEnterTask,
@@ -383,9 +416,15 @@ export function ResearchCanvas({
             onEnterTask,
           },
         }
-        : node
+        : {
+          ...node,
+          data: {
+            ...node.data,
+            onInitializeStage,
+          },
+        }
     )),
-    [activeTaskId, graph.nodes, onEnterTask],
+    [activeTaskId, graph.nodes, onEnterTask, onInitializeStage],
   );
   const [selectionId, setSelectionId] = useState<string | null>(
     localizedResearch ? defaultResearchSelection(localizedResearch) : null,
@@ -396,23 +435,32 @@ export function ResearchCanvas({
   useEffect(() => {
     if (!localizedResearch) {
       didInitializeRef.current = false;
-      setSelectionId(null);
-      setNodes([]);
-      return;
+      const frame = window.requestAnimationFrame(() => {
+        setSelectionId(null);
+        setNodes([]);
+      });
+      return () => {
+        window.cancelAnimationFrame(frame);
+      };
     }
 
-    setSelectionId(defaultResearchSelection(localizedResearch));
-    setNodes((currentNodes) => {
-      const currentPositionById = new Map(currentNodes.map((node) => [node.id, node.position]));
-      if (!didInitializeRef.current) {
-        didInitializeRef.current = true;
-        return enrichedNodes;
-      }
-      return enrichedNodes.map((node) => ({
-        ...node,
-        position: currentPositionById.get(node.id) ?? node.position,
-      }));
+    const frame = window.requestAnimationFrame(() => {
+      setSelectionId(defaultResearchSelection(localizedResearch));
+      setNodes((currentNodes) => {
+        const currentPositionById = new Map(currentNodes.map((node) => [node.id, node.position]));
+        if (!didInitializeRef.current) {
+          didInitializeRef.current = true;
+          return enrichedNodes;
+        }
+        return enrichedNodes.map((node) => ({
+          ...node,
+          position: currentPositionById.get(node.id) ?? node.position,
+        }));
+      });
     });
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
   }, [enrichedNodes, localizedResearch, setNodes]);
 
   if (needsBootstrap) {
@@ -510,6 +558,7 @@ export function ResearchCanvas({
           <StageInspector
             locale={locale}
             stage={resolved.stage}
+            onInitializeStage={onInitializeStage}
             onOpenArtifact={onOpenArtifact}
             onOpenWriting={onOpenWriting}
           />

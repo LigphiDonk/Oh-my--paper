@@ -488,6 +488,18 @@ pub struct ResearchStageSummary {
     pub label: String,
     pub description: String,
     pub status: String,
+    #[serde(default)]
+    pub bundle_id: String,
+    #[serde(default)]
+    pub bundle_label: String,
+    #[serde(default)]
+    pub bundle_description: String,
+    #[serde(default)]
+    pub bundle_skill_ids: Vec<String>,
+    #[serde(default)]
+    pub is_initialized: bool,
+    #[serde(default)]
+    pub can_initialize: bool,
     pub total_tasks: usize,
     pub done_tasks: usize,
     pub artifact_count: usize,
@@ -505,6 +517,8 @@ pub struct ResearchCanvasSnapshot {
     pub brief: Option<serde_json::Value>,
     pub tasks: Vec<ResearchTask>,
     pub current_stage: String,
+    #[serde(default)]
+    pub initialized_stages: Vec<String>,
     pub next_task: Option<ResearchTask>,
     pub stage_summaries: Vec<ResearchStageSummary>,
     pub artifact_paths: HashMap<String, Vec<String>>,

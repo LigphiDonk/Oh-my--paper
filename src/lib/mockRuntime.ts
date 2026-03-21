@@ -203,119 +203,149 @@ const RESEARCH_STAGE_ORDER: ResearchStage[] = [
   "promotion",
 ];
 
-const researchTasks: ResearchTask[] = [
-  {
-    id: "survey-1",
-    title: "Define the survey boundary",
-    description: "Clarify scope, venue, and screening criteria.",
-    status: "done",
-    stage: "survey",
-    priority: "high",
-    dependencies: [],
-    taskType: "planning",
-    inputsNeeded: [],
-    suggestedSkills: ["research-pipeline-planner", "research-literature-trace"],
-    nextActionPrompt:
-      "Use the research-literature-trace skill to collect traceable literature and update the survey notes.",
-    artifactPaths: [
-      ".viewerleaf/research/Survey/reports/survey-notes.md",
-    ],
-    taskPrompt:
-      "Define the survey boundary for this project. Clarify scope, venue, screening criteria, and traceable inputs.",
-    contextNotes: "The initial survey scope has been fixed and the note file already exists.",
-    lastUpdatedAt: "2026-03-20T09:00:00Z",
-    agentEntryLabel: "进入 Agent",
-  },
-  {
-    id: "ideation-1",
-    title: "Extract a publishable angle",
-    description: "Turn the survey into a concrete hypothesis and angle.",
-    status: "in-progress",
-    stage: "ideation",
-    priority: "high",
-    dependencies: ["survey-1"],
-    taskType: "ideation",
-    inputsNeeded: ["gap summary"],
-    suggestedSkills: ["research-pipeline-planner"],
-    nextActionPrompt:
-      "Use the research-pipeline-planner skill to refine the problem statement, chosen angle, and downstream tasks.",
-    artifactPaths: [
-      ".viewerleaf/research/Ideation/ideas/angle-notes.md",
-    ],
-    taskPrompt:
-      "Refine the publishable angle. Use the survey findings to sharpen the hypothesis, novelty, and next experimental commitments.",
-    contextNotes: "Current angle is promising but still needs sharper novelty framing against baseline work.",
-    lastUpdatedAt: "2026-03-21T08:30:00Z",
-    agentEntryLabel: "进入 Agent",
-  },
-  {
-    id: "experiment-1",
-    title: "Design the experiment plan",
-    description: "Define datasets, metrics, ablations, and analysis.",
-    status: "pending",
-    stage: "experiment",
-    priority: "high",
-    dependencies: ["ideation-1"],
-    taskType: "planning",
-    inputsNeeded: ["chosen idea"],
-    suggestedSkills: ["research-experiment-driver"],
-    nextActionPrompt:
-      "Use the research-experiment-driver skill to write the implementation and analysis plan.",
-    artifactPaths: [],
-    taskPrompt:
-      "Design the experiment plan with datasets, metrics, ablations, and analysis checkpoints linked to the current angle.",
-    contextNotes: "",
-    lastUpdatedAt: "",
-    agentEntryLabel: "进入 Agent",
-  },
-  {
-    id: "publication-1",
-    title: "Move into the paper workspace",
-    description: "Build a publication checklist for the LaTeX workspace.",
-    status: "pending",
-    stage: "publication",
-    priority: "high",
-    dependencies: ["experiment-1"],
-    taskType: "handoff",
-    inputsNeeded: ["validated claims"],
-    suggestedSkills: ["research-paper-handoff"],
-    nextActionPrompt:
-      "Use the research-paper-handoff skill to map claims and figures into the LaTeX manuscript.",
-    artifactPaths: ["main.tex", "sections/introduction.tex", "refs/references.bib"],
-    taskPrompt:
-      "Translate the validated research state into a paper-writing checklist for the main LaTeX workspace.",
-    contextNotes: "",
-    lastUpdatedAt: "",
-    agentEntryLabel: "进入 Agent",
-  },
-  {
-    id: "promotion-1",
-    title: "Prepare downstream deliverables",
-    description: "Create slides or a short summary after the draft is stable.",
-    status: "pending",
-    stage: "promotion",
-    priority: "medium",
-    dependencies: ["publication-1"],
-    taskType: "delivery",
-    inputsNeeded: ["paper draft"],
-    suggestedSkills: ["research-paper-handoff"],
-    nextActionPrompt:
-      "Use the research-paper-handoff skill to prepare slides and summary tasks from the manuscript state.",
-    artifactPaths: [],
-    taskPrompt:
-      "Prepare slides, summaries, and release material from the stable manuscript state.",
-    contextNotes: "",
-    lastUpdatedAt: "",
-    agentEntryLabel: "进入 Agent",
-  },
-];
+const STAGE_TASK_TEMPLATES: Record<ResearchStage, ResearchTask[]> = {
+  survey: [
+    {
+      id: "survey-1",
+      title: "Define the research boundary",
+      description: "Clarify topic scope, target venue, and screening criteria.",
+      status: "pending",
+      stage: "survey",
+      priority: "high",
+      dependencies: [],
+      taskType: "exploration",
+      inputsNeeded: ["topic boundary", "target venue"],
+      suggestedSkills: ["research-pipeline-planner", "research-literature-trace"],
+      nextActionPrompt:
+        "Use the research-literature-trace skill to collect traceable literature and map the field boundary.",
+      artifactPaths: [".pipeline/docs/domain_map.md", ".pipeline/docs/paper_bank.json"],
+      taskPrompt:
+        "Define the research boundary, keywords, venue target, and the first traceable literature collection plan.",
+      contextNotes: "",
+      lastUpdatedAt: "",
+      agentEntryLabel: "进入 Agent",
+    },
+    {
+      id: "survey-2",
+      title: "Build a traceable literature shortlist",
+      description: "Collect real papers, canonical links, and screening notes.",
+      status: "pending",
+      stage: "survey",
+      priority: "high",
+      dependencies: ["survey-1"],
+      taskType: "analysis",
+      inputsNeeded: ["seed query list"],
+      suggestedSkills: ["research-literature-trace"],
+      nextActionPrompt:
+        "Search and screen real literature, then update paper_bank.json with traceable links and concise notes.",
+      artifactPaths: [".pipeline/docs/paper_bank.json", ".viewerleaf/research/Survey/reports/screening-notes.md"],
+      taskPrompt:
+        "Build a traceable shortlist of core papers with links, tags, and screening decisions.",
+      contextNotes: "",
+      lastUpdatedAt: "",
+      agentEntryLabel: "进入 Agent",
+    },
+  ],
+  ideation: [
+    {
+      id: "ideation-1",
+      title: "Generate candidate ideas",
+      description: "Turn the survey and gap map into several candidate directions.",
+      status: "pending",
+      stage: "ideation",
+      priority: "high",
+      dependencies: ["survey-2"],
+      taskType: "analysis",
+      inputsNeeded: ["gap summary"],
+      suggestedSkills: ["research-pipeline-planner"],
+      nextActionPrompt:
+        "Generate several candidate ideas from the survey findings and record them in idea_board.json.",
+      artifactPaths: [".pipeline/docs/idea_board.json"],
+      taskPrompt:
+        "Generate candidate ideas from the validated literature gap and make the options concrete.",
+      contextNotes: "",
+      lastUpdatedAt: "",
+      agentEntryLabel: "进入 Agent",
+    },
+  ],
+  experiment: [
+    {
+      id: "experiment-1",
+      title: "Design the experiment plan",
+      description: "Define datasets, metrics, ablations, and analysis checkpoints.",
+      status: "pending",
+      stage: "experiment",
+      priority: "high",
+      dependencies: ["ideation-1"],
+      taskType: "implementation",
+      inputsNeeded: ["selected idea"],
+      suggestedSkills: ["research-experiment-driver"],
+      nextActionPrompt:
+        "Use the research-experiment-driver skill to write the implementation and analysis plan.",
+      artifactPaths: [".pipeline/docs/experiment_plan.md"],
+      taskPrompt:
+        "Design the experiment plan with datasets, metrics, baselines, and analysis checkpoints.",
+      contextNotes: "",
+      lastUpdatedAt: "",
+      agentEntryLabel: "进入 Agent",
+    },
+  ],
+  publication: [
+    {
+      id: "publication-1",
+      title: "Draft the paper outline",
+      description: "Turn the validated research state into a section plan.",
+      status: "pending",
+      stage: "publication",
+      priority: "high",
+      dependencies: ["experiment-1"],
+      taskType: "writing",
+      inputsNeeded: ["validated claims"],
+      suggestedSkills: ["research-paper-handoff"],
+      nextActionPrompt:
+        "Use the research-paper-handoff skill to map claims and figures into the LaTeX manuscript.",
+      artifactPaths: ["main.tex", "sections/introduction.tex", "refs/references.bib"],
+      taskPrompt:
+        "Draft the paper outline and convert validated claims into a writing checklist.",
+      contextNotes: "",
+      lastUpdatedAt: "",
+      agentEntryLabel: "进入 Agent",
+    },
+  ],
+  promotion: [
+    {
+      id: "promotion-1",
+      title: "Prepare downstream deliverables",
+      description: "Create slides or a short summary after the draft is stable.",
+      status: "pending",
+      stage: "promotion",
+      priority: "medium",
+      dependencies: ["publication-1"],
+      taskType: "delivery",
+      inputsNeeded: ["paper draft"],
+      suggestedSkills: ["research-paper-handoff"],
+      nextActionPrompt:
+        "Use the research-paper-handoff skill to prepare slides and summary tasks from the manuscript state.",
+      artifactPaths: [".pipeline/docs/promo_plan.md"],
+      taskPrompt:
+        "Prepare slides, summaries, and release material from the stable manuscript state.",
+      contextNotes: "",
+      lastUpdatedAt: "",
+      agentEntryLabel: "进入 Agent",
+    },
+  ],
+};
+
+const researchTasks: ResearchTask[] = [];
+const initializedResearchStages: ResearchStage[] = [];
 
 const researchBrief = {
   topic: "ViewerLeaf Research Canvas",
   goal: "Unify research planning and LaTeX writing.",
   pipeline: {
     startStage: "survey",
-    currentStage: "ideation",
+    currentStage: "survey",
+    initializedStages: initializedResearchStages,
   },
   systemPrompt:
     "You are the shared research agent for ViewerLeaf. Keep the project coherent across survey, ideation, experiment, publication, and promotion.",
@@ -330,8 +360,8 @@ const researchBrief = {
 
 function buildMockResearch(): ResearchCanvasSnapshot {
   const artifactPaths: Record<ResearchStage, string[]> = {
-    survey: [".viewerleaf/research/Survey/reports/survey-notes.md"],
-    ideation: [".viewerleaf/research/Ideation/ideas/angle-notes.md"],
+    survey: [".pipeline/docs/domain_map.md", ".pipeline/docs/paper_bank.json"],
+    ideation: [".pipeline/docs/idea_board.json"],
     experiment: [],
     publication: ["main.tex", "sections/introduction.tex", "refs/references.bib"],
     promotion: [],
@@ -340,7 +370,9 @@ function buildMockResearch(): ResearchCanvasSnapshot {
   const nextTask = researchTasks.find((task) => task.status === "in-progress")
     ?? researchTasks.find((task) => task.status === "pending")
     ?? null;
-  const currentStage = (nextTask?.stage ?? "ideation") as ResearchStage;
+  const currentStage = (nextTask?.stage
+    ?? RESEARCH_STAGE_ORDER.find((stage) => !initializedResearchStages.includes(stage))
+    ?? researchBrief.pipeline.currentStage) as ResearchStage;
 
   const stageSummaries: ResearchStageSummary[] = RESEARCH_STAGE_ORDER.map((stage) => {
     const stageTasks = researchTasks.filter((task) => task.stage === stage);
@@ -348,22 +380,39 @@ function buildMockResearch(): ResearchCanvasSnapshot {
     const inProgressTasks = stageTasks.filter((task) => task.status === "in-progress").length;
     const reviewTasks = stageTasks.filter((task) => task.status === "review").length;
     const pendingTasks = stageTasks.length - doneTasks - inProgressTasks - reviewTasks;
+    const bundleSkillIds = Array.from(new Set([
+      ...STAGE_TASK_TEMPLATES[stage].flatMap((task) => task.suggestedSkills),
+      ...stageTasks.flatMap((task) => task.suggestedSkills),
+    ]));
+    const isInitialized = initializedResearchStages.includes(stage) || stageTasks.length > 0;
     return {
       stage,
       label: stage[0].toUpperCase() + stage.slice(1),
       description: `Mock ${stage} stage for the browser runtime.`,
+      bundleId: stage,
+      bundleLabel:
+        stage === "survey" ? "领域调研与文献整理" :
+          stage === "ideation" ? "Idea 生成" :
+            stage === "experiment" ? "实验推进" :
+              stage === "publication" ? "论文写作" : "成果传播",
+      bundleDescription: `This bundle drives the ${stage} stage and groups the matching research skills.`,
+      bundleSkillIds,
+      isInitialized,
+      canInitialize: !isInitialized && stage === currentStage,
       status:
         doneTasks === stageTasks.length && stageTasks.length > 0
           ? "complete"
           : stage === currentStage
             ? "active"
-            : "queued",
+            : isInitialized
+              ? "queued"
+              : "idle",
       totalTasks: stageTasks.length,
       doneTasks,
       artifactCount: artifactPaths[stage].length,
       artifactPaths: artifactPaths[stage],
       missingInputs: stageTasks.flatMap((task) => task.inputsNeeded),
-      suggestedSkills: Array.from(new Set(stageTasks.flatMap((task) => task.suggestedSkills))),
+      suggestedSkills: bundleSkillIds,
       nextTaskId: stageTasks.find((task) => task.status !== "done")?.id ?? null,
       taskCounts: {
         total: stageTasks.length,
@@ -394,6 +443,7 @@ function buildMockResearch(): ResearchCanvasSnapshot {
     },
     tasks: structuredClone(researchTasks),
     currentStage,
+    initializedStages: structuredClone(initializedResearchStages),
     nextTask,
     stageSummaries,
     artifactPaths,
@@ -817,6 +867,20 @@ export const mockRuntime = {
   },
 
   async ensureResearchScaffold(_startStage?: string): Promise<WorkspaceSnapshot> {
+    researchTasks.splice(0, researchTasks.length);
+    initializedResearchStages.splice(0, initializedResearchStages.length);
+    researchBrief.pipeline.currentStage = "survey";
+    return this.openProject();
+  },
+
+  async initializeResearchStage(stage: ResearchStage): Promise<WorkspaceSnapshot> {
+    if (!initializedResearchStages.includes(stage)) {
+      initializedResearchStages.push(stage);
+    }
+    if (!researchTasks.some((task) => task.stage === stage)) {
+      researchTasks.push(...structuredClone(STAGE_TASK_TEMPLATES[stage]));
+    }
+    researchBrief.pipeline.currentStage = stage;
     return this.openProject();
   },
 

@@ -458,6 +458,12 @@ export interface ResearchStageSummary {
   label: string;
   description: string;
   status: "active" | "complete" | "queued" | "idle" | string;
+  bundleId?: string;
+  bundleLabel?: string;
+  bundleDescription?: string;
+  bundleSkillIds?: string[];
+  isInitialized?: boolean;
+  canInitialize?: boolean;
   totalTasks: number;
   doneTasks: number;
   artifactCount: number;
@@ -473,6 +479,7 @@ export interface ResearchCanvasSnapshot {
   brief?: Record<string, unknown> | null;
   tasks: ResearchTask[];
   currentStage: ResearchStage;
+  initializedStages?: ResearchStage[];
   nextTask?: ResearchTask | null;
   stageSummaries: ResearchStageSummary[];
   artifactPaths: Record<ResearchStage, string[]>;

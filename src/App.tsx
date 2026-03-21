@@ -104,6 +104,7 @@ import type {
   LatexEngine,
   ProjectNode,
   ProviderConfig,
+  ResearchStage,
   ResearchTask,
   ReviewComment,
   SkillManifest,
@@ -1905,6 +1906,30 @@ function App() {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       window.alert(`初始化研究工作流失败:\n${message}`);
+    } finally {
+      setIsResearchBootstrapBusy(false);
+    }
+  });
+
+  const handleInitializeResearchStage = useEffectEvent(async (stage: ResearchStage) => {
+    if (!snapshot?.projectConfig.rootPath || isResearchBootstrapBusy) {
+      return;
+    }
+
+    setIsResearchBootstrapBusy(true);
+    try {
+      const nextSnapshot = await loadSnapshotWithCollab(() => desktop.initializeResearchStage(stage));
+      applySnapshot(nextSnapshot, {
+        activeFilePath,
+        openTabs,
+        openImageTabs,
+        editorImagePath,
+        previewSelection,
+      });
+      setWorkspaceSurface("research");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      window.alert(`初始化研究阶段失败:\n${message}`);
     } finally {
       setIsResearchBootstrapBusy(false);
     }
@@ -3906,6 +3931,7 @@ function App() {
                   activeTaskId={activeResearchTaskId}
                   isBusy={isResearchBootstrapBusy}
                   onBootstrap={handleEnsureResearchScaffold}
+                  onInitializeStage={handleInitializeResearchStage}
                   onOpenArtifact={handleOpenResearchArtifact}
                   onUseTaskInChat={handleUseResearchTaskInChat}
                   onEnterTask={handleUseResearchTaskInChat}
