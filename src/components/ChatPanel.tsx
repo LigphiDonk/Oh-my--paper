@@ -743,82 +743,164 @@ function AgentRuntimeSetup({
     ? knownVariants
     : [currentVariant, ...knownVariants];
   const hasMissingRuntime = !detectingCli && !activeStatus?.available;
+  const statusLabel = detectingCli
+    ? "检测中…"
+    : activeStatus?.available
+      ? activeStatus.version
+        ? `v${activeStatus.version}`
+        : "已就绪"
+      : "未检测到";
+
+  const vendorButtons = (
+    <div className="ag-runtime-vendors" role="tablist" aria-label="选择 Agent 运行时">
+      {(Object.entries(AGENT_BRANDS) as [AgentVendor, (typeof AGENT_BRANDS)[AgentVendor]][]).map(
+        ([vendor, brand]) => {
+          const status = cliStatus[vendor];
+          const unavailable = !detectingCli && !status?.available;
+
+          return (
+            <button
+              key={vendor}
+              type="button"
+              className={`ag-runtime-chip${activeVendor === vendor ? " is-active" : ""}${unavailable ? " is-unavailable" : ""}`}
+              style={
+                activeVendor === vendor
+                  ? {
+                      borderColor: brand.borderActive,
+                      background: brand.accentBg,
+                      color: brand.accentColor,
+                    }
+                  : undefined
+              }
+              disabled={Boolean(isStreaming)}
+              onClick={() => {
+                setIsModelMenuOpen(false);
+                void onSelectProviderVendor(vendor);
+              }}
+            >
+              <span className="ag-runtime-chip-icon">{brand.icon}</span>
+              <span>{brand.label}</span>
+            </button>
+          );
+        },
+      )}
+    </div>
+  );
 
   useEffect(() => {
     setIsModelMenuOpen(false);
   }, [activeVendor, currentModel]);
 
-  return (
-    <div className={`ag-runtime-setup${compact ? " ag-runtime-setup--compact" : ""}`} ref={runtimeRef}>
-      {!compact && (
-        <div className="ag-runtime-head">
-          <div>
-            <div className="ag-runtime-inline-label">对话运行时</div>
-            <div className="ag-runtime-inline-sub">
-              进入前可选，进入后也能继续切换模型与思考强度。
-            </div>
-          </div>
-          <div className="ag-runtime-head-actions">
-            <span
-              className={`ag-runtime-status${hasMissingRuntime ? " is-missing" : ""}`}
-              title={activeStatus?.path || activeBrand.label}
-            >
-              {detectingCli
-                ? "检测中…"
-                : activeStatus?.available
-                  ? activeStatus.version
-                    ? `v${activeStatus.version}`
-                    : "已就绪"
-                  : "未检测到"}
+  if (compact) {
+    return (
+      <div className="ag-runtime-setup ag-runtime-setup--compact" ref={runtimeRef}>
+        <div className="ag-runtime-compact">
+          <button
+            type="button"
+            className={`ag-runtime-compact-trigger${isModelMenuOpen ? " is-open" : ""}`}
+            disabled={Boolean(isStreaming)}
+            onClick={() => setIsModelMenuOpen((open) => !open)}
+          >
+            <span className="ag-runtime-compact-copy">
+              <span className="ag-runtime-compact-icon">{activeBrand.icon}</span>
+              <span className="ag-runtime-compact-label">{currentVariant.label}</span>
             </span>
-            {hasMissingRuntime && (
-              <button
-                type="button"
-                className="ag-runtime-refresh"
-                disabled={Boolean(isStreaming)}
-                onClick={() => void loadCliStatus()}
-              >
-                重试
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+            <span className="ag-runtime-model-caret" aria-hidden="true">▾</span>
+          </button>
 
-      <div className="ag-runtime-inline">
-        <div className="ag-runtime-vendors" role="tablist" aria-label="选择 Agent 运行时">
-          {(Object.entries(AGENT_BRANDS) as [AgentVendor, (typeof AGENT_BRANDS)[AgentVendor]][]).map(
-            ([vendor, brand]) => {
-              const status = cliStatus[vendor];
-              const unavailable = !detectingCli && !status?.available;
-
-              return (
-                <button
-                  key={vendor}
-                  type="button"
-                  className={`ag-runtime-chip${activeVendor === vendor ? " is-active" : ""}${unavailable ? " is-unavailable" : ""}`}
-                  style={
-                    activeVendor === vendor
-                      ? {
-                          borderColor: brand.borderActive,
-                          background: brand.accentBg,
-                          color: brand.accentColor,
-                        }
-                      : undefined
-                  }
-                  disabled={Boolean(isStreaming)}
-                  onClick={() => {
-                    setIsModelMenuOpen(false);
-                    void onSelectProviderVendor(vendor);
-                  }}
-                >
-                  <span className="ag-runtime-chip-icon">{brand.icon}</span>
-                  <span>{brand.label}</span>
-                </button>
-              );
-            },
+          {isModelMenuOpen && (
+            <div className="ag-runtime-model-menu ag-runtime-model-menu--compact" role="listbox" aria-label="选择模型">
+              <div className="ag-runtime-model-menu-head">
+                {vendorButtons}
+                <div className="ag-runtime-model-menu-meta">
+                  <span
+                    className={`ag-runtime-status${hasMissingRuntime ? " is-missing" : ""}`}
+                    title={activeStatus?.path || activeBrand.label}
+                  >
+                    {statusLabel}
+                  </span>
+                  {hasMissingRuntime && (
+                    <button
+                      type="button"
+                      className="ag-runtime-refresh"
+                      disabled={Boolean(isStreaming)}
+                      onClick={() => void loadCliStatus()}
+                    >
+                      重试
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="ag-runtime-model-options">
+                {modelOptions.map((model) => {
+                  const isSelected = model.key === currentVariant.key;
+                  return (
+                    <button
+                      key={model.key}
+                      type="button"
+                      className={`ag-runtime-model-option${isSelected ? " is-selected" : ""}`}
+                      role="option"
+                      aria-selected={isSelected}
+                      onClick={() => {
+                        setIsModelMenuOpen(false);
+                        void onSelectModel(model.key);
+                      }}
+                    >
+                      <span className="ag-runtime-model-option-main">
+                        <span className="ag-runtime-model-option-title">{model.label}</span>
+                        <span className="ag-runtime-model-option-desc">{model.description}</span>
+                      </span>
+                      <span className="ag-runtime-model-option-meta">
+                        {model.badge ? <span className="ag-runtime-model-option-badge">{model.badge}</span> : null}
+                        {isSelected ? <span className="ag-runtime-model-option-check">✓</span> : null}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {hasMissingRuntime && (
+                <div className="ag-runtime-help ag-runtime-help--compact">
+                  没能拉起 {activeBrand.label}。通常是桌面环境里缺少它依赖的 `node` 或 `PATH`。
+                </div>
+              )}
+            </div>
           )}
         </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="ag-runtime-setup" ref={runtimeRef}>
+      <div className="ag-runtime-head">
+        <div>
+          <div className="ag-runtime-inline-label">对话运行时</div>
+          <div className="ag-runtime-inline-sub">
+            进入前可选，进入后也能继续切换模型与思考强度。
+          </div>
+        </div>
+        <div className="ag-runtime-head-actions">
+          <span
+            className={`ag-runtime-status${hasMissingRuntime ? " is-missing" : ""}`}
+            title={activeStatus?.path || activeBrand.label}
+          >
+            {statusLabel}
+          </span>
+          {hasMissingRuntime && (
+            <button
+              type="button"
+              className="ag-runtime-refresh"
+              disabled={Boolean(isStreaming)}
+              onClick={() => void loadCliStatus()}
+            >
+              重试
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="ag-runtime-inline">
+        {vendorButtons}
 
         <div className="ag-runtime-inline-model">
           <span className="ag-runtime-inline-model-label">模型</span>
@@ -869,22 +951,6 @@ function AgentRuntimeSetup({
           )}
         </div>
 
-        {compact && (
-          <div className="ag-runtime-head-actions ag-runtime-head-actions--compact">
-            <span
-              className={`ag-runtime-status${hasMissingRuntime ? " is-missing" : ""}`}
-              title={activeStatus?.path || activeBrand.label}
-            >
-              {detectingCli
-                ? "检测中…"
-                : activeStatus?.available
-                  ? activeStatus.version
-                    ? `v${activeStatus.version}`
-                    : "已就绪"
-                  : "未检测到"}
-            </span>
-          </div>
-        )}
       </div>
 
       {hasMissingRuntime && (
@@ -902,11 +968,25 @@ function BottomBar({
   skills,
   onToggleSkill,
   usageRecords,
+  hasConversationContent,
+  providers,
+  activeProfile,
+  activeProviderId,
+  isStreaming,
+  onSelectProviderVendor,
+  onSelectModel,
 }: {
   onRunAgent: () => void;
   skills: SkillManifest[];
   onToggleSkill: (skill: SkillManifest) => Promise<void>;
   usageRecords: UsageRecord[];
+  hasConversationContent: boolean;
+  providers: ProviderConfig[];
+  activeProfile: AgentProfile | null;
+  activeProviderId?: string;
+  isStreaming?: boolean;
+  onSelectProviderVendor: (vendor: AgentVendor) => Promise<void>;
+  onSelectModel: (model: string) => Promise<void>;
 }) {
   const [showSkills, setShowSkills] = useState(false);
   const lastRecord = usageRecords[usageRecords.length - 1];
@@ -951,6 +1031,17 @@ function BottomBar({
 
         {/* Right side: ctx ring */}
         <div className="ag-toolbar-right">
+          {hasConversationContent && (
+            <AgentRuntimeSetup
+              providers={providers}
+              activeProfile={activeProfile}
+              activeProviderId={activeProviderId}
+              isStreaming={isStreaming}
+              compact
+              onSelectProviderVendor={onSelectProviderVendor}
+              onSelectModel={onSelectModel}
+            />
+          )}
           {ctxPct > 0 && (
             <div className="ag-ctx-ring" title={`上下文 ${ctxPct}%`}>
               <svg viewBox="0 0 20 20" width="16" height="16">
@@ -1461,18 +1552,6 @@ export function ChatPanel({
         <div ref={endRef} />
       </div>
 
-      {hasConversationContent && (
-        <AgentRuntimeSetup
-          providers={providers}
-          activeProfile={activeProfile}
-          activeProviderId={activeProviderId}
-          isStreaming={isStreaming}
-          compact
-          onSelectProviderVendor={onSelectProviderVendor}
-          onSelectModel={onSelectModel}
-        />
-      )}
-
       {/* Input box */}
       <div className="ag-input-wrap">
         {/* @ file mention dropdown */}
@@ -1550,6 +1629,13 @@ export function ChatPanel({
         skills={skills}
         onToggleSkill={onToggleSkill}
         usageRecords={usageRecords}
+        hasConversationContent={hasConversationContent}
+        providers={providers}
+        activeProfile={activeProfile}
+        activeProviderId={activeProviderId}
+        isStreaming={isStreaming}
+        onSelectProviderVendor={onSelectProviderVendor}
+        onSelectModel={onSelectModel}
       />
     </div>
   );

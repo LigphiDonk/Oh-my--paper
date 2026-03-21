@@ -73,6 +73,7 @@ export function WorkspaceMenuBar({
 
   const recentItems = recentWorkspaces.slice(0, 7);
   const canCloseTabs = workspaceTabs.length > 1;
+  const showWorkspaceTabs = workspaceTabs.length > 1;
 
   function handleMenuAction(action: () => void) {
     setIsFileMenuOpen(false);
@@ -182,40 +183,42 @@ export function WorkspaceMenuBar({
         </div>
       )}
 
-      <div className="workspace-tab-strip" aria-label="Open workspaces">
-        {workspaceTabs.map((workspace) => {
-          const isActive = workspace.rootPath === activeWorkspaceRoot;
-          return (
-            <div
-              key={workspace.rootPath}
-              className={clsx("workspace-top-tab", isActive && "is-active")}
-              title={workspace.rootPath}
-            >
-              <button
-                type="button"
-                className="workspace-top-tab-button"
-                onClick={() => onSelectWorkspace(workspace.rootPath)}
+      {showWorkspaceTabs && (
+        <div className="workspace-tab-strip" aria-label="Open workspaces">
+          {workspaceTabs.map((workspace) => {
+            const isActive = workspace.rootPath === activeWorkspaceRoot;
+            return (
+              <div
+                key={workspace.rootPath}
+                className={clsx("workspace-top-tab", isActive && "is-active")}
+                title={workspace.rootPath}
               >
-                <span className="workspace-top-tab-label">{workspace.label}</span>
-                {isActive && hasDirtyChanges && <span className="workspace-top-tab-dot" aria-hidden="true" />}
-              </button>
-              {canCloseTabs && (
                 <button
                   type="button"
-                  className="workspace-top-tab-close"
-                  onClick={() => onCloseWorkspaceTab(workspace.rootPath)}
-                  aria-label={`关闭 ${workspace.label}`}
+                  className="workspace-top-tab-button"
+                  onClick={() => onSelectWorkspace(workspace.rootPath)}
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
+                  <span className="workspace-top-tab-label">{workspace.label}</span>
+                  {isActive && hasDirtyChanges && <span className="workspace-top-tab-dot" aria-hidden="true" />}
                 </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                {canCloseTabs && (
+                  <button
+                    type="button"
+                    className="workspace-top-tab-close"
+                    onClick={() => onCloseWorkspaceTab(workspace.rootPath)}
+                    aria-label={`关闭 ${workspace.label}`}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

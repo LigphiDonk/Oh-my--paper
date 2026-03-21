@@ -460,39 +460,57 @@ function WorkspaceEmptyState({
   onOpenRecentWorkspace: (rootPath: string) => void;
 }) {
   const isZh = locale === "zh-CN";
-  const visibleRecentWorkspaces = recentWorkspaces.slice(0, 5);
+  const visibleRecentWorkspaces = recentWorkspaces.slice(0, 6);
 
   return (
     <div className="workspace-empty-state">
-      <div className="workspace-empty-state__eyebrow">{isZh ? "工作区" : "Workspace"}</div>
-      <h2>{isZh ? "打开或创建一个项目" : "Open or create a project"}</h2>
-      <p>{isZh ? "左右两侧现在默认收起，直接从主工作区开始。" : "Both side panes start collapsed so you can enter the main workspace immediately."}</p>
+      <div className="workspace-empty-state__hero">
+        <div className="workspace-empty-state__eyebrow">{isZh ? "工作区" : "Workspace"}</div>
+        <h2>{isZh ? "打开或创建一个项目" : "Open or create a project"}</h2>
+        <p>
+          {isZh
+            ? "左右两侧保持折叠，直接从中间主工作区开始。"
+            : "Both side panes stay collapsed so you start directly from the main workspace."}
+        </p>
+      </div>
 
       <div className="workspace-empty-state__actions">
-        <button className="btn-primary workspace-empty-state__btn" type="button" onClick={onOpenProject}>
+        <button className="btn-primary workspace-empty-state__btn workspace-empty-state__btn--primary" type="button" onClick={onOpenProject}>
           {isZh ? "打开项目" : "Open Project"}
         </button>
-        <button className="btn-secondary workspace-empty-state__btn" type="button" onClick={onCreateProject}>
-          {isZh ? "创建项目" : "Create Project"}
-        </button>
-        <button className="btn-secondary workspace-empty-state__btn" type="button" onClick={onLinkCloudProject}>
-          {isZh ? "关联云项目" : "Link Cloud Project"}
-        </button>
+        <div className="workspace-empty-state__secondary-actions">
+          <button className="btn-secondary workspace-empty-state__btn" type="button" onClick={onCreateProject}>
+            {isZh ? "创建项目" : "Create Project"}
+          </button>
+          <button className="btn-secondary workspace-empty-state__btn" type="button" onClick={onLinkCloudProject}>
+            {isZh ? "关联云项目" : "Link Cloud Project"}
+          </button>
+        </div>
       </div>
 
       <div className="workspace-empty-state__recent">
-        <div className="workspace-empty-state__recent-label">{isZh ? "最近项目" : "Recent Projects"}</div>
+        <div className="workspace-empty-state__recent-header">
+          <div className="workspace-empty-state__recent-label">{isZh ? "最近项目" : "Recent Projects"}</div>
+          {visibleRecentWorkspaces.length > 0 ? (
+            <span className="workspace-empty-state__recent-count">
+              {visibleRecentWorkspaces.length}
+            </span>
+          ) : null}
+        </div>
         {visibleRecentWorkspaces.length > 0 ? (
           <div className="workspace-empty-state__recent-list">
             {visibleRecentWorkspaces.map((workspace) => (
               <button
                 key={workspace.rootPath}
                 type="button"
-                className="workspace-empty-state__recent-card"
+                className="workspace-empty-state__recent-item"
                 onClick={() => onOpenRecentWorkspace(workspace.rootPath)}
               >
-                <span className="workspace-empty-state__recent-title">{workspace.label}</span>
-                <span className="workspace-empty-state__recent-path">{workspace.rootPath}</span>
+                <span className="workspace-empty-state__recent-copy">
+                  <span className="workspace-empty-state__recent-title">{workspace.label}</span>
+                  <span className="workspace-empty-state__recent-path">{workspace.rootPath}</span>
+                </span>
+                <span className="workspace-empty-state__recent-open">{isZh ? "打开" : "Open"}</span>
               </button>
             ))}
           </div>
