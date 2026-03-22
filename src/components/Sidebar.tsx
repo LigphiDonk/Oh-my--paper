@@ -64,7 +64,6 @@ interface SidebarProps {
   onSelectChatVendor: (vendor: "claude-code" | "codex") => Promise<void>;
   onSelectChatModel: (model: string) => Promise<void>;
   onToggleSkill: (skill: SkillManifest) => Promise<void>;
-  onSkillsChanged?: () => void;
   streamThinkingText?: string;
   streamThinkingHistoryText?: string;
   streamThinkingDurationMs?: number;
@@ -192,7 +191,6 @@ export function Sidebar({
   onSelectChatVendor,
   onSelectChatModel,
   onToggleSkill,
-  onSkillsChanged,
   streamThinkingText,
   streamThinkingHistoryText,
   streamThinkingDurationMs,

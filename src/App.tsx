@@ -3927,7 +3927,6 @@ function App() {
               onSelectChatVendor={handleSelectChatVendor}
               onSelectChatModel={handleSelectChatModel}
               onToggleSkill={handleToggleSkill}
-              onSkillsChanged={handleSkillsChanged}
               streamThinkingText={streamThinkingText}
               streamThinkingHistoryText={streamThinkingHistoryText}
               streamThinkingDurationMs={streamThinkingDurationMs}
