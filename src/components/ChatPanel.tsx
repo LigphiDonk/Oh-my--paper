@@ -31,6 +31,9 @@ import type {
   UsageRecord,
 } from "../types";
 
+/* Module-level set so dismissed-suggestion keys survive component re-mounts */
+const _appliedSuggestionKeys = new Set<string>();
+
 /* ─── stream block parser ─────────────────────────────── */
 interface ToolCallBlock {
   id: string;
@@ -1556,7 +1559,7 @@ export function ChatPanel({
   const sessionSearchRef = useRef<HTMLInputElement>(null);
   const [isSessionPickerOpen, setIsSessionPickerOpen] = useState(false);
   const [sessionQuery, setSessionQuery] = useState("");
-  const [dismissedSuggestionKeys, setDismissedSuggestionKeys] = useState<string[]>([]);
+  const [dismissedSuggestionKeys, setDismissedSuggestionKeys] = useState<string[]>(() => Array.from(_appliedSuggestionKeys));
   const activeSession = sessions.find((session) => session.id === activeSessionId) ?? null;
   const filteredSessions = useMemo(() => {
     const keyword = sessionQuery.trim().toLowerCase();
@@ -1996,9 +1999,13 @@ export function ChatPanel({
           <TaskSuggestionCard
             suggestion={latestTaskSuggestion.suggestion}
             activeTask={activeResearchTask}
-            onDismiss={() => setDismissedSuggestionKeys((current) => [...current, latestTaskSuggestion.key])}
+            onDismiss={() => {
+              _appliedSuggestionKeys.add(latestTaskSuggestion.key);
+              setDismissedSuggestionKeys((current) => [...current, latestTaskSuggestion.key]);
+            }}
             onApply={async () => {
               await onApplyTaskUpdateSuggestion(latestTaskSuggestion.suggestion);
+              _appliedSuggestionKeys.add(latestTaskSuggestion.key);
               setDismissedSuggestionKeys((current) => [...current, latestTaskSuggestion.key]);
             }}
           />

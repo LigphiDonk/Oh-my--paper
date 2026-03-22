@@ -2183,6 +2183,7 @@ function App() {
         previewSelection,
       });
       setRuntimeNotice(null);
+      setWorkspaceSurface("research");
     } catch (error) {
       reportRuntimeIssue(error, isZh ? "应用任务建议失败" : "Failed to apply task suggestion");
       throw error;
