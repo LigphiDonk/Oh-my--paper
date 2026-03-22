@@ -536,7 +536,12 @@ pub struct ResearchCanvasSnapshot {
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ResearchTaskUpdateChanges {
+    pub title: Option<String>,
     pub status: Option<String>,
+    pub stage: Option<String>,
+    pub priority: Option<String>,
+    pub dependencies: Option<Vec<String>>,
+    pub task_type: Option<String>,
     pub description: Option<String>,
     pub inputs_needed: Option<Vec<String>>,
     pub artifact_paths: Option<Vec<String>>,
@@ -544,13 +549,51 @@ pub struct ResearchTaskUpdateChanges {
     pub next_action_prompt: Option<String>,
     pub context_notes: Option<String>,
     pub task_prompt: Option<String>,
+    pub agent_entry_label: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ResearchTaskDraft {
+    pub id: Option<String>,
+    pub title: String,
+    pub description: Option<String>,
+    pub status: Option<String>,
+    pub stage: String,
+    pub priority: Option<String>,
+    pub dependencies: Option<Vec<String>>,
+    pub task_type: Option<String>,
+    pub inputs_needed: Option<Vec<String>>,
+    pub artifact_paths: Option<Vec<String>>,
+    pub suggested_skills: Option<Vec<String>>,
+    pub next_action_prompt: Option<String>,
+    pub context_notes: Option<String>,
+    pub task_prompt: Option<String>,
+    pub agent_entry_label: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase", tag = "type")]
+pub enum ResearchTaskPlanOperation {
+    Update {
+        task_id: String,
+        changes: ResearchTaskUpdateChanges,
+    },
+    Add {
+        task: ResearchTaskDraft,
+        after_task_id: Option<String>,
+    },
+    Remove {
+        task_id: String,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ApplyResearchTaskSuggestionRequest {
-    pub task_id: String,
-    pub changes: ResearchTaskUpdateChanges,
+    pub task_id: Option<String>,
+    pub changes: Option<ResearchTaskUpdateChanges>,
+    pub operations: Option<Vec<ResearchTaskPlanOperation>>,
     pub working_memory: Option<String>,
 }
 

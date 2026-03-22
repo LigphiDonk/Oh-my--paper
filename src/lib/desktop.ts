@@ -20,8 +20,8 @@ import type {
   ProjectFile,
   ProfileConfig,
   ProviderConfig,
+  ApplyResearchTaskSuggestionRequest,
   ResearchStage,
-  ResearchTaskUpdateChanges,
   SkillManifest,
   StreamChunk,
   SyncLocation,
@@ -239,11 +239,11 @@ export const desktop = {
       mockRuntime.runAgent(profileId, filePath, selectedText, userMessage, sessionId, taskMode, taskContext),
     );
   },
-  applyResearchTaskSuggestion(taskId: string, changes: ResearchTaskUpdateChanges, workingMemory?: string) {
+  applyResearchTaskSuggestion(request: ApplyResearchTaskSuggestionRequest) {
     return runOrMock<WorkspaceSnapshot>(
       "apply_research_task_suggestion",
-      { request: { taskId, changes, workingMemory } },
-      () => mockRuntime.applyResearchTaskSuggestion(taskId, changes, workingMemory),
+      { request },
+      () => mockRuntime.applyResearchTaskSuggestion(request),
     );
   },
   applyAgentPatch(filePath: string, content: string) {

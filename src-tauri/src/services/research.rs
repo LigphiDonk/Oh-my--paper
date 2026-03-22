@@ -9,7 +9,8 @@ use walkdir::WalkDir;
 
 use crate::models::{
     ApplyResearchTaskSuggestionRequest, ResearchBootstrapState, ResearchCanvasSnapshot,
-    ResearchStageSummary, ResearchTask,
+    ResearchStageSummary, ResearchTask, ResearchTaskDraft, ResearchTaskPlanOperation,
+    ResearchTaskUpdateChanges,
     ResearchTaskCounts,
 };
 
@@ -412,6 +413,142 @@ fn dedup_strings(values: &[String]) -> Vec<String> {
     out.sort();
     out.dedup();
     out
+}
+
+fn apply_task_changes(task: &mut ResearchTask, changes: &ResearchTaskUpdateChanges, known_task_ids: &BTreeSet<String>) {
+    if let Some(title) = changes.title.as_ref().map(|value| value.trim()).filter(|value| !value.is_empty()) {
+        task.title = title.to_string();
+    }
+    if let Some(status) = changes.status.as_ref().map(|value| value.trim()).filter(|value| !value.is_empty()) {
+        task.status = status.to_string();
+    }
+    if let Some(stage) = changes.stage.as_deref() {
+        task.stage = normalize_stage(Some(stage));
+    }
+    if let Some(priority) = changes.priority.as_ref().map(|value| value.trim()).filter(|value| !value.is_empty()) {
+        task.priority = priority.to_string();
+    }
+    if let Some(dependencies) = changes.dependencies.as_ref() {
+        task.dependencies = dedup_strings(dependencies)
+            .into_iter()
+            .filter(|dependency| dependency != &task.id && known_task_ids.contains(dependency))
+            .collect();
+    }
+    if let Some(task_type) = changes.task_type.as_ref().map(|value| value.trim()).filter(|value| !value.is_empty()) {
+        task.task_type = task_type.to_string();
+    }
+    if let Some(description) = changes.description.as_ref().map(|value| value.trim()).filter(|value| !value.is_empty()) {
+        task.description = description.to_string();
+    }
+    if let Some(inputs_needed) = changes.inputs_needed.as_ref() {
+        task.inputs_needed = dedup_strings(inputs_needed);
+    }
+    if let Some(artifact_paths) = changes.artifact_paths.as_ref() {
+        task.artifact_paths = dedup_strings(artifact_paths);
+    }
+    if let Some(suggested_skills) = changes.suggested_skills.as_ref() {
+        task.suggested_skills = dedup_strings(suggested_skills);
+    }
+    if let Some(next_action_prompt) = changes
+        .next_action_prompt
+        .as_ref()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+    {
+        task.next_action_prompt = next_action_prompt.to_string();
+    }
+    if let Some(context_notes) = changes
+        .context_notes
+        .as_ref()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+    {
+        task.context_notes = context_notes.to_string();
+    }
+    if let Some(task_prompt) = changes
+        .task_prompt
+        .as_ref()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+    {
+        task.task_prompt = task_prompt.to_string();
+    }
+    if let Some(agent_entry_label) = changes
+        .agent_entry_label
+        .as_ref()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+    {
+        task.agent_entry_label = agent_entry_label.to_string();
+    }
+    task.last_updated_at = iso_now();
+}
+
+fn next_custom_task_id(tasks: &[ResearchTask], stage: &str) -> String {
+    let mut suffix = 1;
+    loop {
+        let candidate = format!("{stage}-custom-{suffix}");
+        if !tasks.iter().any(|task| task.id == candidate) {
+            return candidate;
+        }
+        suffix += 1;
+    }
+}
+
+fn build_custom_task(tasks: &[ResearchTask], draft: &ResearchTaskDraft) -> Result<ResearchTask> {
+    let title = draft.title.trim();
+    if title.is_empty() {
+        bail!("task title is required");
+    }
+
+    let stage = normalize_stage(Some(&draft.stage));
+    let known_task_ids = tasks.iter().map(|task| task.id.clone()).collect::<BTreeSet<_>>();
+    let id = draft
+        .id
+        .as_ref()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string)
+        .unwrap_or_else(|| next_custom_task_id(tasks, &stage));
+    let dependencies = dedup_strings(draft.dependencies.as_deref().unwrap_or(&[]))
+        .into_iter()
+        .filter(|dependency| dependency != &id && known_task_ids.contains(dependency))
+        .collect::<Vec<_>>();
+
+    Ok(ResearchTask {
+        id,
+        title: title.to_string(),
+        description: draft.description.as_deref().unwrap_or("").trim().to_string(),
+        status: draft.status.as_deref().unwrap_or("pending").trim().to_string(),
+        stage,
+        priority: draft.priority.as_deref().unwrap_or("medium").trim().to_string(),
+        dependencies,
+        task_type: draft.task_type.as_deref().unwrap_or("custom").trim().to_string(),
+        inputs_needed: dedup_strings(draft.inputs_needed.as_deref().unwrap_or(&[])),
+        suggested_skills: dedup_strings(draft.suggested_skills.as_deref().unwrap_or(&[])),
+        next_action_prompt: draft
+            .next_action_prompt
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or(title)
+            .to_string(),
+        artifact_paths: dedup_strings(draft.artifact_paths.as_deref().unwrap_or(&[])),
+        task_prompt: draft.task_prompt.as_deref().unwrap_or("").trim().to_string(),
+        context_notes: draft.context_notes.as_deref().unwrap_or("").trim().to_string(),
+        last_updated_at: iso_now(),
+        agent_entry_label: draft.agent_entry_label.as_deref().unwrap_or("").trim().to_string(),
+    })
+}
+
+fn sort_tasks(tasks: &mut [ResearchTask]) {
+    tasks.sort_by(|left, right| {
+        stage_index(&left.stage)
+            .cmp(&stage_index(&right.stage))
+            .then(status_rank(&left.status).cmp(&status_rank(&right.status)))
+            .then(left.title.cmp(&right.title))
+            .then(left.id.cmp(&right.id))
+    });
 }
 
 fn default_tasks(start_stage: &str) -> Vec<ResearchTask> {
@@ -1213,67 +1350,54 @@ pub fn load_research_snapshot(root: &Path) -> Result<ResearchCanvasSnapshot> {
 pub fn apply_task_suggestion(root: &Path, request: &ApplyResearchTaskSuggestionRequest) -> Result<()> {
     let tasks_path = pipeline_root(root).join("tasks").join("tasks.json");
     let brief_path = pipeline_root(root).join("docs").join("research_brief.json");
-
-    let raw_tasks = fs::read_to_string(&tasks_path)?;
-    let mut tasks_json = serde_json::from_str::<Value>(&raw_tasks)?;
-    let Some(tasks) = tasks_json.get_mut("tasks").and_then(|value| value.as_array_mut()) else {
-        bail!("invalid tasks.json shape");
+    let mut tasks = read_tasks(&tasks_path);
+    let operations = if let Some(operations) = request.operations.as_ref().filter(|items| !items.is_empty()) {
+        operations.clone()
+    } else if let (Some(task_id), Some(changes)) = (request.task_id.as_ref(), request.changes.as_ref()) {
+        vec![ResearchTaskPlanOperation::Update {
+            task_id: task_id.clone(),
+            changes: changes.clone(),
+        }]
+    } else {
+        Vec::new()
     };
 
-    let Some(task_json) = tasks.iter_mut().find(|task| {
-        task.get("id")
-            .and_then(|value| value.as_str())
-            .map(|value| value == request.task_id)
-            .unwrap_or(false)
-    }) else {
-        bail!("task not found: {}", request.task_id);
-    };
+    if operations.is_empty() {
+        bail!("no task operations provided");
+    }
 
-    if let Some(status) = request.changes.status.as_ref().map(|value| value.trim()).filter(|value| !value.is_empty()) {
-        task_json["status"] = Value::String(status.to_string());
+    for operation in operations {
+        match operation {
+            ResearchTaskPlanOperation::Update { task_id, changes } => {
+                let known_task_ids = tasks.iter().map(|task| task.id.clone()).collect::<BTreeSet<_>>();
+                let Some(task) = tasks.iter_mut().find(|task| task.id == task_id) else {
+                    bail!("task not found: {task_id}");
+                };
+                apply_task_changes(task, &changes, &known_task_ids);
+            }
+            ResearchTaskPlanOperation::Add { task, .. } => {
+                let custom_task = build_custom_task(&tasks, &task)?;
+                tasks.push(custom_task);
+            }
+            ResearchTaskPlanOperation::Remove { task_id } => {
+                let Some(index) = tasks.iter().position(|task| task.id == task_id) else {
+                    continue;
+                };
+                if matches!(tasks[index].status.as_str(), "done" | "in-progress") {
+                    tasks[index].status = "cancelled".into();
+                    tasks[index].last_updated_at = iso_now();
+                } else {
+                    tasks.remove(index);
+                    for task in &mut tasks {
+                        task.dependencies.retain(|dependency| dependency != &task_id);
+                    }
+                }
+            }
+        }
     }
-    if let Some(description) = request.changes.description.as_ref().map(|value| value.trim()).filter(|value| !value.is_empty()) {
-        task_json["description"] = Value::String(description.to_string());
-    }
-    if let Some(inputs_needed) = request.changes.inputs_needed.as_ref() {
-        task_json["inputsNeeded"] = serde_json::to_value(dedup_strings(inputs_needed))?;
-    }
-    if let Some(artifact_paths) = request.changes.artifact_paths.as_ref() {
-        task_json["artifactPaths"] = serde_json::to_value(dedup_strings(artifact_paths))?;
-    }
-    if let Some(suggested_skills) = request.changes.suggested_skills.as_ref() {
-        task_json["suggestedSkills"] = serde_json::to_value(dedup_strings(suggested_skills))?;
-    }
-    if let Some(next_action_prompt) = request
-        .changes
-        .next_action_prompt
-        .as_ref()
-        .map(|value| value.trim())
-        .filter(|value| !value.is_empty())
-    {
-        task_json["nextActionPrompt"] = Value::String(next_action_prompt.to_string());
-    }
-    if let Some(context_notes) = request
-        .changes
-        .context_notes
-        .as_ref()
-        .map(|value| value.trim())
-        .filter(|value| !value.is_empty())
-    {
-        task_json["contextNotes"] = Value::String(context_notes.to_string());
-    }
-    if let Some(task_prompt) = request
-        .changes
-        .task_prompt
-        .as_ref()
-        .map(|value| value.trim())
-        .filter(|value| !value.is_empty())
-    {
-        task_json["taskPrompt"] = Value::String(task_prompt.to_string());
-    }
-    task_json["lastUpdatedAt"] = Value::String(iso_now());
 
-    fs::write(&tasks_path, serde_json::to_string_pretty(&tasks_json)?)?;
+    sort_tasks(&mut tasks);
+    write_tasks(&tasks_path, &tasks)?;
 
     if let Some(working_memory) = request
         .working_memory
@@ -1380,5 +1504,67 @@ mod tests {
         let skills = recommended_skills("publication", "writing");
         assert!(skills.iter().any(|skill| skill == "inno-paper-writing"));
         assert!(skills.iter().any(|skill| skill == "ml-paper-writing"));
+    }
+
+    #[test]
+    fn task_suggestion_can_add_custom_task() {
+        let root = make_temp_project("research-add-task");
+        let app_root = make_app_root();
+        ensure_research_scaffold(&app_root, &root, Some("survey")).expect("scaffold");
+        initialize_research_stage(&root, "survey").expect("initialize survey");
+
+        apply_task_suggestion(
+            &root,
+            &ApplyResearchTaskSuggestionRequest {
+                task_id: None,
+                changes: None,
+                operations: Some(vec![ResearchTaskPlanOperation::Add {
+                    task: ResearchTaskDraft {
+                        title: "Check venue scope".into(),
+                        stage: "survey".into(),
+                        description: Some("Verify target venue boundaries.".into()),
+                        priority: Some("high".into()),
+                        dependencies: Some(vec!["survey-1".into()]),
+                        next_action_prompt: Some("Review venue CFP and collect constraints.".into()),
+                        ..ResearchTaskDraft::default()
+                    },
+                    after_task_id: None,
+                }]),
+                working_memory: None,
+            },
+        )
+        .expect("apply task suggestion");
+
+        let snapshot = load_research_snapshot(&root).expect("snapshot");
+        let custom_task = snapshot
+            .tasks
+            .iter()
+            .find(|task| task.title == "Check venue scope")
+            .expect("custom task");
+        assert_eq!(custom_task.stage, "survey");
+        assert_eq!(custom_task.dependencies, vec!["survey-1"]);
+    }
+
+    #[test]
+    fn task_suggestion_can_remove_pending_task() {
+        let root = make_temp_project("research-remove-task");
+        let app_root = make_app_root();
+        ensure_research_scaffold(&app_root, &root, Some("survey")).expect("scaffold");
+
+        apply_task_suggestion(
+            &root,
+            &ApplyResearchTaskSuggestionRequest {
+                task_id: None,
+                changes: None,
+                operations: Some(vec![ResearchTaskPlanOperation::Remove {
+                    task_id: "survey-2".into(),
+                }]),
+                working_memory: None,
+            },
+        )
+        .expect("remove task");
+
+        let snapshot = load_research_snapshot(&root).expect("snapshot");
+        assert!(snapshot.tasks.iter().all(|task| task.id != "survey-2"));
     }
 }

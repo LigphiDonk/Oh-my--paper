@@ -1,6 +1,6 @@
 import type { Edge, Node } from "@xyflow/react";
 
-import type { ResearchCanvasSnapshot, ResearchStage, ResearchStageSummary, ResearchTask } from "../types";
+import type { ResearchCanvasSnapshot, ResearchStage, ResearchStageSummary, ResearchTask, ResearchTaskDraft } from "../types";
 
 export interface ResearchStageNodeData extends Record<string, unknown> {
   kind: "stage";
@@ -14,14 +14,18 @@ export interface ResearchStageContainerData extends Record<string, unknown> {
   containerWidth: number;
   containerHeight: number;
   isCollapsed: boolean;
+  isCurrentStage?: boolean;
   onToggleCollapse?: (stage: ResearchStage) => void;
   onInitializeStage?: (stage: ResearchStage) => void;
+  onAddTask?: (draft: ResearchTaskDraft) => void;
 }
 
 export interface ResearchTaskNodeData extends Record<string, unknown> {
   kind: "task";
   task: ResearchTask;
   isCurrentTask?: boolean;
+  isExecutableTask?: boolean;
+  isBlockedTask?: boolean;
   onEnterTask?: (task: ResearchTask) => void;
 }
 
@@ -39,19 +43,20 @@ const STAGE_ORDER: ResearchStage[] = [
 ];
 
 const STAGE_CENTER_X = 760;
-const TASK_NODE_WIDTH = 250;
-const TASK_NODE_HEIGHT = 228;
-const TASK_COLUMN_GAP = 56;
-const TASK_ROW_GAP = 104;
+const TASK_NODE_WIDTH = 292;
+const TASK_NODE_HEIGHT = 278;
+const TASK_COLUMN_GAP = 92;
+const TASK_ROW_GAP = 136;
 
 /* Container layout constants */
-const CONTAINER_HEADER_H = 68;
-const CONTAINER_PAD_X = 28;
-const CONTAINER_PAD_BOTTOM = 28;
-const CONTAINER_MIN_WIDTH = 680;
-const COLLAPSED_HEIGHT = 68;
-const CONTAINER_GAP = 60;
-const CONTAINER_TOP = 40;
+const CONTAINER_HEADER_H = 88;
+const CONTAINER_CHIPS_H = 48;
+const CONTAINER_PAD_X = 52;
+const CONTAINER_PAD_BOTTOM = 42;
+const CONTAINER_MIN_WIDTH = 960;
+const COLLAPSED_HEIGHT = 88;
+const CONTAINER_GAP = 92;
+const CONTAINER_TOP = 44;
 
 function stageNodeId(stage: ResearchStage) {
   return `stage:${stage}`;
@@ -134,6 +139,7 @@ export function buildResearchCanvasGraph(
     const stageTaskIdSet = new Set(stageTasks.map((task) => task.id));
     const isCollapsed = collapsedStages.has(stage);
     const taskRows = isCollapsed ? [] : groupTasksByDepth(stageTasks);
+    const chipsHeight = !isCollapsed && summary.suggestedSkills.length > 0 ? CONTAINER_CHIPS_H : 0;
 
     /* Calculate container dimensions */
     const maxRowWidth = taskRows.length > 0
@@ -147,7 +153,7 @@ export function buildResearchCanvasGraph(
       : 0;
     const containerHeight = isCollapsed
       ? COLLAPSED_HEIGHT
-      : CONTAINER_HEADER_H + taskAreaHeight + (taskRows.length > 0 ? CONTAINER_PAD_BOTTOM : 8);
+      : CONTAINER_HEADER_H + chipsHeight + taskAreaHeight + (taskRows.length > 0 ? CONTAINER_PAD_BOTTOM : 16);
 
     const containerX = STAGE_CENTER_X - containerWidth / 2;
     const containerY = currentTop;
@@ -166,6 +172,7 @@ export function buildResearchCanvasGraph(
         containerWidth,
         containerHeight,
         isCollapsed,
+        isCurrentStage: research.currentStage === stage,
       },
     } as ResearchStageContainerNode);
 
@@ -175,11 +182,11 @@ export function buildResearchCanvasGraph(
         id: `flow:${STAGE_ORDER[stageIndex - 1]}:${stage}`,
         source: stageNodeId(STAGE_ORDER[stageIndex - 1]),
         target: stageId,
-        type: "smoothstep",
+        type: "default",
         animated: research.currentStage === stage,
         style: {
-          stroke: stage === research.currentStage ? "#2563eb" : "rgba(148, 163, 184, 0.72)",
-          strokeWidth: stage === research.currentStage ? 2.1 : 1.35,
+          stroke: stage === research.currentStage ? "rgba(109, 40, 217, 0.98)" : "rgba(124, 58, 237, 0.38)",
+          strokeWidth: stage === research.currentStage ? 3.4 : 2.4,
         },
       });
     }
@@ -189,7 +196,7 @@ export function buildResearchCanvasGraph(
       taskRows.forEach((row, rowIndex) => {
         const totalWidth = rowWidth(row.length);
         const rowStartX = (containerWidth - totalWidth) / 2;
-        const rowY = CONTAINER_HEADER_H + rowIndex * (TASK_NODE_HEIGHT + TASK_ROW_GAP);
+        const rowY = CONTAINER_HEADER_H + chipsHeight + rowIndex * (TASK_NODE_HEIGHT + TASK_ROW_GAP);
 
         row.forEach((task, columnIndex) => {
           const taskId = taskNodeId(task.id);
@@ -215,11 +222,11 @@ export function buildResearchCanvasGraph(
               id: `stage:${stage}:${task.id}`,
               source: stageId,
               target: taskId,
-              type: "smoothstep",
+              type: "default",
               animated: research.nextTask?.id === task.id,
               style: {
-                stroke: research.nextTask?.id === task.id ? "#2563eb" : "rgba(148, 163, 184, 0.56)",
-                strokeWidth: research.nextTask?.id === task.id ? 2 : 1.2,
+                stroke: research.nextTask?.id === task.id ? "rgba(109, 40, 217, 0.98)" : "rgba(124, 58, 237, 0.3)",
+                strokeWidth: research.nextTask?.id === task.id ? 3 : 2,
               },
             });
           }
@@ -233,12 +240,11 @@ export function buildResearchCanvasGraph(
               id: `dep:${dependencyId}:${task.id}`,
               source: taskNodeId(dependencyId),
               target: taskId,
-              type: "smoothstep",
+              type: "default",
               animated: research.nextTask?.id === task.id,
               style: {
-                stroke: research.nextTask?.id === task.id ? "rgba(37, 99, 235, 0.8)" : "rgba(148, 163, 184, 0.44)",
-                strokeDasharray: "4 5",
-                strokeWidth: research.nextTask?.id === task.id ? 1.8 : 1.1,
+                stroke: research.nextTask?.id === task.id ? "rgba(109, 40, 217, 0.96)" : "rgba(124, 58, 237, 0.32)",
+                strokeWidth: research.nextTask?.id === task.id ? 2.7 : 1.9,
               },
             });
           });

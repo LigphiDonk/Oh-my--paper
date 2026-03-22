@@ -24,6 +24,7 @@ import type {
   ResearchCanvasSnapshot,
   ResearchStageSummary,
   ResearchStage,
+  ResearchTaskDraft,
   ResearchTask,
 } from "../types";
 
@@ -37,6 +38,7 @@ interface ResearchCanvasProps {
   onOpenArtifact: (path: string) => void;
   onUseTaskInChat: (task: ResearchTask) => Promise<void> | void;
   onEnterTask: (task: ResearchTask) => Promise<void> | void;
+  onAddTask: (draft: ResearchTaskDraft) => Promise<void> | void;
   onOpenWriting: () => void;
 }
 
@@ -63,6 +65,75 @@ function formatPriority(task: ResearchTask, isZh: boolean) {
     medium: "中优先级",
     low: "低优先级",
   }[task.priority] ?? task.priority);
+}
+
+interface ResearchTaskExecutionState {
+  executableTaskIds: Set<string>;
+  blockedTaskIds: Set<string>;
+}
+
+interface TaskComposerState {
+  stage: ResearchStage;
+  title: string;
+  description: string;
+  priority: string;
+  taskType: string;
+  dependencies: string[];
+  inputsNeeded: string;
+  suggestedSkills: string;
+  nextActionPrompt: string;
+}
+
+function resolveResearchTaskExecutionState(research: ResearchCanvasSnapshot): ResearchTaskExecutionState {
+  const doneIds = new Set(
+    research.tasks
+      .filter((task) => task.status === "done")
+      .map((task) => task.id),
+  );
+  const executableTaskIds = new Set(
+    research.tasks
+      .filter((task) => task.stage === research.currentStage)
+      .filter((task) => ["in-progress", "review"].includes(task.status))
+      .map((task) => task.id),
+  );
+
+  if (executableTaskIds.size === 0) {
+    research.tasks
+      .filter((task) => task.stage === research.currentStage)
+      .filter((task) => ["pending", "review", ""].includes(task.status))
+      .filter((task) => task.dependencies.every((dependencyId) => doneIds.has(dependencyId)))
+      .forEach((task) => executableTaskIds.add(task.id));
+  }
+
+  const blockedTaskIds = new Set(
+    research.tasks
+      .filter((task) => task.status !== "done" && !executableTaskIds.has(task.id))
+      .filter((task) => task.dependencies.some((dependencyId) => !doneIds.has(dependencyId)))
+      .map((task) => task.id),
+  );
+
+  return { executableTaskIds, blockedTaskIds };
+}
+
+function splitComposerList(value: string) {
+  return value
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function createTaskComposerState(stage: ResearchStage, dependencies: string[] = [], suggestedSkills: string[] = []): TaskComposerState {
+  return {
+    stage,
+    title: "",
+    description: "",
+    priority: "medium",
+    taskType: "custom",
+    dependencies,
+    inputsNeeded: "",
+    suggestedSkills: suggestedSkills.join(", "),
+    nextActionPrompt: "",
+  };
 }
 
 /* ── Stage Container Node ── */
@@ -111,6 +182,20 @@ function StageContainerNode({ data, selected }: NodeProps<ResearchStageContainer
           ) : null}
           <button
             type="button"
+            className="research-stage-container__add"
+            onClick={(event) => {
+              event.stopPropagation();
+              data.onAddTask?.({
+                stage: stage.stage as ResearchStage,
+                title: "",
+                suggestedSkills: stage.suggestedSkills,
+              });
+            }}
+          >
+            {isZh ? "添加任务" : "Add Task"}
+          </button>
+          <button
+            type="button"
             className="research-stage-container__toggle"
             onClick={(event) => {
               event.stopPropagation();
@@ -147,12 +232,29 @@ function StageContainerNode({ data, selected }: NodeProps<ResearchStageContainer
 function TaskNode({ data, selected }: NodeProps<ResearchTaskNode>) {
   const task = data.task;
   const isZh = /[\u4e00-\u9fff]/.test(task.title);
+  const isExecutable = Boolean(data.isExecutableTask);
+  const isBlocked = Boolean(data.isBlockedTask);
+  const statusIcon =
+    task.status === "done"
+      ? "check"
+      : task.status === "in-progress" || task.status === "review"
+        ? "pulse"
+        : isBlocked
+          ? "lock"
+          : "pending";
   return (
-    <div className={`research-task-node is-${task.status}${selected ? " is-selected" : ""}${data.isCurrentTask ? " is-current-task" : ""}`}>
+    <div
+      className={
+        `research-task-node is-${task.status}${selected ? " is-selected" : ""}${data.isCurrentTask ? " is-current-task" : ""}${isExecutable ? " is-executable" : ""}${isBlocked ? " is-blocked" : ""}`
+      }
+    >
       <Handle type="target" position={Position.Top} className="research-node-handle" />
       <div className="research-task-node__stripe" />
       <div className="research-task-node__header">
-        <span className="research-task-node__status">{formatTaskStatus(task, isZh)}</span>
+        <span className={`research-task-node__status is-${statusIcon}`}>
+          <span className={`research-task-node__status-dot is-${statusIcon}`} />
+          {formatTaskStatus(task, isZh)}
+        </span>
         <span className="research-task-node__priority">{formatPriority(task, isZh)}</span>
       </div>
       <div className="research-task-node__title">{task.title}</div>
@@ -160,6 +262,7 @@ function TaskNode({ data, selected }: NodeProps<ResearchTaskNode>) {
       <div className="research-task-node__meta">
         <span>{task.inputsNeeded.length} {isZh ? "输入" : "inputs"}</span>
         <span>{task.artifactPaths.length} {isZh ? "产物" : "artifacts"}</span>
+        <span>{isExecutable ? (isZh ? "可执行" : "ready") : isBlocked ? (isZh ? "阻塞" : "blocked") : (isZh ? "等待中" : "waiting")}</span>
       </div>
       <div className="research-task-node__actions">
         <button
@@ -169,8 +272,9 @@ function TaskNode({ data, selected }: NodeProps<ResearchTaskNode>) {
             event.stopPropagation();
             void data.onEnterTask?.(task);
           }}
+          disabled={!isExecutable}
         >
-          {task.agentEntryLabel || (isZh ? "进入 Agent" : "Enter Agent")}
+          {isExecutable ? (task.agentEntryLabel || (isZh ? "进入 Agent" : "Enter Agent")) : (isZh ? "等待前置任务" : "Waiting on dependencies")}
         </button>
       </div>
       {task.suggestedSkills.length > 0 ? (
@@ -282,12 +386,14 @@ function ResearchOnboarding({
 function TaskInspector({
   locale,
   task,
+  canUseTask,
   onOpenArtifact,
   onUseTaskInChat,
   onOpenWriting,
 }: {
   locale: AppLocale;
   task: ResearchTask;
+  canUseTask: boolean;
   onOpenArtifact: (path: string) => void;
   onUseTaskInChat: (task: ResearchTask) => Promise<void> | void;
   onOpenWriting: () => void;
@@ -319,8 +425,8 @@ function TaskInspector({
         </>
       ) : null}
       <div className="research-inspector__actions">
-        <button type="button" className="research-primary-btn" onClick={() => void onUseTaskInChat(task)}>
-          {isZh ? "发送到聊天" : "Use in Chat"}
+        <button type="button" className="research-primary-btn" onClick={() => void onUseTaskInChat(task)} disabled={!canUseTask}>
+          {canUseTask ? (isZh ? "发送到聊天" : "Use in Chat") : (isZh ? "等待轮到该任务" : "Wait until this task is ready")}
         </button>
         {task.stage === "publication" ? (
           <button type="button" className="research-secondary-btn" onClick={onOpenWriting}>
@@ -348,12 +454,14 @@ function TaskInspector({
 function StageInspector({
   locale,
   stage,
+  onAddTask,
   onInitializeStage,
   onOpenArtifact,
   onOpenWriting,
 }: {
   locale: AppLocale;
   stage: ResearchStageSummary;
+  onAddTask: (stage: ResearchStage) => void;
   onInitializeStage: (stage: ResearchStage) => Promise<void> | void;
   onOpenArtifact: (path: string) => void;
   onOpenWriting: () => void;
@@ -397,8 +505,25 @@ function StageInspector({
           >
             {isZh ? "开始本阶段" : "Start Stage"}
           </button>
+          <button
+            type="button"
+            className="research-secondary-btn"
+            onClick={() => onAddTask(stage.stage)}
+          >
+            {isZh ? "添加任务" : "Add Task"}
+          </button>
         </div>
-      ) : null}
+      ) : (
+        <div className="research-inspector__actions">
+          <button
+            type="button"
+            className="research-secondary-btn"
+            onClick={() => onAddTask(stage.stage)}
+          >
+            {isZh ? "添加任务" : "Add Task"}
+          </button>
+        </div>
+      )}
       {stage.stage === "publication" ? (
         <div className="research-inspector__actions">
           <button type="button" className="research-primary-btn" onClick={onOpenWriting}>
@@ -418,6 +543,103 @@ function StageInspector({
           </div>
         </>
       ) : null}
+    </div>
+  );
+}
+
+function TaskComposerDialog({
+  locale,
+  draft,
+  dependencyOptions,
+  onChange,
+  onClose,
+  onSubmit,
+}: {
+  locale: AppLocale;
+  draft: TaskComposerState;
+  dependencyOptions: ResearchTask[];
+  onChange: (next: TaskComposerState) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+}) {
+  const isZh = locale === "zh-CN";
+  return (
+    <div className="research-task-composer">
+      <div className="research-task-composer__backdrop" onClick={onClose} />
+      <div className="research-task-composer__panel">
+        <div className="research-task-composer__head">
+          <div>
+            <div className="research-inspector__eyebrow">{isZh ? "手动添加任务" : "Add Task"}</div>
+            <h3>{isZh ? "向当前阶段插入一个新任务" : "Insert a task into this stage"}</h3>
+          </div>
+          <button type="button" className="research-stage-container__toggle" onClick={onClose}>×</button>
+        </div>
+        <label className="research-task-composer__field">
+          <span>{isZh ? "标题" : "Title"}</span>
+          <input value={draft.title} onChange={(event) => onChange({ ...draft, title: event.target.value })} />
+        </label>
+        <label className="research-task-composer__field">
+          <span>{isZh ? "描述" : "Description"}</span>
+          <textarea value={draft.description} onChange={(event) => onChange({ ...draft, description: event.target.value })} rows={4} />
+        </label>
+        <div className="research-task-composer__row">
+          <label className="research-task-composer__field">
+            <span>{isZh ? "优先级" : "Priority"}</span>
+            <select value={draft.priority} onChange={(event) => onChange({ ...draft, priority: event.target.value })}>
+              <option value="high">{isZh ? "高" : "High"}</option>
+              <option value="medium">{isZh ? "中" : "Medium"}</option>
+              <option value="low">{isZh ? "低" : "Low"}</option>
+            </select>
+          </label>
+          <label className="research-task-composer__field">
+            <span>{isZh ? "类型" : "Type"}</span>
+            <input value={draft.taskType} onChange={(event) => onChange({ ...draft, taskType: event.target.value })} />
+          </label>
+        </div>
+        <label className="research-task-composer__field">
+          <span>{isZh ? "下一步提示" : "Next Action Prompt"}</span>
+          <textarea value={draft.nextActionPrompt} onChange={(event) => onChange({ ...draft, nextActionPrompt: event.target.value })} rows={3} />
+        </label>
+        <label className="research-task-composer__field">
+          <span>{isZh ? "输入项（逗号或换行分隔）" : "Inputs (comma or newline separated)"}</span>
+          <textarea value={draft.inputsNeeded} onChange={(event) => onChange({ ...draft, inputsNeeded: event.target.value })} rows={3} />
+        </label>
+        <label className="research-task-composer__field">
+          <span>{isZh ? "技能（逗号或换行分隔）" : "Skills (comma or newline separated)"}</span>
+          <textarea value={draft.suggestedSkills} onChange={(event) => onChange({ ...draft, suggestedSkills: event.target.value })} rows={2} />
+        </label>
+        {dependencyOptions.length > 0 ? (
+          <div className="research-task-composer__field">
+            <span>{isZh ? "依赖任务" : "Dependencies"}</span>
+            <div className="research-task-composer__deps">
+              {dependencyOptions.map((task) => {
+                const checked = draft.dependencies.includes(task.id);
+                return (
+                  <label key={task.id} className="research-task-composer__dep">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(event) => onChange({
+                        ...draft,
+                        dependencies: event.target.checked
+                          ? [...draft.dependencies, task.id]
+                          : draft.dependencies.filter((item) => item !== task.id),
+                      })}
+                    />
+                    <span>{task.title}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+        <div className="research-task-composer__actions">
+          <button type="button" className="research-secondary-btn" onClick={onClose}>{isZh ? "取消" : "Cancel"}</button>
+          <button type="button" className="research-primary-btn" onClick={onSubmit} disabled={!draft.title.trim()}>
+            {isZh ? "创建任务" : "Create Task"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -468,6 +690,7 @@ export function ResearchCanvas({
   onOpenArtifact,
   onUseTaskInChat,
   onEnterTask,
+  onAddTask,
   onOpenWriting,
 }: ResearchCanvasProps) {
   const isZh = locale === "zh-CN";
@@ -476,6 +699,11 @@ export function ResearchCanvas({
     [locale, research],
   );
   const needsBootstrap = !localizedResearch || localizedResearch.bootstrap.status !== "ready";
+  const taskExecutionState = useMemo(
+    () => (localizedResearch ? resolveResearchTaskExecutionState(localizedResearch) : { executableTaskIds: new Set<string>(), blockedTaskIds: new Set<string>() }),
+    [localizedResearch],
+  );
+  const [taskComposer, setTaskComposer] = useState<TaskComposerState | null>(null);
 
   /* Collapse state: which stages are collapsed */
   const [collapsedStages, setCollapsedStages] = useState<Set<ResearchStage>>(new Set());
@@ -503,7 +731,9 @@ export function ResearchCanvas({
           ...node,
           data: {
             ...node.data,
-            isCurrentTask: node.data.task.id === activeTaskId,
+            isCurrentTask: node.data.task.id === activeTaskId || node.data.task.id === localizedResearch?.nextTask?.id,
+            isExecutableTask: taskExecutionState.executableTaskIds.has(node.data.task.id),
+            isBlockedTask: taskExecutionState.blockedTaskIds.has(node.data.task.id),
             onEnterTask,
           },
         };
@@ -514,11 +744,18 @@ export function ResearchCanvas({
         data: {
           ...node.data,
           onInitializeStage,
+          onAddTask: (draft: ResearchTaskDraft) => {
+            const dependencyDefaults = localizedResearch?.tasks
+              .filter((task) => task.stage === draft.stage && task.status !== "cancelled")
+              .filter((task) => taskExecutionState.executableTaskIds.has(task.id))
+              .map((task) => task.id) ?? [];
+            setTaskComposer(createTaskComposerState(draft.stage, dependencyDefaults, draft.suggestedSkills ?? []));
+          },
           onToggleCollapse: handleToggleCollapse,
         },
       };
     }),
-    [activeTaskId, graph.nodes, onEnterTask, onInitializeStage, handleToggleCollapse],
+    [activeTaskId, graph.nodes, localizedResearch?.nextTask?.id, localizedResearch?.tasks, onEnterTask, onInitializeStage, handleToggleCollapse, taskExecutionState.blockedTaskIds, taskExecutionState.executableTaskIds],
   );
   const layoutSignature = useMemo(() => buildNodeLayoutSignature(enrichedNodes), [enrichedNodes]);
   const visibleNodeIds = useMemo(() => new Set(enrichedNodes.map((node) => node.id)), [enrichedNodes]);
@@ -583,6 +820,10 @@ export function ResearchCanvas({
   const currentStageLabel =
     localizedResearch.stageSummaries.find((item) => item.stage === localizedResearch.currentStage)?.label ??
     localizedResearch.currentStage;
+  const taskComposerDependencyOptions = taskComposer
+    ? localizedResearch.tasks.filter((task) =>
+      (task.stage === taskComposer.stage || task.status === "done" || taskExecutionState.executableTaskIds.has(task.id)))
+    : [];
 
   return (
     <div className="research-canvas-shell">
@@ -657,6 +898,7 @@ export function ResearchCanvas({
           <TaskInspector
             locale={locale}
             task={resolved.task}
+            canUseTask={taskExecutionState.executableTaskIds.has(resolved.task.id)}
             onOpenArtifact={onOpenArtifact}
             onUseTaskInChat={onUseTaskInChat}
             onOpenWriting={onOpenWriting}
@@ -665,6 +907,13 @@ export function ResearchCanvas({
           <StageInspector
             locale={locale}
             stage={resolved.stage}
+            onAddTask={(stage) => {
+              const dependencyDefaults = localizedResearch.tasks
+                .filter((task) => task.stage === stage && taskExecutionState.executableTaskIds.has(task.id))
+                .map((task) => task.id);
+              const stageSummary = localizedResearch.stageSummaries.find((item) => item.stage === stage);
+              setTaskComposer(createTaskComposerState(stage, dependencyDefaults, stageSummary?.suggestedSkills ?? []));
+            }}
             onInitializeStage={onInitializeStage}
             onOpenArtifact={onOpenArtifact}
             onOpenWriting={onOpenWriting}
@@ -675,6 +924,29 @@ export function ResearchCanvas({
           </div>
         )}
       </aside>
+      {taskComposer ? (
+        <TaskComposerDialog
+          locale={locale}
+          draft={taskComposer}
+          dependencyOptions={taskComposerDependencyOptions}
+          onChange={setTaskComposer}
+          onClose={() => setTaskComposer(null)}
+          onSubmit={() => {
+            void onAddTask({
+              stage: taskComposer.stage,
+              title: taskComposer.title.trim(),
+              description: taskComposer.description.trim(),
+              priority: taskComposer.priority,
+              taskType: taskComposer.taskType.trim() || "custom",
+              dependencies: taskComposer.dependencies,
+              inputsNeeded: splitComposerList(taskComposer.inputsNeeded),
+              suggestedSkills: splitComposerList(taskComposer.suggestedSkills),
+              nextActionPrompt: taskComposer.nextActionPrompt.trim() || taskComposer.description.trim() || taskComposer.title.trim(),
+            });
+            setTaskComposer(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

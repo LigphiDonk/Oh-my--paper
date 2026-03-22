@@ -625,7 +625,7 @@ fn build_project_stage_context(project_root: &Path, task_context: Option<&AgentT
         if !task.artifact_paths.is_empty() {
             lines.push(format!("activeTaskArtifacts: {}", task.artifact_paths.join(", ")));
         }
-        lines.push("taskUpdateProtocol: When the active task state materially changes, append a fenced code block with language `viewerleaf_task_update` containing JSON with keys `taskId`, `reason`, `confidence`, `changes`, and optional `workingMemory`. Only use these change keys: status, description, inputsNeeded, artifactPaths, suggestedSkills, nextActionPrompt, contextNotes, taskPrompt. Never propose updates for id, stage, dependencies, title, or priority.".into());
+        lines.push("taskUpdateProtocol: When the active task or project plan materially changes, append a fenced code block with language `viewerleaf_task_update`. Use JSON with keys `reason`, optional `confidence`, optional `workingMemory`, and either legacy `taskId` + `changes` or `operations`. `operations` is an array of plan actions: `{ \"type\": \"update\", \"taskId\": \"...\", \"changes\": { ... } }`, `{ \"type\": \"add\", \"task\": { \"title\": \"...\", \"stage\": \"survey|ideation|experiment|publication|promotion\", optional \"description\", \"priority\", \"dependencies\", \"taskType\", \"inputsNeeded\", \"suggestedSkills\", \"nextActionPrompt\" } }`, or `{ \"type\": \"remove\", \"taskId\": \"...\" }`. Prefer updating only the active task unless project evidence clearly requires replanning. Do not remove completed tasks.".into());
     } else {
         lines.push("taskMode: false".into());
     }

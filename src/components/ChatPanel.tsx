@@ -24,6 +24,7 @@ import type {
   DiffLine,
   ProjectNode,
   ProviderConfig,
+  ResearchTaskDraft,
   SkillManifest,
   TaskUpdateSuggestion,
   UsageRecord,
@@ -340,39 +341,112 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
 
+function sanitizeTaskDraft(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const title = typeof record.title === "string" ? record.title.trim() : "";
+  const stage = typeof record.stage === "string" ? record.stage.trim() : "";
+  if (!title || !stage) {
+    return null;
+  }
+  return {
+    id: typeof record.id === "string" && record.id.trim() ? record.id.trim() : undefined,
+    title,
+    description: typeof record.description === "string" && record.description.trim() ? record.description.trim() : undefined,
+    status: typeof record.status === "string" && record.status.trim() ? record.status.trim() : undefined,
+    stage: stage as ResearchTaskDraft["stage"],
+    priority: typeof record.priority === "string" && record.priority.trim() ? record.priority.trim() : undefined,
+    dependencies: isStringArray(record.dependencies) ? record.dependencies.map((item) => item.trim()).filter(Boolean) : undefined,
+    taskType: typeof record.taskType === "string" && record.taskType.trim() ? record.taskType.trim() : undefined,
+    inputsNeeded: isStringArray(record.inputsNeeded) ? record.inputsNeeded.map((item) => item.trim()).filter(Boolean) : undefined,
+    artifactPaths: isStringArray(record.artifactPaths) ? record.artifactPaths.map((item) => item.trim()).filter(Boolean) : undefined,
+    suggestedSkills: isStringArray(record.suggestedSkills) ? record.suggestedSkills.map((item) => item.trim()).filter(Boolean) : undefined,
+    nextActionPrompt: typeof record.nextActionPrompt === "string" && record.nextActionPrompt.trim() ? record.nextActionPrompt.trim() : undefined,
+    contextNotes: typeof record.contextNotes === "string" && record.contextNotes.trim() ? record.contextNotes.trim() : undefined,
+    taskPrompt: typeof record.taskPrompt === "string" && record.taskPrompt.trim() ? record.taskPrompt.trim() : undefined,
+    agentEntryLabel: typeof record.agentEntryLabel === "string" && record.agentEntryLabel.trim() ? record.agentEntryLabel.trim() : undefined,
+  } satisfies NonNullable<NonNullable<TaskUpdateSuggestion["operations"]>[number] & { type: "add" }>["task"];
+}
+
+function sanitizeTaskPlanOperations(value: unknown): NonNullable<TaskUpdateSuggestion["operations"]> {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((candidate) => {
+    if (!candidate || typeof candidate !== "object") {
+      return [];
+    }
+    const record = candidate as Record<string, unknown>;
+    const type = typeof record.type === "string" ? record.type.trim() : "";
+    if (type === "update") {
+      const taskId = typeof record.taskId === "string" ? record.taskId.trim() : "";
+      const changes = sanitizeTaskUpdateSuggestion({
+        taskId,
+        reason: "operation",
+        changes: record.changes,
+      })?.changes;
+      return taskId && changes ? [{ type, taskId, changes }] : [];
+    }
+    if (type === "add") {
+      const task = sanitizeTaskDraft(record.task);
+      return task ? [{
+        type,
+        task,
+        afterTaskId: typeof record.afterTaskId === "string" && record.afterTaskId.trim() ? record.afterTaskId.trim() : undefined,
+      }] : [];
+    }
+    if (type === "remove") {
+      const taskId = typeof record.taskId === "string" ? record.taskId.trim() : "";
+      return taskId ? [{ type, taskId }] : [];
+    }
+    return [];
+  });
+}
+
 function sanitizeTaskUpdateSuggestion(value: unknown): TaskUpdateSuggestion | null {
   if (!value || typeof value !== "object") {
     return null;
   }
   const record = value as Record<string, unknown>;
-  const taskId = typeof record.taskId === "string" ? record.taskId.trim() : "";
   const reason = typeof record.reason === "string" ? record.reason.trim() : "";
+  const taskId = typeof record.taskId === "string" ? record.taskId.trim() : "";
   const changes = record.changes && typeof record.changes === "object"
     ? (record.changes as Record<string, unknown>)
     : null;
-  if (!taskId || !reason || !changes) {
+  const operations = sanitizeTaskPlanOperations(record.operations);
+  if (!reason || (!taskId || !changes) && operations.length === 0) {
     return null;
   }
 
   const nextChanges: TaskUpdateSuggestion["changes"] = {};
-  if (typeof changes.status === "string" && changes.status.trim()) nextChanges.status = changes.status.trim();
-  if (typeof changes.description === "string" && changes.description.trim()) nextChanges.description = changes.description.trim();
-  if (isStringArray(changes.inputsNeeded)) nextChanges.inputsNeeded = changes.inputsNeeded.map((item) => item.trim()).filter(Boolean);
-  if (isStringArray(changes.artifactPaths)) nextChanges.artifactPaths = changes.artifactPaths.map((item) => item.trim()).filter(Boolean);
-  if (isStringArray(changes.suggestedSkills)) nextChanges.suggestedSkills = changes.suggestedSkills.map((item) => item.trim()).filter(Boolean);
-  if (typeof changes.nextActionPrompt === "string" && changes.nextActionPrompt.trim()) nextChanges.nextActionPrompt = changes.nextActionPrompt.trim();
-  if (typeof changes.contextNotes === "string" && changes.contextNotes.trim()) nextChanges.contextNotes = changes.contextNotes.trim();
-  if (typeof changes.taskPrompt === "string" && changes.taskPrompt.trim()) nextChanges.taskPrompt = changes.taskPrompt.trim();
+  if (typeof changes?.title === "string" && changes.title.trim()) nextChanges.title = changes.title.trim();
+  if (typeof changes?.status === "string" && changes.status.trim()) nextChanges.status = changes.status.trim();
+  if (typeof changes?.stage === "string" && changes.stage.trim()) nextChanges.stage = changes.stage.trim() as ResearchTaskDraft["stage"];
+  if (typeof changes?.priority === "string" && changes.priority.trim()) nextChanges.priority = changes.priority.trim();
+  if (isStringArray(changes?.dependencies)) nextChanges.dependencies = changes.dependencies.map((item) => item.trim()).filter(Boolean);
+  if (typeof changes?.taskType === "string" && changes.taskType.trim()) nextChanges.taskType = changes.taskType.trim();
+  if (typeof changes?.description === "string" && changes.description.trim()) nextChanges.description = changes.description.trim();
+  if (isStringArray(changes?.inputsNeeded)) nextChanges.inputsNeeded = changes.inputsNeeded.map((item) => item.trim()).filter(Boolean);
+  if (isStringArray(changes?.artifactPaths)) nextChanges.artifactPaths = changes.artifactPaths.map((item) => item.trim()).filter(Boolean);
+  if (isStringArray(changes?.suggestedSkills)) nextChanges.suggestedSkills = changes.suggestedSkills.map((item) => item.trim()).filter(Boolean);
+  if (typeof changes?.nextActionPrompt === "string" && changes.nextActionPrompt.trim()) nextChanges.nextActionPrompt = changes.nextActionPrompt.trim();
+  if (typeof changes?.contextNotes === "string" && changes.contextNotes.trim()) nextChanges.contextNotes = changes.contextNotes.trim();
+  if (typeof changes?.taskPrompt === "string" && changes.taskPrompt.trim()) nextChanges.taskPrompt = changes.taskPrompt.trim();
+  if (typeof changes?.agentEntryLabel === "string" && changes.agentEntryLabel.trim()) nextChanges.agentEntryLabel = changes.agentEntryLabel.trim();
 
-  if (Object.keys(nextChanges).length === 0) {
+  if (Object.keys(nextChanges).length === 0 && operations.length === 0) {
     return null;
   }
 
   return {
-    taskId,
+    taskId: taskId || undefined,
     reason,
     confidence: typeof record.confidence === "number" ? record.confidence : undefined,
-    changes: nextChanges,
+    changes: Object.keys(nextChanges).length > 0 ? nextChanges : undefined,
+    operations: operations.length > 0 ? operations : undefined,
     workingMemory: typeof record.workingMemory === "string" && record.workingMemory.trim()
       ? record.workingMemory.trim()
       : undefined,
@@ -738,8 +812,18 @@ function TaskSuggestionCard({
   onApply: () => void | Promise<void>;
   onDismiss: () => void;
 }) {
-  const changeLabels: Array<[keyof TaskUpdateSuggestion["changes"], string]> = [
+  const operations = suggestion.operations?.length
+    ? suggestion.operations
+    : suggestion.taskId && suggestion.changes
+      ? [{ type: "update", taskId: suggestion.taskId, changes: suggestion.changes }]
+      : [];
+  const changeLabels: Array<[keyof NonNullable<TaskUpdateSuggestion["changes"]>, string]> = [
+    ["title", "标题"],
     ["status", "状态"],
+    ["stage", "阶段"],
+    ["priority", "优先级"],
+    ["dependencies", "依赖"],
+    ["taskType", "类型"],
     ["description", "描述"],
     ["inputsNeeded", "输入"],
     ["artifactPaths", "产物"],
@@ -747,17 +831,27 @@ function TaskSuggestionCard({
     ["nextActionPrompt", "下一步"],
     ["contextNotes", "上下文"],
     ["taskPrompt", "任务提示词"],
+    ["agentEntryLabel", "按钮文案"],
   ];
 
-  const visibleChanges = changeLabels.filter(([key]) => suggestion.changes[key] !== undefined);
+  const updateOperation = operations.find((operation) => operation.type === "update");
+  const visibleChanges = updateOperation?.type === "update"
+    ? changeLabels.filter(([key]) => updateOperation.changes[key] !== undefined)
+    : [];
+  const title =
+    updateOperation?.type === "update"
+      ? (activeTask?.taskId === updateOperation.taskId ? activeTask.title : updateOperation.taskId)
+      : operations[0]?.type === "add"
+        ? operations[0].task.title
+        : operations[0]?.taskId ?? suggestion.taskId ?? "计划调整";
 
   return (
     <div className="ag-task-suggestion-card">
       <div className="ag-task-suggestion-card__head">
         <div>
-          <div className="ag-task-suggestion-card__eyebrow">任务更新建议</div>
+          <div className="ag-task-suggestion-card__eyebrow">任务/计划建议</div>
           <div className="ag-task-suggestion-card__title">
-            {activeTask?.taskId === suggestion.taskId ? activeTask.title : suggestion.taskId}
+            {title}
           </div>
         </div>
         {typeof suggestion.confidence === "number" ? (
@@ -768,6 +862,11 @@ function TaskSuggestionCard({
       </div>
       <div className="ag-task-suggestion-card__reason">{suggestion.reason}</div>
       <div className="ag-task-suggestion-card__chips">
+        {operations.map((operation, index) => (
+          <span key={`${operation.type}:${index}`} className="ag-task-suggestion-card__chip">
+            {operation.type === "add" ? "新增任务" : operation.type === "remove" ? "移除任务" : "更新任务"}
+          </span>
+        ))}
         {visibleChanges.map(([key, label]) => (
           <span key={key} className="ag-task-suggestion-card__chip">{label}</span>
         ))}

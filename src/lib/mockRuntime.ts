@@ -8,6 +8,7 @@ import type {
   AgentProfileId,
   AgentRunResult,
   AgentSessionSummary,
+  ApplyResearchTaskSuggestionRequest,
   AssetResource,
   CompileEnvironmentStatus,
   CompileResult,
@@ -23,6 +24,7 @@ import type {
   ResearchStageSummary,
   ResearchTask,
   ResearchTaskUpdateChanges,
+  type ResearchTaskPlanOperation,
   SkillManifest,
   SyncLocation,
   WorkspaceSnapshot,
@@ -832,6 +834,49 @@ function createRunSummary(profileId: AgentProfileId, selection: string) {
   }
 }
 
+function applyTaskChanges(task: ResearchTask, changes: ResearchTaskUpdateChanges) {
+  if (changes.title) task.title = changes.title;
+  if (changes.status) task.status = changes.status;
+  if (changes.stage) task.stage = changes.stage;
+  if (changes.priority) task.priority = changes.priority;
+  if (changes.dependencies) task.dependencies = Array.from(new Set(changes.dependencies));
+  if (changes.taskType) task.taskType = changes.taskType;
+  if (changes.description) task.description = changes.description;
+  if (changes.inputsNeeded) task.inputsNeeded = Array.from(new Set(changes.inputsNeeded));
+  if (changes.artifactPaths) task.artifactPaths = Array.from(new Set(changes.artifactPaths));
+  if (changes.suggestedSkills) task.suggestedSkills = Array.from(new Set(changes.suggestedSkills));
+  if (changes.nextActionPrompt) task.nextActionPrompt = changes.nextActionPrompt;
+  if (changes.contextNotes) task.contextNotes = changes.contextNotes;
+  if (changes.taskPrompt) task.taskPrompt = changes.taskPrompt;
+  if (changes.agentEntryLabel) task.agentEntryLabel = changes.agentEntryLabel;
+  task.lastUpdatedAt = new Date().toISOString();
+}
+
+function nextMockTaskId(stage: ResearchStage) {
+  let suffix = 1;
+  while (researchTasks.some((task) => task.id === `${stage}-custom-${suffix}`)) {
+    suffix += 1;
+  }
+  return `${stage}-custom-${suffix}`;
+}
+
+function normalizeSuggestionOperations(request: ApplyResearchTaskSuggestionRequest): ResearchTaskPlanOperation[] {
+  if (request.operations?.length) {
+    return request.operations;
+  }
+  if (request.taskId && request.changes) {
+    return [{ type: "update", taskId: request.taskId, changes: request.changes }];
+  }
+  return [];
+}
+
+function sortMockResearchTasks() {
+  researchTasks.sort((left, right) =>
+    RESEARCH_STAGE_ORDER.indexOf(left.stage) - RESEARCH_STAGE_ORDER.indexOf(right.stage)
+      || left.title.localeCompare(right.title, "zh-CN"),
+  );
+}
+
 export const mockRuntime = {
   async getAppVersion() {
     return "0.1.0";
@@ -1213,21 +1258,56 @@ export const mockRuntime = {
     return { ok: true };
   },
 
-  async applyResearchTaskSuggestion(taskId: string, changes: ResearchTaskUpdateChanges, workingMemory?: string) {
-    const task = researchTasks.find((item) => item.id === taskId);
-    if (task) {
-      if (changes.status) task.status = changes.status;
-      if (changes.description) task.description = changes.description;
-      if (changes.inputsNeeded) task.inputsNeeded = Array.from(new Set(changes.inputsNeeded));
-      if (changes.artifactPaths) task.artifactPaths = Array.from(new Set(changes.artifactPaths));
-      if (changes.suggestedSkills) task.suggestedSkills = Array.from(new Set(changes.suggestedSkills));
-      if (changes.nextActionPrompt) task.nextActionPrompt = changes.nextActionPrompt;
-      if (changes.contextNotes) task.contextNotes = changes.contextNotes;
-      if (changes.taskPrompt) task.taskPrompt = changes.taskPrompt;
-      task.lastUpdatedAt = new Date().toISOString();
+  async applyResearchTaskSuggestion(request: ApplyResearchTaskSuggestionRequest) {
+    for (const operation of normalizeSuggestionOperations(request)) {
+      if (operation.type === "update") {
+        const task = researchTasks.find((item) => item.id === operation.taskId);
+        if (task) {
+          applyTaskChanges(task, operation.changes);
+        }
+        continue;
+      }
+
+      if (operation.type === "add") {
+        const nextTask: ResearchTask = {
+          id: operation.task.id?.trim() || nextMockTaskId(operation.task.stage),
+          title: operation.task.title.trim(),
+          description: operation.task.description?.trim() ?? "",
+          status: operation.task.status?.trim() || "pending",
+          stage: operation.task.stage,
+          priority: operation.task.priority?.trim() || "medium",
+          dependencies: Array.from(new Set(operation.task.dependencies ?? [])),
+          taskType: operation.task.taskType?.trim() || "custom",
+          inputsNeeded: Array.from(new Set(operation.task.inputsNeeded ?? [])),
+          suggestedSkills: Array.from(new Set(operation.task.suggestedSkills ?? [])),
+          nextActionPrompt: operation.task.nextActionPrompt?.trim() || operation.task.description?.trim() || operation.task.title.trim(),
+          artifactPaths: Array.from(new Set(operation.task.artifactPaths ?? [])),
+          taskPrompt: operation.task.taskPrompt?.trim(),
+          contextNotes: operation.task.contextNotes?.trim(),
+          agentEntryLabel: operation.task.agentEntryLabel?.trim(),
+          lastUpdatedAt: new Date().toISOString(),
+        };
+        researchTasks.push(nextTask);
+        continue;
+      }
+
+      const taskIndex = researchTasks.findIndex((item) => item.id === operation.taskId);
+      if (taskIndex >= 0) {
+        const task = researchTasks[taskIndex];
+        if (task.status === "done" || task.status === "in-progress") {
+          task.status = "cancelled";
+          task.lastUpdatedAt = new Date().toISOString();
+        } else {
+          researchTasks.splice(taskIndex, 1);
+          researchTasks.forEach((candidate) => {
+            candidate.dependencies = candidate.dependencies.filter((dependencyId) => dependencyId !== operation.taskId);
+          });
+        }
+      }
     }
-    if (workingMemory) {
-      researchBrief.workingMemory = workingMemory;
+    sortMockResearchTasks();
+    if (request.workingMemory) {
+      researchBrief.workingMemory = request.workingMemory;
     }
     return this.openProject();
   },

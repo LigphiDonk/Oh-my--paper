@@ -493,7 +493,12 @@ export interface ResearchCanvasSnapshot {
 }
 
 export interface ResearchTaskUpdateChanges {
+  title?: string;
   status?: string;
+  stage?: ResearchStage;
+  priority?: string;
+  dependencies?: string[];
+  taskType?: string;
   description?: string;
   inputsNeeded?: string[];
   artifactPaths?: string[];
@@ -501,13 +506,56 @@ export interface ResearchTaskUpdateChanges {
   nextActionPrompt?: string;
   contextNotes?: string;
   taskPrompt?: string;
+  agentEntryLabel?: string;
+}
+
+export interface ResearchTaskDraft {
+  id?: string;
+  title: string;
+  description?: string;
+  status?: string;
+  stage: ResearchStage;
+  priority?: string;
+  dependencies?: string[];
+  taskType?: string;
+  inputsNeeded?: string[];
+  artifactPaths?: string[];
+  suggestedSkills?: string[];
+  nextActionPrompt?: string;
+  contextNotes?: string;
+  taskPrompt?: string;
+  agentEntryLabel?: string;
+}
+
+export type ResearchTaskPlanOperation =
+  | {
+    type: "update";
+    taskId: string;
+    changes: ResearchTaskUpdateChanges;
+  }
+  | {
+    type: "add";
+    task: ResearchTaskDraft;
+    afterTaskId?: string;
+  }
+  | {
+    type: "remove";
+    taskId: string;
+  };
+
+export interface ApplyResearchTaskSuggestionRequest {
+  taskId?: string;
+  changes?: ResearchTaskUpdateChanges;
+  operations?: ResearchTaskPlanOperation[];
+  workingMemory?: string;
 }
 
 export interface TaskUpdateSuggestion {
-  taskId: string;
   reason: string;
   confidence?: number;
-  changes: ResearchTaskUpdateChanges;
+  taskId?: string;
+  changes?: ResearchTaskUpdateChanges;
+  operations?: ResearchTaskPlanOperation[];
   workingMemory?: string;
 }
 

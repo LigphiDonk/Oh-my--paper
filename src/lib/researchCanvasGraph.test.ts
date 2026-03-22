@@ -236,6 +236,6 @@ describe("research canvas graph", () => {
     const graph = buildResearchCanvasGraph(sampleResearch);
     const container = graph.nodes.find((node): node is ResearchStageContainerNode => node.id === "stage:survey");
     expect(container).toBeDefined();
-    expect(container?.data.containerWidth).toBeGreaterThanOrEqual(680);
+    expect(container?.data.containerWidth).toBeGreaterThanOrEqual(960);
   });
 });

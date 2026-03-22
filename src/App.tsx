@@ -105,6 +105,7 @@ import type {
   ProjectNode,
   ProviderConfig,
   ResearchStage,
+  ResearchTaskDraft,
   ResearchTask,
   ReviewComment,
   SkillManifest,
@@ -2013,11 +2014,27 @@ function App() {
 
   const handleApplyResearchTaskSuggestion = useEffectEvent(async (suggestion: TaskUpdateSuggestion) => {
     const nextSnapshot = await loadSnapshotWithCollab(() =>
-      desktop.applyResearchTaskSuggestion(
-        suggestion.taskId,
-        suggestion.changes,
-        suggestion.workingMemory,
-      ),
+      desktop.applyResearchTaskSuggestion({
+        taskId: suggestion.taskId,
+        changes: suggestion.changes,
+        operations: suggestion.operations,
+        workingMemory: suggestion.workingMemory,
+      }),
+    );
+    applySnapshot(nextSnapshot, {
+      activeFilePath,
+      openTabs,
+      openImageTabs,
+      editorImagePath,
+      previewSelection,
+    });
+  });
+
+  const handleAddResearchTask = useEffectEvent(async (draft: ResearchTaskDraft) => {
+    const nextSnapshot = await loadSnapshotWithCollab(() =>
+      desktop.applyResearchTaskSuggestion({
+        operations: [{ type: "add", task: draft }],
+      }),
     );
     applySnapshot(nextSnapshot, {
       activeFilePath,
@@ -3935,6 +3952,7 @@ function App() {
                   onOpenArtifact={handleOpenResearchArtifact}
                   onUseTaskInChat={handleUseResearchTaskInChat}
                   onEnterTask={handleUseResearchTaskInChat}
+                  onAddTask={handleAddResearchTask}
                   onOpenWriting={() => setWorkspaceSurface("writing")}
                 />
               </div>
