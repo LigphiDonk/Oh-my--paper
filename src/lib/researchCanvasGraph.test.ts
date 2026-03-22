@@ -5,6 +5,8 @@ import {
   buildResearchCanvasGraph,
   defaultResearchSelection,
   selectionToEntity,
+  type ResearchStageContainerNode,
+  type ResearchTaskNode,
 } from "./researchCanvasGraph";
 
 const sampleResearch: ResearchCanvasSnapshot = {
@@ -150,10 +152,16 @@ const sampleResearch: ResearchCanvasSnapshot = {
 };
 
 describe("research canvas graph", () => {
-  it("builds stage and task nodes for the workflow", () => {
+  it("builds stage container and task nodes for the workflow", () => {
     const graph = buildResearchCanvasGraph(sampleResearch);
-    expect(graph.nodes.some((node) => node.id === "stage:publication")).toBe(true);
-    expect(graph.nodes.some((node) => node.id === "task:publication-1")).toBe(true);
+    const stageContainer = graph.nodes.find((node): node is ResearchStageContainerNode => node.id === "stage:publication");
+    expect(stageContainer).toBeDefined();
+    expect(stageContainer?.type).toBe("stageContainer");
+
+    const taskNode = graph.nodes.find((node): node is ResearchTaskNode => node.id === "task:publication-1");
+    expect(taskNode).toBeDefined();
+    expect(taskNode?.parentId).toBe("stage:publication");
+
     expect(graph.edges.some((edge) => edge.id === "dep:survey-1:publication-1")).toBe(true);
   });
 
@@ -201,5 +209,33 @@ describe("research canvas graph", () => {
     expect(Math.max(...publicationTasks.map((node) => node.position.y))).toBeGreaterThan(
       Math.min(...publicationTasks.map((node) => node.position.y)),
     );
+  });
+
+  it("collapses stages without generating child task nodes", () => {
+    const collapsed = new Set<"survey" | "ideation" | "experiment" | "publication" | "promotion">(["publication"]);
+    const graph = buildResearchCanvasGraph(sampleResearch, collapsed);
+
+    /* Container should still exist */
+    const container = graph.nodes.find((node): node is ResearchStageContainerNode => node.id === "stage:publication");
+    expect(container).toBeDefined();
+    expect(container?.data.isCollapsed).toBe(true);
+
+    /* Task node should NOT exist */
+    expect(graph.nodes.find((node) => node.id === "task:publication-1")).toBeUndefined();
+  });
+
+  it("removes dependency edges that point to collapsed upstream tasks", () => {
+    const collapsed = new Set<"survey" | "ideation" | "experiment" | "publication" | "promotion">(["survey"]);
+    const graph = buildResearchCanvasGraph(sampleResearch, collapsed);
+
+    expect(graph.nodes.find((node) => node.id === "task:survey-1")).toBeUndefined();
+    expect(graph.edges.find((edge) => edge.id === "dep:survey-1:publication-1")).toBeUndefined();
+  });
+
+  it("container width is at least CONTAINER_MIN_WIDTH", () => {
+    const graph = buildResearchCanvasGraph(sampleResearch);
+    const container = graph.nodes.find((node): node is ResearchStageContainerNode => node.id === "stage:survey");
+    expect(container).toBeDefined();
+    expect(container?.data.containerWidth).toBeGreaterThanOrEqual(680);
   });
 });

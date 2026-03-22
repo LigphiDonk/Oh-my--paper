@@ -8,6 +8,16 @@ export interface ResearchStageNodeData extends Record<string, unknown> {
   onInitializeStage?: (stage: ResearchStage) => void;
 }
 
+export interface ResearchStageContainerData extends Record<string, unknown> {
+  kind: "stageContainer";
+  stage: ResearchStageSummary;
+  containerWidth: number;
+  containerHeight: number;
+  isCollapsed: boolean;
+  onToggleCollapse?: (stage: ResearchStage) => void;
+  onInitializeStage?: (stage: ResearchStage) => void;
+}
+
 export interface ResearchTaskNodeData extends Record<string, unknown> {
   kind: "task";
   task: ResearchTask;
@@ -16,8 +26,9 @@ export interface ResearchTaskNodeData extends Record<string, unknown> {
 }
 
 export type ResearchStageNode = Node<ResearchStageNodeData, "researchStage">;
+export type ResearchStageContainerNode = Node<ResearchStageContainerData, "stageContainer">;
 export type ResearchTaskNode = Node<ResearchTaskNodeData, "researchTask">;
-export type ResearchCanvasNode = ResearchStageNode | ResearchTaskNode;
+export type ResearchCanvasNode = ResearchStageNode | ResearchStageContainerNode | ResearchTaskNode;
 
 const STAGE_ORDER: ResearchStage[] = [
   "survey",
@@ -28,15 +39,19 @@ const STAGE_ORDER: ResearchStage[] = [
 ];
 
 const STAGE_CENTER_X = 760;
-const STAGE_NODE_WIDTH = 300;
-const STAGE_NODE_HEIGHT = 182;
 const TASK_NODE_WIDTH = 250;
 const TASK_NODE_HEIGHT = 228;
 const TASK_COLUMN_GAP = 56;
 const TASK_ROW_GAP = 104;
-const STAGE_TO_TASK_GAP = 118;
-const STAGE_BLOCK_GAP = 172;
-const STAGE_TOP = 40;
+
+/* Container layout constants */
+const CONTAINER_HEADER_H = 68;
+const CONTAINER_PAD_X = 28;
+const CONTAINER_PAD_BOTTOM = 28;
+const CONTAINER_MIN_WIDTH = 680;
+const COLLAPSED_HEIGHT = 68;
+const CONTAINER_GAP = 60;
+const CONTAINER_TOP = 40;
 
 function stageNodeId(stage: ResearchStage) {
   return `stage:${stage}`;
@@ -92,13 +107,21 @@ function rowWidth(count: number) {
   return count * TASK_NODE_WIDTH + Math.max(0, count - 1) * TASK_COLUMN_GAP;
 }
 
-export function buildResearchCanvasGraph(research: ResearchCanvasSnapshot): {
+export function buildResearchCanvasGraph(
+  research: ResearchCanvasSnapshot,
+  collapsedStages: Set<ResearchStage> = new Set(),
+): {
   nodes: ResearchCanvasNode[];
   edges: Edge[];
 } {
   const nodes: ResearchCanvasNode[] = [];
   const edges: Edge[] = [];
-  let currentTop = STAGE_TOP;
+  let currentTop = CONTAINER_TOP;
+  const visibleTaskIds = new Set(
+    research.tasks
+      .filter((task) => !collapsedStages.has(task.stage))
+      .map((task) => task.id),
+  );
 
   for (const [stageIndex, stage] of STAGE_ORDER.entries()) {
     const summary = research.stageSummaries.find((item) => item.stage === stage);
@@ -109,21 +132,44 @@ export function buildResearchCanvasGraph(research: ResearchCanvasSnapshot): {
     const stageId = stageNodeId(stage);
     const stageTasks = research.tasks.filter((task) => task.stage === stage);
     const stageTaskIdSet = new Set(stageTasks.map((task) => task.id));
-    const taskRows = groupTasksByDepth(stageTasks);
-    const stageX = STAGE_CENTER_X - STAGE_NODE_WIDTH / 2;
-    const stageY = currentTop;
+    const isCollapsed = collapsedStages.has(stage);
+    const taskRows = isCollapsed ? [] : groupTasksByDepth(stageTasks);
 
+    /* Calculate container dimensions */
+    const maxRowWidth = taskRows.length > 0
+      ? Math.max(...taskRows.map((row) => rowWidth(row.length)))
+      : 0;
+    const contentWidth = maxRowWidth + CONTAINER_PAD_X * 2;
+    const containerWidth = Math.max(CONTAINER_MIN_WIDTH, contentWidth);
+
+    const taskAreaHeight = taskRows.length > 0
+      ? taskRows.length * TASK_NODE_HEIGHT + Math.max(0, taskRows.length - 1) * TASK_ROW_GAP
+      : 0;
+    const containerHeight = isCollapsed
+      ? COLLAPSED_HEIGHT
+      : CONTAINER_HEADER_H + taskAreaHeight + (taskRows.length > 0 ? CONTAINER_PAD_BOTTOM : 8);
+
+    const containerX = STAGE_CENTER_X - containerWidth / 2;
+    const containerY = currentTop;
+
+    /* Create container node */
     nodes.push({
       id: stageId,
-      type: "researchStage",
-      position: { x: stageX, y: stageY },
+      type: "stageContainer",
+      position: { x: containerX, y: containerY },
       selectable: true,
+      draggable: true,
+      style: { width: containerWidth, height: containerHeight },
       data: {
-        kind: "stage",
+        kind: "stageContainer",
         stage: summary,
+        containerWidth,
+        containerHeight,
+        isCollapsed,
       },
-    });
+    } as ResearchStageContainerNode);
 
+    /* Stage-to-stage edge */
     if (stageIndex > 0) {
       edges.push({
         id: `flow:${STAGE_ORDER[stageIndex - 1]}:${stage}`,
@@ -138,65 +184,69 @@ export function buildResearchCanvasGraph(research: ResearchCanvasSnapshot): {
       });
     }
 
-    taskRows.forEach((row, rowIndex) => {
-      const totalWidth = rowWidth(row.length);
-      const rowStartX = STAGE_CENTER_X - totalWidth / 2;
-      const rowY = stageY + STAGE_NODE_HEIGHT + STAGE_TO_TASK_GAP + rowIndex * (TASK_NODE_HEIGHT + TASK_ROW_GAP);
+    /* Task nodes inside the container */
+    if (!isCollapsed) {
+      taskRows.forEach((row, rowIndex) => {
+        const totalWidth = rowWidth(row.length);
+        const rowStartX = (containerWidth - totalWidth) / 2;
+        const rowY = CONTAINER_HEADER_H + rowIndex * (TASK_NODE_HEIGHT + TASK_ROW_GAP);
 
-      row.forEach((task, columnIndex) => {
-        const taskId = taskNodeId(task.id);
-        nodes.push({
-          id: taskId,
-          type: "researchTask",
-          position: {
-            x: rowStartX + columnIndex * (TASK_NODE_WIDTH + TASK_COLUMN_GAP),
-            y: rowY,
-          },
-          selectable: true,
-          data: {
-            kind: "task",
-            task,
-          },
-        });
-
-        if (!task.dependencies.some((dependencyId) => stageTaskIdSet.has(dependencyId))) {
-          edges.push({
-            id: `stage:${stage}:${task.id}`,
-            source: stageId,
-            target: taskId,
-            type: "smoothstep",
-            animated: research.nextTask?.id === task.id,
-            style: {
-              stroke: research.nextTask?.id === task.id ? "#2563eb" : "rgba(148, 163, 184, 0.56)",
-              strokeWidth: research.nextTask?.id === task.id ? 2 : 1.2,
+        row.forEach((task, columnIndex) => {
+          const taskId = taskNodeId(task.id);
+          nodes.push({
+            id: taskId,
+            type: "researchTask",
+            position: {
+              x: rowStartX + columnIndex * (TASK_NODE_WIDTH + TASK_COLUMN_GAP),
+              y: rowY,
             },
-          });
-        }
-
-        task.dependencies.forEach((dependencyId) => {
-          edges.push({
-            id: `dep:${dependencyId}:${task.id}`,
-            source: taskNodeId(dependencyId),
-            target: taskId,
-            type: "smoothstep",
-            animated: research.nextTask?.id === task.id,
-            style: {
-              stroke: research.nextTask?.id === task.id ? "rgba(37, 99, 235, 0.8)" : "rgba(148, 163, 184, 0.44)",
-              strokeDasharray: "4 5",
-              strokeWidth: research.nextTask?.id === task.id ? 1.8 : 1.1,
+            parentId: stageId,
+            extent: "parent" as const,
+            selectable: true,
+            data: {
+              kind: "task",
+              task,
             },
+          } as ResearchTaskNode);
+
+          /* Stage → first-row task edges */
+          if (!task.dependencies.some((dependencyId) => stageTaskIdSet.has(dependencyId))) {
+            edges.push({
+              id: `stage:${stage}:${task.id}`,
+              source: stageId,
+              target: taskId,
+              type: "smoothstep",
+              animated: research.nextTask?.id === task.id,
+              style: {
+                stroke: research.nextTask?.id === task.id ? "#2563eb" : "rgba(148, 163, 184, 0.56)",
+                strokeWidth: research.nextTask?.id === task.id ? 2 : 1.2,
+              },
+            });
+          }
+
+          /* Task dependency edges */
+          task.dependencies.forEach((dependencyId) => {
+            if (!visibleTaskIds.has(dependencyId)) {
+              return;
+            }
+            edges.push({
+              id: `dep:${dependencyId}:${task.id}`,
+              source: taskNodeId(dependencyId),
+              target: taskId,
+              type: "smoothstep",
+              animated: research.nextTask?.id === task.id,
+              style: {
+                stroke: research.nextTask?.id === task.id ? "rgba(37, 99, 235, 0.8)" : "rgba(148, 163, 184, 0.44)",
+                strokeDasharray: "4 5",
+                strokeWidth: research.nextTask?.id === task.id ? 1.8 : 1.1,
+              },
+            });
           });
         });
       });
-    });
+    }
 
-    const blockHeight = STAGE_NODE_HEIGHT + (
-      taskRows.length > 0
-        ? STAGE_TO_TASK_GAP + taskRows.length * TASK_NODE_HEIGHT + Math.max(0, taskRows.length - 1) * TASK_ROW_GAP
-        : 0
-    );
-    currentTop += blockHeight + STAGE_BLOCK_GAP;
-
+    currentTop += containerHeight + CONTAINER_GAP;
   }
 
   return { nodes, edges };

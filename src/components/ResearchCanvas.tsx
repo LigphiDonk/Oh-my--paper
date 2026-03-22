@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
   Controls,
@@ -15,15 +15,15 @@ import {
   buildResearchCanvasGraph,
   defaultResearchSelection,
   selectionToEntity,
-  type ResearchStageNode,
+  type ResearchStageContainerNode,
   type ResearchTaskNode,
 } from "../lib/researchCanvasGraph";
 import { localizeResearchSnapshot } from "../lib/researchLocale";
 import type {
   AppLocale,
   ResearchCanvasSnapshot,
-  ResearchStage,
   ResearchStageSummary,
+  ResearchStage,
   ResearchTask,
 } from "../types";
 
@@ -65,52 +65,85 @@ function formatPriority(task: ResearchTask, isZh: boolean) {
   }[task.priority] ?? task.priority);
 }
 
-function StageNode({ data, selected }: NodeProps<ResearchStageNode>) {
+/* ── Stage Container Node ── */
+function StageContainerNode({ data, selected }: NodeProps<ResearchStageContainerNode>) {
   const stage = data.stage;
+  const isCollapsed = data.isCollapsed;
   const completion = stage.totalTasks > 0 ? Math.round((stage.doneTasks / stage.totalTasks) * 100) : 0;
+  const isZh = /[\u4e00-\u9fff]/.test(stage.label);
+
   return (
-    <div className={`research-stage-node is-${stage.status}${selected ? " is-selected" : ""}`}>
+    <div
+      className={`research-stage-container is-${stage.status}${selected ? " is-selected" : ""}${isCollapsed ? " is-collapsed" : ""}`}
+      style={{ width: data.containerWidth, height: data.containerHeight }}
+    >
       <Handle type="target" position={Position.Top} className="research-node-handle" />
-      <div className="research-stage-node__stripe" />
-      <div className="research-stage-node__eyebrow">{stage.label}</div>
-      <div className="research-stage-node__title">{stage.description}</div>
-      <div className="research-stage-node__progress">
-        <span>{completion}%</span>
-        <div className="research-stage-node__progress-bar">
-          <div className="research-stage-node__progress-fill" style={{ width: `${completion}%` }} />
+
+      <div className="research-stage-container__header">
+        <div className="research-stage-container__stripe" />
+        <div className="research-stage-container__info">
+          <div className="research-stage-container__eyebrow">{stage.label}</div>
+          <div className="research-stage-container__desc">{stage.description}</div>
+        </div>
+        <div className="research-stage-container__right">
+          <div className="research-stage-container__progress">
+            <span className="research-stage-container__pct">{completion}%</span>
+            <div className="research-stage-container__progress-bar">
+              <div className="research-stage-container__progress-fill" style={{ width: `${completion}%` }} />
+            </div>
+          </div>
+          <div className="research-stage-container__stats">
+            <span>{stage.doneTasks}/{stage.totalTasks || 0}</span>
+            <span>{stage.taskCounts.inProgress} {isZh ? "进行中" : "active"}</span>
+            <span>{stage.artifactCount} {isZh ? "产物" : "assets"}</span>
+          </div>
+          {stage.canInitialize ? (
+            <button
+              type="button"
+              className="research-task-node__agent-btn"
+              onClick={(event) => {
+                event.stopPropagation();
+                void data.onInitializeStage?.(stage.stage as ResearchStage);
+              }}
+            >
+              {isZh ? "开始本阶段" : "Start Stage"}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="research-stage-container__toggle"
+            onClick={(event) => {
+              event.stopPropagation();
+              data.onToggleCollapse?.(stage.stage as ResearchStage);
+            }}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              style={{ transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }}
+            >
+              <path d="M4 6L8 10L12 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
         </div>
       </div>
-      <div className="research-stage-node__stats">
-        <span>{stage.doneTasks}/{stage.totalTasks || 0}</span>
-        <span>{stage.taskCounts.inProgress} active</span>
-        <span>{stage.artifactCount} assets</span>
-      </div>
-      {stage.suggestedSkills.length > 0 ? (
-        <div className="research-node-chips">
+
+      {stage.suggestedSkills.length > 0 && !isCollapsed ? (
+        <div className="research-stage-container__chips">
           {stage.suggestedSkills.slice(0, 2).map((skill) => (
             <span key={skill} className="research-node-chip">{skill}</span>
           ))}
         </div>
       ) : null}
-      {stage.canInitialize ? (
-        <div className="research-task-node__actions">
-          <button
-            type="button"
-            className="research-task-node__agent-btn"
-            onClick={(event) => {
-              event.stopPropagation();
-              void data.onInitializeStage?.(stage.stage as ResearchStage);
-            }}
-          >
-            {/[\u4e00-\u9fff]/.test(stage.label) ? "开始本阶段" : "Start Stage"}
-          </button>
-        </div>
-      ) : null}
+
       <Handle type="source" position={Position.Bottom} className="research-node-handle" />
     </div>
   );
 }
 
+/* ── Task Node (preserved from original) ── */
 function TaskNode({ data, selected }: NodeProps<ResearchTaskNode>) {
   const task = data.task;
   const isZh = /[\u4e00-\u9fff]/.test(task.title);
@@ -153,9 +186,51 @@ function TaskNode({ data, selected }: NodeProps<ResearchTaskNode>) {
 }
 
 const nodeTypes = {
-  researchStage: StageNode,
+  stageContainer: StageContainerNode,
   researchTask: TaskNode,
 } satisfies NodeTypes;
+
+function buildNodeLayoutSignature(nodes: ReadonlyArray<{
+  id: string;
+  type?: string;
+  parentId?: string;
+  position: { x: number; y: number };
+  style?: { width?: string | number; height?: string | number };
+}>) {
+  return nodes.map((node) => [
+    node.id,
+    node.type,
+    node.parentId ?? "",
+    node.position.x,
+    node.position.y,
+    String(node.style?.width ?? ""),
+    String(node.style?.height ?? ""),
+  ].join(":")).join("|");
+}
+
+function resolveFallbackSelection(
+  research: ResearchCanvasSnapshot,
+  selectionId: string | null,
+  visibleNodeIds: Set<string>,
+) {
+  if (selectionId && visibleNodeIds.has(selectionId)) {
+    return selectionId;
+  }
+
+  if (selectionId?.startsWith("task:")) {
+    const taskId = selectionId.slice("task:".length);
+    const task = research.tasks.find((item) => item.id === taskId);
+    if (task) {
+      const stageId = `stage:${task.stage}`;
+      if (visibleNodeIds.has(stageId)) {
+        return stageId;
+      }
+    }
+  }
+
+  const defaultSelection = defaultResearchSelection(research);
+  return visibleNodeIds.has(defaultSelection) ? defaultSelection : null;
+}
 
 function ResearchOnboarding({
   locale,
@@ -401,40 +476,64 @@ export function ResearchCanvas({
     [locale, research],
   );
   const needsBootstrap = !localizedResearch || localizedResearch.bootstrap.status !== "ready";
+
+  /* Collapse state: which stages are collapsed */
+  const [collapsedStages, setCollapsedStages] = useState<Set<ResearchStage>>(new Set());
+  const handleToggleCollapse = useCallback((stage: ResearchStage) => {
+    setCollapsedStages((prev) => {
+      const next = new Set(prev);
+      if (next.has(stage)) {
+        next.delete(stage);
+      } else {
+        next.add(stage);
+      }
+      return next;
+    });
+  }, []);
+
   const graph = useMemo(
-    () => (localizedResearch ? buildResearchCanvasGraph(localizedResearch) : { nodes: [], edges: [] }),
-    [localizedResearch],
+    () => (localizedResearch ? buildResearchCanvasGraph(localizedResearch, collapsedStages) : { nodes: [], edges: [] }),
+    [localizedResearch, collapsedStages],
   );
+
   const enrichedNodes = useMemo(
-    () => graph.nodes.map((node) => (
-      node.type === "researchTask"
-        ? {
+    () => graph.nodes.map((node) => {
+      if (node.type === "researchTask") {
+        return {
           ...node,
           data: {
             ...node.data,
             isCurrentTask: node.data.task.id === activeTaskId,
             onEnterTask,
           },
-        }
-        : {
-          ...node,
-          data: {
-            ...node.data,
-            onInitializeStage,
-          },
-        }
-    )),
-    [activeTaskId, graph.nodes, onEnterTask, onInitializeStage],
+        };
+      }
+      /* stageContainer */
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          onInitializeStage,
+          onToggleCollapse: handleToggleCollapse,
+        },
+      };
+    }),
+    [activeTaskId, graph.nodes, onEnterTask, onInitializeStage, handleToggleCollapse],
   );
+  const layoutSignature = useMemo(() => buildNodeLayoutSignature(enrichedNodes), [enrichedNodes]);
+  const visibleNodeIds = useMemo(() => new Set(enrichedNodes.map((node) => node.id)), [enrichedNodes]);
+
   const [selectionId, setSelectionId] = useState<string | null>(
     localizedResearch ? defaultResearchSelection(localizedResearch) : null,
   );
   const [nodes, setNodes, onNodesChange] = useNodesState(enrichedNodes);
   const didInitializeRef = useRef(false);
+  const previousLayoutSignatureRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!localizedResearch) {
       didInitializeRef.current = false;
+      previousLayoutSignatureRef.current = null;
       const frame = window.requestAnimationFrame(() => {
         setSelectionId(null);
         setNodes([]);
@@ -445,13 +544,21 @@ export function ResearchCanvas({
     }
 
     const frame = window.requestAnimationFrame(() => {
-      setSelectionId(defaultResearchSelection(localizedResearch));
+      setSelectionId((currentSelectionId) => resolveFallbackSelection(localizedResearch, currentSelectionId, visibleNodeIds));
       setNodes((currentNodes) => {
-        const currentPositionById = new Map(currentNodes.map((node) => [node.id, node.position]));
         if (!didInitializeRef.current) {
           didInitializeRef.current = true;
+          previousLayoutSignatureRef.current = layoutSignature;
           return enrichedNodes;
         }
+
+        const shouldResetLayout = previousLayoutSignatureRef.current !== layoutSignature;
+        previousLayoutSignatureRef.current = layoutSignature;
+        if (shouldResetLayout) {
+          return enrichedNodes;
+        }
+
+        const currentPositionById = new Map(currentNodes.map((node) => [node.id, node.position]));
         return enrichedNodes.map((node) => ({
           ...node,
           position: currentPositionById.get(node.id) ?? node.position,
@@ -461,7 +568,7 @@ export function ResearchCanvas({
     return () => {
       window.cancelAnimationFrame(frame);
     };
-  }, [enrichedNodes, localizedResearch, setNodes]);
+  }, [enrichedNodes, layoutSignature, localizedResearch, setNodes, visibleNodeIds]);
 
   if (needsBootstrap) {
     return <ResearchOnboarding locale={locale} research={localizedResearch} isBusy={isBusy} onBootstrap={onBootstrap} />;
