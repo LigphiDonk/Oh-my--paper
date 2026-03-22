@@ -117,6 +117,7 @@ export function useAgentChat({
   taskMode = false,
   activeTaskContext = null,
   replaceFileContent,
+  refreshWorkspace,
 }: UseAgentChatParams): AgentChatState {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [agentSessions, setAgentSessions] = useState<AgentSessionSummary[]>([]);
@@ -443,9 +444,11 @@ export function useAgentChat({
                 setMessages(nextMessages);
                 setActiveSessionId(resolvedId);
                 setIsStreaming(false);
+                void refreshWorkspace();
               });
             } else {
               setIsStreaming(false);
+              void refreshWorkspace();
             }
           });
           break;
@@ -601,9 +604,11 @@ export function useAgentChat({
                 setMessages(nextMessages);
                 setActiveSessionId(resolvedId);
                 setIsStreaming(false);
+                void refreshWorkspace();
               });
             } else {
               setIsStreaming(false);
+              void refreshWorkspace();
             }
           });
           break;

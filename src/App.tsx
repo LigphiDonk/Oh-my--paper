@@ -1127,6 +1127,7 @@ function App() {
     [activeResearchTask],
   );
 
+  const refreshWorkspaceRef = useRef<(() => Promise<void>) | null>(null);
   const agentChat = useAgentChat({
     snapshot,
     activeFile,
@@ -1136,7 +1137,7 @@ function App() {
     cursorLine,
     replaceFileContent: replaceDocumentContent,
     addDirtyPath,
-    refreshWorkspace: async () => {},
+    refreshWorkspace: async () => { await refreshWorkspaceRef.current?.(); },
   });
   const {
     messages,
@@ -1483,6 +1484,7 @@ function App() {
     applySnapshot(nextSnapshot, options);
     return nextSnapshot;
   });
+  refreshWorkspaceRef.current = async () => { await refreshWorkspace(); };
 
   useEffect(() => {
     void (async () => {
