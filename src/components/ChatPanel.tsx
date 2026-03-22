@@ -966,9 +966,13 @@ function TaskSuggestionCard({
     setIsApplying(true);
     setApplyError("");
     try {
+      console.log("[TaskSuggestionCard] applying suggestion, operations:", JSON.stringify(suggestion.operations, null, 2));
       await onApply();
+      console.log("[TaskSuggestionCard] apply succeeded");
     } catch (error) {
-      setApplyError(error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("[TaskSuggestionCard] apply failed:", message);
+      setApplyError(message);
     } finally {
       setIsApplying(false);
     }
