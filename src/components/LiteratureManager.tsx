@@ -47,6 +47,7 @@ export function LiteratureManager({ locale, filterTaskId = null, onClearTaskFilt
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [zoteroStatus, setZoteroStatus] = useState<CliAgentStatus | null>(null);
+  const [isCheckingZotero, setIsCheckingZotero] = useState(false);
 
   const selectedItem = items.find((i) => i.id === selectedId) ?? null;
   const selectedZoteroResult = zoteroResults.find((item) => item.itemKey === selectedZoteroKey) ?? null;
@@ -90,15 +91,22 @@ export function LiteratureManager({ locale, filterTaskId = null, onClearTaskFilt
     }
   }, [filterTaskId, selectedId, visibleLibraryItems]);
 
-  useEffect(() => {
-    desktop
-      .detectZoteroMcp()
-      .then((status) => setZoteroStatus(status))
-      .catch((error) => {
-        console.warn("failed to detect zotero-mcp", error);
-        setZoteroStatus({ name: "zotero-mcp", available: false });
-      });
+  const refreshZoteroStatus = useCallback(async () => {
+    setIsCheckingZotero(true);
+    try {
+      const status = await desktop.detectZoteroMcp();
+      setZoteroStatus(status);
+    } catch (error) {
+      console.warn("failed to detect zotero-mcp", error);
+      setZoteroStatus({ name: "zotero-mcp", available: false });
+    } finally {
+      setIsCheckingZotero(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void refreshZoteroStatus();
+  }, [refreshZoteroStatus]);
 
   /* ── Handlers ── */
   const handleSearch = useCallback(async () => {
@@ -321,21 +329,31 @@ export function LiteratureManager({ locale, filterTaskId = null, onClearTaskFilt
               Zotero
             </button>
           </div>
-          <div
-            className="literature-badge"
-            style={{
-              marginRight: 8,
-              borderColor: zoteroStatus?.available ? "rgba(22, 163, 74, 0.28)" : "rgba(185, 28, 28, 0.22)",
-              background: zoteroStatus?.available ? "rgba(22, 163, 74, 0.12)" : "rgba(239, 68, 68, 0.08)",
-              color: zoteroStatus?.available ? "#166534" : "#991b1b",
-            }}
-            title={zoteroStatus?.path || (zoteroStatus?.available ? "zotero-mcp detected" : "zotero-mcp not found")}
-          >
-            {zoteroStatus == null
-              ? t(locale, "Zotero 检测中…", "Checking Zotero…")
-              : zoteroStatus.available
-                ? t(locale, "Zotero 已连接", "Zotero Connected")
-                : t(locale, "Zotero 未安装", "Zotero Not Installed")}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginRight: 8 }}>
+            <div
+              className="literature-badge"
+              style={{
+                borderColor: zoteroStatus?.available ? "rgba(22, 163, 74, 0.28)" : "rgba(185, 28, 28, 0.22)",
+                background: zoteroStatus?.available ? "rgba(22, 163, 74, 0.12)" : "rgba(239, 68, 68, 0.08)",
+                color: zoteroStatus?.available ? "#166534" : "#991b1b",
+              }}
+              title={zoteroStatus?.path || (zoteroStatus?.available ? "zotero-mcp detected" : "zotero-mcp not found")}
+            >
+              {isCheckingZotero || zoteroStatus == null
+                ? t(locale, "Zotero 检测中…", "Checking Zotero…")
+                : zoteroStatus.available
+                  ? t(locale, "Zotero 已连接", "Zotero Connected")
+                  : t(locale, "Zotero 未安装", "Zotero Not Installed")}
+            </div>
+            <button
+              type="button"
+              className="literature-toolbar__btn"
+              onClick={() => void refreshZoteroStatus()}
+              disabled={isCheckingZotero}
+              title={t(locale, "重新检测 Zotero MCP", "Recheck Zotero MCP")}
+            >
+              <span>{isCheckingZotero ? t(locale, "检测中", "Checking") : t(locale, "重新检测", "Recheck")}</span>
+            </button>
           </div>
           <input
             type="text"
@@ -367,6 +385,16 @@ export function LiteratureManager({ locale, filterTaskId = null, onClearTaskFilt
               "未检测到 `zotero-mcp`。先在本机安装并执行 `zotero-mcp setup`，然后重启应用。",
               "No `zotero-mcp` detected. Install it locally, run `zotero-mcp setup`, then restart the app.",
             )}
+          </div>
+        )}
+        {searchSource === "zotero" && zoteroStatus?.path && (
+          <div
+            className="literature-empty__hint"
+            style={{ marginLeft: 12, maxWidth: 420 }}
+            title={zoteroStatus.path}
+          >
+            {t(locale, "检测路径：", "Detected path: ")}
+            <code>{zoteroStatus.path}</code>
           </div>
         )}
 
