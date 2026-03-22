@@ -585,7 +585,7 @@ pub struct ResearchTaskDraft {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase", tag = "type")]
+#[serde(rename_all = "camelCase", rename_all_fields = "camelCase", tag = "type")]
 pub enum ResearchTaskPlanOperation {
     Update {
         task_id: String,
