@@ -154,13 +154,13 @@ pub async fn ensure_research_scaffold(
         }
 
         research::ensure_research_scaffold(
-            Path::new(&state.app_root),
+            &state.skills_dir,
             Path::new(&root_path),
             start_stage.as_deref(),
         )
         .map_err(|err| err.to_string())?;
         let conn = state.db.lock().map_err(|err| err.to_string())?;
-        skill::refresh_skill_registry(&conn, &state.app_root, Some(Path::new(&root_path)))
+        skill::refresh_skill_registry(&conn, &state.skills_dir, Some(Path::new(&root_path)))
             .map_err(|err| err.to_string())?;
         drop(conn);
         project::load_project_snapshot(&state).map_err(|err| err.to_string())
@@ -423,7 +423,7 @@ pub fn list_skills(state: State<'_, AppState>) -> Result<Vec<SkillManifest>, Str
         .clone();
     let conn = state.db.lock().map_err(|err| err.to_string())?;
     let project_root = (!root_path.trim().is_empty()).then(|| Path::new(&root_path));
-    skill::refresh_skill_registry(&conn, &state.app_root, project_root)
+    skill::refresh_skill_registry(&conn, &state.skills_dir, project_root)
         .map_err(|err| err.to_string())?;
     skill::list_skills(&conn)
 }

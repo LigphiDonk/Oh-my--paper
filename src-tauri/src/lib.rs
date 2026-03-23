@@ -9,6 +9,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, RwLock};
 
+use walkdir::WalkDir;
+
 use tauri::Manager;
 
 use state::{default_compile_result, empty_project_config, load_project_config, AppState};
@@ -37,6 +39,7 @@ pub fn run() {
 
             let app_root = resolve_app_root(app.handle());
             let sidecar_dir = resolve_sidecar_dir(app.handle(), &app_root);
+            let skills_dir = resolve_skills_dir(app.handle(), &app_root);
             let workspace_root = match resolve_launch_workspace() {
                 LaunchWorkspace::Empty => None,
                 LaunchWorkspace::Root(root) if root.exists() => Some(root),
@@ -47,7 +50,7 @@ pub fn run() {
                 .map(|root| load_project_config(root))
                 .unwrap_or_else(empty_project_config);
 
-            services::skill::refresh_skill_registry(&conn, &app_root, workspace_root.as_deref())
+            services::skill::refresh_skill_registry(&conn, &skills_dir, workspace_root.as_deref())
                 .expect("failed to refresh skills");
 
             let last_compile = workspace_root
@@ -64,6 +67,7 @@ pub fn run() {
                 terminals: Mutex::new(HashMap::new()),
                 app_root,
                 sidecar_dir,
+                skills_dir,
                 app_data_dir,
                 active_sidecar: Mutex::new(None),
             });
@@ -322,6 +326,72 @@ fn has_root_markers(path: &Path) -> bool {
 
 fn has_sidecar_entry(path: &Path) -> bool {
     path.join("dist").join("index.mjs").is_file()
+}
+
+fn has_skills_entry(path: &Path) -> bool {
+    path.is_dir()
+        && WalkDir::new(path)
+            .min_depth(1)
+            .max_depth(2)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .any(|e| e.file_name() == "SKILL.md")
+}
+
+pub(crate) fn resolve_skills_dir(
+    app: &tauri::AppHandle,
+    app_root: &std::path::Path,
+) -> PathBuf {
+    let mut candidates: Vec<PathBuf> = Vec::new();
+
+    if let Ok(explicit) = std::env::var("VIEWERLEAF_SKILLS_DIR") {
+        let explicit = PathBuf::from(explicit.trim());
+        if !explicit.as_os_str().is_empty() {
+            candidates.push(explicit);
+        }
+    }
+
+    candidates.push(app_root.join("skills"));
+    candidates.push(app_root.join("src-tauri/resources/skills"));
+    candidates.push(app_root.join("resources/skills"));
+
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        push_bundled_resource_candidates(&mut candidates, &resource_dir, "skills");
+    }
+
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            push_bundled_resource_candidates(&mut candidates, parent, "skills");
+            push_bundled_resource_candidates(
+                &mut candidates,
+                &parent.join("../Resources"),
+                "skills",
+            );
+            push_bundled_resource_candidates(
+                &mut candidates,
+                &parent.join("../../Resources"),
+                "skills",
+            );
+        }
+    }
+
+    let manifest_skills = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("skills");
+    candidates.push(manifest_skills.clone());
+    candidates.push(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("resources")
+            .join("skills"),
+    );
+
+    for candidate in candidates {
+        if has_skills_entry(&candidate) {
+            return candidate;
+        }
+    }
+
+    manifest_skills
 }
 
 fn push_bundled_resource_candidates(candidates: &mut Vec<PathBuf>, base: &Path, resource: &str) {

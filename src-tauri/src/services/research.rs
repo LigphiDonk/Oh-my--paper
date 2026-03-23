@@ -205,18 +205,8 @@ fn pipeline_root(root: &Path) -> PathBuf {
     root.join(".pipeline")
 }
 
-fn bundled_skills_root(app_root: &Path) -> PathBuf {
-    let candidates = [
-        app_root.join("skills"),
-        app_root.join("src-tauri/resources/skills"),
-        app_root.join("resources/skills"),
-    ];
-    for candidate in &candidates {
-        if candidate.is_dir() {
-            return candidate.clone();
-        }
-    }
-    app_root.join("skills")
+fn bundled_skills_root(skills_dir: &Path) -> PathBuf {
+    skills_dir.to_path_buf()
 }
 
 fn write_if_missing(path: &Path, contents: &str) -> Result<()> {
@@ -928,10 +918,10 @@ fn default_instance(root: &Path) -> Value {
     })
 }
 
-fn copy_bundled_skill_set(app_root: &Path, target_root: &Path) -> Result<()> {
+fn copy_bundled_skill_set(skills_dir: &Path, target_root: &Path) -> Result<()> {
     fs::create_dir_all(target_root)?;
     for skill_id in research_scope_skill_ids() {
-        let source_dir = bundled_skills_root(app_root).join(&skill_id);
+        let source_dir = bundled_skills_root(skills_dir).join(&skill_id);
         if !source_dir.exists() {
             continue;
         }
@@ -940,7 +930,7 @@ fn copy_bundled_skill_set(app_root: &Path, target_root: &Path) -> Result<()> {
     Ok(())
 }
 
-fn write_skill_views(app_root: &Path, root: &Path) -> Result<()> {
+fn write_skill_views(skills_dir: &Path, root: &Path) -> Result<()> {
     let skill_dirs = research_scope_skill_ids();
 
     let skills_index = {
@@ -963,7 +953,7 @@ fn write_skill_views(app_root: &Path, root: &Path) -> Result<()> {
     ] {
         fs::create_dir_all(&base)?;
         fs::write(base.join("skills-index.md"), &skills_index)?;
-        copy_bundled_skill_set(app_root, &base)?;
+        copy_bundled_skill_set(skills_dir, &base)?;
     }
 
     Ok(())
@@ -1024,7 +1014,7 @@ pub fn project_skill_roots(root: &Path) -> Vec<PathBuf> {
 }
 
 pub fn ensure_research_scaffold(
-    app_root: &Path,
+    skills_dir: &Path,
     root: &Path,
     start_stage: Option<&str>,
 ) -> Result<()> {
@@ -1046,8 +1036,8 @@ pub fn ensure_research_scaffold(
     fs::create_dir_all(pipeline_root(root).join("tasks"))?;
 
     write_templates(root)?;
-    copy_bundled_skill_set(app_root, &root.join("skills"))?;
-    write_skill_views(app_root, root)?;
+    copy_bundled_skill_set(skills_dir, &root.join("skills"))?;
+    write_skill_views(skills_dir, root)?;
 
     let project_title = root
         .file_name()

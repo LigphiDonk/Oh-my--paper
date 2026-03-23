@@ -26,17 +26,13 @@ pub fn global_skill_roots() -> Vec<PathBuf> {
 
 pub fn refresh_skill_registry(
     conn: &Connection,
-    app_root: &Path,
+    skills_dir: &Path,
     project_root: Option<&Path>,
 ) -> Result<(), String> {
-    let builtin_roots: Vec<PathBuf> = [
-        app_root.join("skills"),
-        app_root.join("src-tauri/resources/skills"),
-        app_root.join("resources/skills"),
-    ]
-    .into_iter()
-    .filter(|p| p.is_dir())
-    .collect();
+    let builtin_roots: Vec<PathBuf> = [skills_dir.to_path_buf()]
+        .into_iter()
+        .filter(|p| p.is_dir())
+        .collect();
     sync_skill_source(conn, &builtin_roots, "builtin")?;
     sync_skill_source(conn, &global_skill_roots(), "local")?;
 

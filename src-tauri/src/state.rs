@@ -14,6 +14,7 @@ pub struct AppState {
     pub terminals: Mutex<HashMap<String, Arc<crate::services::terminal::TerminalSessionHandle>>>,
     pub app_root: PathBuf,
     pub sidecar_dir: PathBuf,
+    pub skills_dir: PathBuf,
     pub app_data_dir: PathBuf,
     pub active_sidecar: Mutex<Option<u32>>,
 }
