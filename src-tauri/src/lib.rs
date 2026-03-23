@@ -70,6 +70,7 @@ pub fn run() {
                 skills_dir,
                 app_data_dir,
                 active_sidecar: Mutex::new(None),
+                sidecar_cancelled: std::sync::atomic::AtomicBool::new(false),
             });
             Ok(())
         })

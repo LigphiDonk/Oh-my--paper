@@ -14,6 +14,8 @@ use crate::models::{
 use crate::services::{profile, provider, sidecar, skill};
 use crate::state::AppState;
 
+use std::sync::atomic::Ordering;
+
 fn read_provider_reasoning_effort(meta_json: &str) -> String {
     serde_json::from_str::<serde_json::Value>(meta_json)
         .ok()
@@ -148,6 +150,9 @@ pub fn run_agent(
     task_mode: bool,
     task_context: Option<&AgentTaskContext>,
 ) -> Result<AgentRunResult> {
+    // Reset cancellation flag at the start of each run
+    state.sidecar_cancelled.store(false, Ordering::SeqCst);
+
     let project_root = {
         let config = state
             .project_config
@@ -372,6 +377,42 @@ pub fn run_agent(
         .wait_with_output()
         .context("failed to wait for sidecar")?;
     if !output.status.success() {
+        // Check if this was a user-initiated cancellation
+        if state.sidecar_cancelled.load(Ordering::SeqCst) {
+            // User cancelled — treat as a graceful stop, not an error
+            let all_thinking = merge_thinking_segments(&committed_thinking, &active_thinking);
+            let partial_content =
+                build_assistant_message_content(&all_thinking, &full_response, &assistant_timeline);
+            if !partial_content.trim().is_empty() {
+                persist_assistant_message(state, &session_id, profile_id, &partial_content)?;
+            }
+            // Clear sidecar PID
+            {
+                let mut active = state
+                    .active_sidecar
+                    .lock()
+                    .expect("active_sidecar lock poisoned");
+                *active = None;
+            }
+            let usage = done_usage.unwrap_or_else(|| UsageInfo {
+                input_tokens: 0,
+                output_tokens: 0,
+                model: profile.model.clone(),
+            });
+            let _ = app_handle.emit(
+                "agent:stream",
+                &StreamChunk::Done {
+                    usage,
+                    remote_session_id: final_remote_session_id,
+                },
+            );
+            return Ok(AgentRunResult {
+                session_id: Some(session_id),
+                message: None,
+                suggested_patch: None,
+            });
+        }
+
         let stderr = String::from_utf8_lossy(&output.stderr);
         let error_message = if stderr.trim().is_empty() {
             last_error.unwrap_or_else(|| "agent sidecar failed with empty stderr".to_string())
@@ -474,6 +515,9 @@ pub fn cancel_agent(state: &AppState) -> Result<bool> {
         .lock()
         .expect("active_sidecar lock poisoned");
     if let Some(pid) = active.take() {
+        // Mark as user-initiated cancellation so run_agent knows not to
+        // treat the non-zero exit code as an error.
+        state.sidecar_cancelled.store(true, Ordering::SeqCst);
         #[cfg(unix)]
         {
             // Kill entire process group (sidecar + Claude CLI children).

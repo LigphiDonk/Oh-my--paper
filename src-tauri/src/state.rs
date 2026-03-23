@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, RwLock};
 
 use rusqlite::Connection;
@@ -17,6 +18,7 @@ pub struct AppState {
     pub skills_dir: PathBuf,
     pub app_data_dir: PathBuf,
     pub active_sidecar: Mutex<Option<u32>>,
+    pub sidecar_cancelled: AtomicBool,
 }
 
 pub fn default_compile_result(project_root: &Path, main_tex: &str) -> CompileResult {
