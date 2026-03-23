@@ -307,11 +307,22 @@ export async function runClaudeCode(request) {
           const block = rawEvent.content_block;
           if (!emittedToolUseIds.has(block.id)) {
             emittedToolUseIds.add(block.id);
-            emit({
-              type: "tool_call_start",
-              toolId: block.name || "tool",
-              args: block.input || {},
-            });
+            const blockName = block.name || "tool";
+            const blockInput = block.input || {};
+            if (blockName === "AskUserQuestion" && blockInput.questions) {
+              emit({
+                type: "interactive_question",
+                requestId: block.id || `iq-${Date.now()}`,
+                title: blockInput.title || "",
+                questions: blockInput.questions,
+              });
+            } else {
+              emit({
+                type: "tool_call_start",
+                toolId: blockName,
+                args: blockInput,
+              });
+            }
           }
         }
 
@@ -343,6 +354,16 @@ export async function runClaudeCode(request) {
         const input = event.input || {};
         const toolId = event.tool_use_id || event.id;
         if (toolId) emittedToolUseIds.add(toolId);
+        // Intercept AskUserQuestion → emit interactive_question
+        if (toolName === "AskUserQuestion" && input.questions) {
+          emit({
+            type: "interactive_question",
+            requestId: toolId || `iq-${Date.now()}`,
+            title: input.title || "",
+            questions: input.questions,
+          });
+          break;
+        }
         emit({ type: "tool_call_start", toolId: toolName, args: input });
         break;
       }

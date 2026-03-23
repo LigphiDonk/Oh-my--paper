@@ -1,5 +1,6 @@
 import clsx from "clsx";
 import { useEffect, useState } from "react";
+import type { PendingInteractiveQuestion } from "../hooks/useAgentChat";
 
 import { ChatPanel } from "./ChatPanel";
 import { CommentPanel } from "./CommentPanel";
@@ -87,6 +88,8 @@ interface SidebarProps {
   onApplyTaskUpdateSuggestion?: (suggestion: TaskUpdateSuggestion) => Promise<void> | void;
   onRespondElicitation?: (requestId: string, action: "accept" | "decline") => void;
   onSelectSuggestion?: (suggestion: string) => void;
+  pendingInteractiveQuestion?: PendingInteractiveQuestion | null;
+  onRespondInteractiveQuestion?: (answers: Record<string, string[]>) => void;
   // Collab props
   collabAuthSession: CollabAuthSession | null;
   collabConfig: CollabConfig | null;
@@ -221,6 +224,8 @@ export function Sidebar({
   onApplyTaskUpdateSuggestion,
   onRespondElicitation,
   onSelectSuggestion,
+  pendingInteractiveQuestion,
+  onRespondInteractiveQuestion,
   collabAuthSession,
   collabConfig: collabConfigProp,
   cloudCollab,
@@ -465,6 +470,8 @@ curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh`}</pre>
             onApplyTaskUpdateSuggestion={onApplyTaskUpdateSuggestion}
             onRespondElicitation={onRespondElicitation}
             onSelectSuggestion={onSelectSuggestion}
+            pendingInteractiveQuestion={pendingInteractiveQuestion}
+            onRespondInteractiveQuestion={onRespondInteractiveQuestion}
           />
         </div>
       )}

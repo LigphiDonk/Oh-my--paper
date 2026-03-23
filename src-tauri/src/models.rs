@@ -446,11 +446,29 @@ pub enum StreamChunk {
         request_id: String,
         action: String,
     },
+    #[serde(rename = "interactive_question")]
+    InteractiveQuestion {
+        request_id: String,
+        title: String,
+        questions: Vec<InteractiveQuestionItem>,
+    },
     #[serde(rename = "done")]
     Done {
         usage: UsageInfo,
         remote_session_id: Option<String>,
     },
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct InteractiveQuestionItem {
+    pub id: String,
+    pub label: String,
+    pub options: Vec<String>,
+    #[serde(default)]
+    pub allow_custom: bool,
+    #[serde(default)]
+    pub multi_select: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

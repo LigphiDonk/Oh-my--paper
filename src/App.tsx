@@ -1243,6 +1243,7 @@ function App() {
     activeModelInfo,
     pendingElicitation,
     pendingPatch,
+    pendingInteractiveQuestion,
     handleRunAgent: runAgentBase,
     handleSendMessage: sendMessageBase,
     handleNewSession: newSessionBase,
@@ -1251,6 +1252,7 @@ function App() {
     handleDismissPatch,
     handleCancelAgent,
     handleRespondElicitation,
+    handleRespondInteractiveQuestion,
     resetForSnapshot: resetAgentChatForSnapshot,
   } = agentChat;
 
@@ -4266,6 +4268,8 @@ function App() {
                       onApplyTaskUpdateSuggestion={handleApplyResearchTaskSuggestion}
                       onRespondElicitation={handleRespondElicitation}
                       onSelectSuggestion={(s) => handleSendMessage(s)}
+                      pendingInteractiveQuestion={pendingInteractiveQuestion}
+                      onRespondInteractiveQuestion={handleRespondInteractiveQuestion}
                       collabAuthSession={collabAuthSession}
                       collabConfig={collabConfigState}
                       cloudCollab={snapshot.collab ?? null}

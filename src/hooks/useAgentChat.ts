@@ -82,6 +82,20 @@ interface UseAgentChatParams {
   refreshWorkspace: () => Promise<void>;
 }
 
+export interface InteractiveQuestionItem {
+  id: string;
+  label: string;
+  options: string[];
+  allowCustom?: boolean;
+  multiSelect?: boolean;
+}
+
+export interface PendingInteractiveQuestion {
+  requestId: string;
+  title: string;
+  questions: InteractiveQuestionItem[];
+}
+
 export interface AgentChatState {
   messages: AgentMessage[];
   agentSessions: AgentSessionSummary[];
@@ -101,6 +115,7 @@ export interface AgentChatState {
   activeModelInfo: { model: string; fastModeState: string } | null;
   pendingElicitation: { requestId: string; serverName: string; message: string; mode?: string } | null;
   pendingPatch: { filePath: string; content: string; summary: string; diff?: DiffLine[] } | null;
+  pendingInteractiveQuestion: PendingInteractiveQuestion | null;
   setActiveProfileId: (profileId: AgentProfileId) => void;
   handleRunAgent: () => Promise<void>;
   handleSendMessage: (
@@ -113,6 +128,7 @@ export interface AgentChatState {
   handleDismissPatch: () => void;
   handleCancelAgent: () => Promise<void>;
   handleRespondElicitation: (requestId: string, action: "accept" | "decline") => Promise<void>;
+  handleRespondInteractiveQuestion: (answers: Record<string, string[]>) => void;
   resetForSnapshot: () => void;
 }
 
@@ -144,6 +160,7 @@ export function useAgentChat({
   const [pendingPatch, setPendingPatch] = useState<{ filePath: string; content: string; summary: string; diff?: DiffLine[] } | null>(
     null,
   );
+  const [pendingInteractiveQuestion, setPendingInteractiveQuestion] = useState<PendingInteractiveQuestion | null>(null);
 
   const streamBufferRef = useRef("");
   const streamFlushTimerRef = useRef<number | null>(null);
@@ -480,6 +497,14 @@ export function useAgentChat({
           });
           setStreamStatusMessage(`${chunk.serverName} 请求授权`);
           break;
+        case "interactive_question":
+          setPendingInteractiveQuestion({
+            requestId: chunk.requestId,
+            title: chunk.title,
+            questions: chunk.questions,
+          });
+          setStreamStatusMessage("等待用户选择");
+          break;
         case "error":
           appendInterruptedStreamMessage();
           clearThinkingText();
@@ -686,6 +711,14 @@ export function useAgentChat({
           });
           setStreamStatusMessage(`${chunk.serverName} 请求授权`);
           break;
+        case "interactive_question":
+          setPendingInteractiveQuestion({
+            requestId: chunk.requestId,
+            title: chunk.title,
+            questions: chunk.questions,
+          });
+          setStreamStatusMessage("等待用户选择");
+          break;
         case "error":
           appendInterruptedStreamMessage();
           clearThinkingText();
@@ -761,6 +794,25 @@ export function useAgentChat({
     }
   }, []);
 
+  const handleRespondInteractiveQuestion = useEffectEvent((answers: Record<string, string[]>) => {
+    const question = pendingInteractiveQuestion;
+    if (!question) return;
+    setPendingInteractiveQuestion(null);
+    setStreamStatusMessage("");
+
+    const lines: string[] = [];
+    for (const q of question.questions) {
+      const selected = answers[q.id] ?? [];
+      if (selected.length > 0) {
+        lines.push(`${q.label} ${selected.join("、")}`);
+      }
+    }
+    const text = lines.join("\n");
+    if (text.trim()) {
+      void handleSendMessage(text);
+    }
+  });
+
   return {
     messages,
     agentSessions,
@@ -780,6 +832,7 @@ export function useAgentChat({
     activeModelInfo,
     pendingElicitation,
     pendingPatch,
+    pendingInteractiveQuestion,
     setActiveProfileId,
     handleRunAgent,
     handleSendMessage,
@@ -789,6 +842,7 @@ export function useAgentChat({
     handleDismissPatch,
     handleCancelAgent,
     handleRespondElicitation,
+    handleRespondInteractiveQuestion,
     resetForSnapshot,
   };
 }

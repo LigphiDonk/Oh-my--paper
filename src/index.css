@@ -4175,6 +4175,127 @@ button {
   color: var(--text-secondary);
 }
 
+/* ─── Interactive question card ────────────────────────── */
+.ag-question-card {
+  margin-bottom: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(99, 102, 241, 0.16);
+  background: linear-gradient(180deg, rgba(238, 242, 255, 0.94), rgba(255, 255, 255, 0.98));
+  box-shadow: 0 12px 28px rgba(99, 102, 241, 0.08);
+  overflow: hidden;
+  animation: ag-question-slide-in 0.3s ease-out;
+}
+@keyframes ag-question-slide-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ag-question-card__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 10px;
+}
+.ag-question-card__icon {
+  font-size: 16px;
+}
+.ag-question-card__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.ag-question-card__body {
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ag-question-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ag-question-group__label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.ag-question-group__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ag-question-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(203, 213, 225, 0.7);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.ag-question-chip:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  background: rgba(240, 253, 250, 0.9);
+  transform: translateY(-1px);
+}
+.ag-question-chip.is-selected {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(15, 118, 110, 0.18);
+}
+.ag-question-custom-input {
+  margin-top: 2px;
+  padding: 7px 11px;
+  border-radius: 10px;
+  border: 1px solid rgba(203, 213, 225, 0.6);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.ag-question-custom-input::placeholder {
+  color: var(--text-tertiary);
+}
+.ag-question-custom-input:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.08);
+}
+.ag-question-card__footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 16px;
+}
+.ag-question-submit-btn {
+  padding: 8px 22px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, var(--accent-primary), #0d9488);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 4px 12px rgba(15, 118, 110, 0.2);
+}
+.ag-question-submit-btn:hover:not(:disabled) {
+  opacity: 0.92;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(15, 118, 110, 0.28);
+}
+.ag-question-submit-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ─── Prompt suggestion chips ───────────────────────────── */
 .ag-prompt-suggestions {
   display: flex;

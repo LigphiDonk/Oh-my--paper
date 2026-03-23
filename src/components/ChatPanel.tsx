@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { PendingInteractiveQuestion } from "../hooks/useAgentChat";
 import ReactMarkdown from "react-markdown";
 import { SkillArsenal } from "./SkillArsenal";
 import { desktop } from "../lib/desktop";
@@ -866,6 +867,110 @@ function AssistantMessage({ msg, streaming }: {
   );
 }
 
+/* ─── Interactive question card ──────────────────────── */
+function InteractiveQuestionCard({
+  question,
+  onSubmit,
+}: {
+  question: PendingInteractiveQuestion;
+  onSubmit: (answers: Record<string, string[]>) => void;
+}) {
+  const [selections, setSelections] = useState<Record<string, Set<string>>>(() => {
+    const init: Record<string, Set<string>> = {};
+    for (const q of question.questions) {
+      init[q.id] = new Set<string>();
+    }
+    return init;
+  });
+  const [customTexts, setCustomTexts] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {};
+    for (const q of question.questions) {
+      init[q.id] = "";
+    }
+    return init;
+  });
+
+  const toggleOption = useCallback((questionId: string, option: string, multiSelect: boolean) => {
+    setSelections((prev) => {
+      const next = { ...prev };
+      const current = new Set(prev[questionId] ?? []);
+      if (current.has(option)) {
+        current.delete(option);
+      } else {
+        if (!multiSelect) current.clear();
+        current.add(option);
+      }
+      next[questionId] = current;
+      return next;
+    });
+  }, []);
+
+  const handleSubmit = useCallback(() => {
+    const answers: Record<string, string[]> = {};
+    for (const q of question.questions) {
+      const selected = Array.from(selections[q.id] ?? []);
+      const custom = (customTexts[q.id] ?? "").trim();
+      if (custom) selected.push(custom);
+      answers[q.id] = selected;
+    }
+    onSubmit(answers);
+  }, [question.questions, selections, customTexts, onSubmit]);
+
+  const hasAnyAnswer = question.questions.some((q) => {
+    const selected = selections[q.id];
+    const custom = (customTexts[q.id] ?? "").trim();
+    return (selected && selected.size > 0) || custom.length > 0;
+  });
+
+  return (
+    <div className="ag-question-card">
+      <div className="ag-question-card__header">
+        <span className="ag-question-card__icon">💬</span>
+        <span className="ag-question-card__title">{question.title || "请回答以下问题"}</span>
+      </div>
+      <div className="ag-question-card__body">
+        {question.questions.map((q) => (
+          <div key={q.id} className="ag-question-group">
+            <div className="ag-question-group__label">{q.label}</div>
+            <div className="ag-question-group__options">
+              {q.options.map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  className={`ag-question-chip${selections[q.id]?.has(opt) ? " is-selected" : ""}`}
+                  onClick={() => toggleOption(q.id, opt, q.multiSelect ?? false)}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+            {(q.allowCustom ?? true) && (
+              <input
+                className="ag-question-custom-input"
+                placeholder="自定义答案…"
+                value={customTexts[q.id] ?? ""}
+                onChange={(e) =>
+                  setCustomTexts((prev) => ({ ...prev, [q.id]: e.target.value }))
+                }
+              />
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="ag-question-card__footer">
+        <button
+          type="button"
+          className="ag-question-submit-btn"
+          disabled={!hasAnyAnswer}
+          onClick={handleSubmit}
+        >
+          提交回答
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Patch card ──────────────────────────────────────── */
 function PatchCard({ summary, diff, onApply, onDismiss }: {
   summary: string; diff?: DiffLine[]; onApply: () => void; onDismiss: () => void;
@@ -1551,6 +1656,8 @@ export interface ChatPanelProps {
   onApplyTaskUpdateSuggestion?: (suggestion: TaskUpdateSuggestion) => Promise<void> | void;
   onRespondElicitation?: (requestId: string, action: "accept" | "decline") => void;
   onSelectSuggestion?: (suggestion: string) => void;
+  pendingInteractiveQuestion?: PendingInteractiveQuestion | null;
+  onRespondInteractiveQuestion?: (answers: Record<string, string[]>) => void;
 }
 
 export function ChatPanel({
@@ -1572,6 +1679,8 @@ export function ChatPanel({
   onApplyTaskUpdateSuggestion,
   onRespondElicitation,
   onSelectSuggestion,
+  pendingInteractiveQuestion,
+  onRespondInteractiveQuestion,
 }: ChatPanelProps) {
   const [inputText, setInputText] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
@@ -2044,6 +2153,14 @@ export function ChatPanel({
               </button>
             </div>
           </div>
+        )}
+
+        {/* Interactive question card */}
+        {pendingInteractiveQuestion && (
+          <InteractiveQuestionCard
+            question={pendingInteractiveQuestion}
+            onSubmit={(answers) => onRespondInteractiveQuestion?.(answers)}
+          />
         )}
 
         {/* Prompt suggestion chips */}
