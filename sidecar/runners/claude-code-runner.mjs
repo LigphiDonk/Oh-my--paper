@@ -164,6 +164,7 @@ export async function runClaudeCode(request) {
   // double-emit tool starts that were already handled by `tool_use` events.
   const emittedToolUseIds = new Set();
   const completedToolUseIds = new Set();
+  let toolUseCounter = 0;
 
   try {
     await streamQuery(options);
@@ -246,21 +247,24 @@ export async function runClaudeCode(request) {
             } else if (block.type === "tool_use") {
               // Emit tool_call_start from the finalized assistant message
               // if it wasn't already emitted by a stream_event or tool_use event.
-              if (!emittedToolUseIds.has(block.id)) {
-                emittedToolUseIds.add(block.id);
+              const blockUseId = block.id || `auto-${++toolUseCounter}`;
+              if (!emittedToolUseIds.has(blockUseId)) {
+                emittedToolUseIds.add(blockUseId);
                 emit({
                   type: "tool_call_start",
                   toolId: block.name || "tool",
+                  toolUseId: blockUseId,
                   args: block.input || {},
                 });
               }
               // Auto-close: if this tool_use never received a tool_result,
               // emit an empty completed result so the card stops spinning.
-              if (!completedToolUseIds.has(block.id)) {
-                completedToolUseIds.add(block.id);
+              if (!completedToolUseIds.has(blockUseId)) {
+                completedToolUseIds.add(blockUseId);
                 emit({
                   type: "tool_call_result",
                   toolId: block.name || "tool",
+                  toolUseId: blockUseId,
                   output: "",
                   status: "completed",
                 });
@@ -305,14 +309,15 @@ export async function runClaudeCode(request) {
           rawEvent.content_block?.type === "tool_use"
         ) {
           const block = rawEvent.content_block;
-          if (!emittedToolUseIds.has(block.id)) {
-            emittedToolUseIds.add(block.id);
+          const blockUseId = block.id || `auto-${++toolUseCounter}`;
+          if (!emittedToolUseIds.has(blockUseId)) {
+            emittedToolUseIds.add(blockUseId);
             const blockName = block.name || "tool";
             const blockInput = block.input || {};
             if (blockName === "AskUserQuestion" && blockInput.questions) {
               emit({
                 type: "interactive_question",
-                requestId: block.id || `iq-${Date.now()}`,
+                requestId: blockUseId || `iq-${Date.now()}`,
                 title: blockInput.title || "",
                 questions: blockInput.questions,
               });
@@ -320,6 +325,7 @@ export async function runClaudeCode(request) {
               emit({
                 type: "tool_call_start",
                 toolId: blockName,
+                toolUseId: blockUseId,
                 args: blockInput,
               });
             }
@@ -352,7 +358,7 @@ export async function runClaudeCode(request) {
       case "tool_use": {
         const toolName = event.name || event.tool_name || "tool";
         const input = event.input || {};
-        const toolId = event.tool_use_id || event.id;
+        const toolId = event.tool_use_id || event.id || `auto-${++toolUseCounter}`;
         if (toolId) emittedToolUseIds.add(toolId);
         // Intercept AskUserQuestion → emit interactive_question
         if (toolName === "AskUserQuestion" && input.questions) {
@@ -364,12 +370,12 @@ export async function runClaudeCode(request) {
           });
           break;
         }
-        emit({ type: "tool_call_start", toolId: toolName, args: input });
+        emit({ type: "tool_call_start", toolId: toolName, toolUseId: toolId, args: input });
         break;
       }
 
       case "tool_result": {
-        const toolResultId = event.tool_use_id || event.id;
+        const toolResultId = event.tool_use_id || event.id || "";
         if (toolResultId) completedToolUseIds.add(toolResultId);
         const toolName = event.name || event.tool_name || "tool";
         const output =
@@ -377,7 +383,7 @@ export async function runClaudeCode(request) {
             ? event.output
             : JSON.stringify(event.output ?? "");
         const status = event.is_error ? "error" : "completed";
-        emit({ type: "tool_call_result", toolId: toolName, output, status });
+        emit({ type: "tool_call_result", toolId: toolName, toolUseId: toolResultId, output, status });
         break;
       }
 

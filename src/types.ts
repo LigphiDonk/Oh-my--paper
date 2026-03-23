@@ -256,8 +256,8 @@ export type StreamChunk =
   | { type: "thinking_clear" }
   | { type: "thinking_commit" }
   | { type: "text_delta"; content: string }
-  | { type: "tool_call_start"; toolId: string; args: Record<string, unknown> }
-  | { type: "tool_call_result"; toolId: string; output: string; status?: "completed" | "error" }
+  | { type: "tool_call_start"; toolId: string; toolUseId?: string; args: Record<string, unknown> }
+  | { type: "tool_call_result"; toolId: string; toolUseId?: string; output: string; status?: "completed" | "error" }
   | { type: "patch"; filePath: string; startLine: number; endLine: number; newContent: string; diff?: DiffLine[] }
   | { type: "error"; message: string }
   | { type: "subagent_start"; taskId: string; description: string }

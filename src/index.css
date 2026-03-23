@@ -3814,7 +3814,7 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-top: 10px;
   padding: 6px 10px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.86);
@@ -3900,6 +3900,18 @@ button {
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.01em;
+}
+
+.ag-scramble-text {
+  font-family: var(--font-mono, "JetBrains Mono", "Fira Code", monospace);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: var(--text-tertiary);
+  animation: ag-scramble-fade 0.6s ease-in-out infinite alternate;
+}
+@keyframes ag-scramble-fade {
+  0% { opacity: 0.4; }
+  100% { opacity: 0.8; }
 }
 
 /* Streaming cursor */

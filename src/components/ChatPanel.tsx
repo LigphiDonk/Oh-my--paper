@@ -39,6 +39,7 @@ const _appliedSuggestionKeys = new Set<string>();
 interface ToolCallBlock {
   id: string;
   toolId: string;
+  toolUseId?: string;
   args?: Record<string, unknown>;
   output?: string;
   status: "running" | "completed" | "error" | "requested";
@@ -227,10 +228,18 @@ function parseSerializedToolBlocks(raw: string): { toolCalls: ToolCallBlock[]; b
     if (toolMatch) {
       pushTextBlock();
       const toolId = toolMatch[1];
+      let toolUseId: string | undefined;
       let args: Record<string, unknown> | undefined;
       let result = "";
       let status: ToolCallBlock["status"] = "running";
       let cursor = i + 1;
+
+      // Parse optional [ToolUseId: xxx]
+      if (cursor < lines.length && lines[cursor].startsWith("[ToolUseId: ")) {
+        const lastBracket = lines[cursor].lastIndexOf("]");
+        toolUseId = lines[cursor].slice("[ToolUseId: ".length, lastBracket > -1 ? lastBracket : undefined).trim();
+        cursor += 1;
+      }
 
       if (cursor < lines.length && lines[cursor].trim() === "[Args]") {
         cursor += 1;
@@ -285,6 +294,7 @@ function parseSerializedToolBlocks(raw: string): { toolCalls: ToolCallBlock[]; b
       const call: ToolCallBlock = {
         id: `${i}-${toolId}`,
         toolId,
+        toolUseId,
         args,
         output: result.trim() || undefined,
         status: result ? (status === "running" ? "completed" : status) : status,
@@ -299,6 +309,47 @@ function parseSerializedToolBlocks(raw: string): { toolCalls: ToolCallBlock[]; b
         pendingToolIndices.push(toolCalls.length - 1);
       }
       i = cursor - 1;
+    } else if (lines[i].startsWith("[ToolUseId: ")) {
+      // ToolUseId line before a [Result] — match to pending tool by toolUseId
+      const lastBracket = lines[i].lastIndexOf("]");
+      const resultToolUseId = lines[i].slice("[ToolUseId: ".length, lastBracket > -1 ? lastBracket : undefined).trim();
+      // Look ahead for [Status:] and [Result]
+      let cursor = i + 1;
+      // Parse optional [Status:]
+      while (cursor < lines.length && lines[cursor].startsWith("[Status: ")) {
+        const statusBracket = lines[cursor].lastIndexOf("]");
+        const nextStatus = lines[cursor].slice("[Status: ".length, statusBracket > -1 ? statusBracket : undefined).trim();
+        // Find the matching pending tool by toolUseId
+        const matchedByUseId = toolCalls.find(
+          (tc) => tc.toolUseId === resultToolUseId && tc.status === "running",
+        );
+        if (matchedByUseId && (nextStatus === "error" || nextStatus === "completed" || nextStatus === "running" || nextStatus === "requested")) {
+          matchedByUseId.status = nextStatus;
+        }
+        cursor += 1;
+      }
+      if (cursor < lines.length && lines[cursor].trim() === "[Result]") {
+        cursor += 1;
+        const resultLines: string[] = [];
+        while (cursor < lines.length && lines[cursor].trim() !== "[/Result]") {
+          resultLines.push(lines[cursor]);
+          cursor += 1;
+        }
+        const matchedByUseId = toolCalls.find(
+          (tc) => tc.toolUseId === resultToolUseId && tc.status === "running",
+        );
+        if (matchedByUseId) {
+          matchedByUseId.output = resultLines.join("\n").trim() || undefined;
+          if (matchedByUseId.status === "running") matchedByUseId.status = "completed";
+        }
+        if (cursor < lines.length && lines[cursor].trim() === "[/Result]") {
+          i = cursor;
+        } else {
+          i = cursor - 1;
+        }
+      } else {
+        i = cursor - 1;
+      }
     } else if (lines[i].startsWith("[Status: ")) {
       const pendingTool = resolvePendingTool();
       if (!pendingTool) {
@@ -681,6 +732,23 @@ function buildToolOutputPreview(output?: string) {
   return lines.length > 240 ? `${lines.slice(0, 240)}…` : lines;
 }
 
+/* ─── Scramble indicator (Claude Code style) ─────────── */
+const SCRAMBLE_CHARS = "abcdefghijklmnopqrstuvwxyz";
+function ScrambleIndicator() {
+  const [text, setText] = useState(() =>
+    Array.from({ length: 6 }, () => SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)]).join(""),
+  );
+  useEffect(() => {
+    const id = setInterval(() => {
+      setText(
+        Array.from({ length: 6 }, () => SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)]).join(""),
+      );
+    }, 60);
+    return () => clearInterval(id);
+  }, []);
+  return <span className="ag-scramble-text">{text}</span>;
+}
+
 /* ─── Tool call card ──────────────────────────────────── */
 function ToolCallCard({ call }: { call: ToolCallBlock }) {
   const isRunning = call.status === "running";
@@ -831,16 +899,6 @@ function AssistantMessage({ msg, streaming }: {
           durationMs={streaming?.thinkingDurationMs ?? 0}
         />
       )}
-      {streaming && (!thoughtText || streamStatusLabel !== "正在思考") && (
-        <div className="ag-stream-status" aria-live="polite">
-          <span className="ag-stream-status-dots" aria-hidden="true">
-            <span className="ag-thinking-dot" />
-            <span className="ag-thinking-dot" />
-            <span className="ag-thinking-dot" />
-          </span>
-          <span className="ag-stream-status-label">{streamStatusLabel}</span>
-        </div>
-      )}
       {streamError && <div className="ag-assistant-error">Error: {streamError}</div>}
       {blocks.length > 0 && (
         <div className="ag-assistant-sequence">
@@ -853,15 +911,30 @@ function AssistantMessage({ msg, streaming }: {
           ))}
         </div>
       )}
+      {streaming && (
+        <div className="ag-stream-status" aria-live="polite">
+          {runningToolCalls > 0 && !clean ? (
+            <ScrambleIndicator />
+          ) : clean ? (
+            <span className="ag-cursor-blink" />
+          ) : (
+            <>
+              <span className="ag-stream-status-dots" aria-hidden="true">
+                <span className="ag-thinking-dot" />
+                <span className="ag-thinking-dot" />
+                <span className="ag-thinking-dot" />
+              </span>
+              <span className="ag-stream-status-label">{streamStatusLabel}</span>
+            </>
+          )}
+        </div>
+      )}
       {!clean && !thinkingText && toolCalls.length === 0 && !streaming && (
         <div className="ag-assistant-text ag-thinking">
           <span className="ag-thinking-dot" />
           <span className="ag-thinking-dot" />
           <span className="ag-thinking-dot" />
         </div>
-      )}
-      {streaming && (
-        <span className="ag-cursor-blink" />
       )}
     </div>
   );

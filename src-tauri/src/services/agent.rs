@@ -321,9 +321,10 @@ pub fn run_agent(
                     last_error = Some(message.clone());
                     let _ = app_handle.emit("agent:stream", &chunk);
                 }
-                StreamChunk::ToolCallStart { tool_id, args } => {
+                StreamChunk::ToolCallStart { tool_id, tool_use_id, args } => {
                     assistant_timeline.push(AssistantTimelineItem::Tool {
                         tool_id: tool_id.clone(),
+                        tool_use_id: tool_use_id.clone(),
                         status: "running".into(),
                         args: serialize_tool_args(args),
                         preview: String::new(),
@@ -332,25 +333,39 @@ pub fn run_agent(
                 }
                 StreamChunk::ToolCallResult {
                     tool_id,
+                    tool_use_id,
                     output,
                     status,
                 } => {
                     let resolved_status = status.as_deref().unwrap_or("completed").to_string();
                     let preview = truncate_preview(output, 240);
-                    if let Some(AssistantTimelineItem::Tool {
-                        status,
-                        preview: item_preview,
-                        ..
-                    }) = assistant_timeline
-                        .iter_mut()
-                        .rev()
-                        .find(|item| matches!(item, AssistantTimelineItem::Tool { tool_id: id, status, .. } if id == tool_id && status == "running"))
-                    {
-                        *status = resolved_status;
-                        *item_preview = preview;
+                    // Find matching index — prefer tool_use_id, fallback to name+status
+                    let matched_idx = if !tool_use_id.is_empty() {
+                        assistant_timeline
+                            .iter()
+                            .rposition(|item| matches!(item, AssistantTimelineItem::Tool { tool_use_id: uid, status, .. } if uid == tool_use_id && status == "running"))
+                    } else {
+                        None
+                    };
+                    let matched_idx = matched_idx.or_else(|| {
+                        assistant_timeline
+                            .iter()
+                            .rposition(|item| matches!(item, AssistantTimelineItem::Tool { tool_id: id, status, .. } if id == tool_id && status == "running"))
+                    });
+                    if let Some(idx) = matched_idx {
+                        if let AssistantTimelineItem::Tool {
+                            status,
+                            preview: item_preview,
+                            ..
+                        } = &mut assistant_timeline[idx]
+                        {
+                            *status = resolved_status;
+                            *item_preview = preview;
+                        }
                     } else {
                         assistant_timeline.push(AssistantTimelineItem::Tool {
                             tool_id: tool_id.clone(),
+                            tool_use_id: tool_use_id.clone(),
                             status: resolved_status,
                             args: String::new(),
                             preview,
@@ -737,11 +752,15 @@ fn build_assistant_message_content(
             }
             AssistantTimelineItem::Tool {
                 tool_id,
+                tool_use_id,
                 status,
                 args,
                 preview,
             } => {
                 let mut lines = vec![format!("[Tool: {tool_id}]")];
+                if !tool_use_id.is_empty() {
+                    lines.push(format!("[ToolUseId: {tool_use_id}]"));
+                }
                 if !args.is_empty() {
                     lines.push("[Args]".into());
                     lines.push(args.clone());
@@ -767,6 +786,7 @@ enum AssistantTimelineItem {
     Text(String),
     Tool {
         tool_id: String,
+        tool_use_id: String,
         status: String,
         args: String,
         preview: String,

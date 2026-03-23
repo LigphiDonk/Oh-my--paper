@@ -377,11 +377,15 @@ pub enum StreamChunk {
     #[serde(rename = "tool_call_start")]
     ToolCallStart {
         tool_id: String,
+        #[serde(default)]
+        tool_use_id: String,
         args: serde_json::Value,
     },
     #[serde(rename = "tool_call_result")]
     ToolCallResult {
         tool_id: String,
+        #[serde(default)]
+        tool_use_id: String,
         output: String,
         status: Option<String>,
     },
