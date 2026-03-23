@@ -22,6 +22,9 @@ Use this skill for literature collection, screening, and source tracing.
 2. Keep claims tied to an explicit source path or URL.
 3. Record short screening notes rather than long prose.
 4. Mark uncertainty explicitly when a source cannot be verified.
+5. Each paper entry in `paper_bank.json` **MUST** include a `url` field pointing to the real paper page (prefer DOI link `https://doi.org/...`; fallback to Semantic Scholar, arXiv, or publisher page). Never leave `url` empty.
+6. The `authors` field in `paper_bank.json` **MUST** be an array of strings (e.g. `["Alice", "Bob"]`), never a single string like `"TBD"`.
+7. For every markdown artifact (e.g. `domain_map.md`), generate **both** a Chinese version (`domain_map.zh.md`) and an English version (`domain_map.en.md`) alongside the main file.
 
 ## Expected Outputs
 

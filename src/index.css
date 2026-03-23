@@ -8687,3 +8687,415 @@ div.ve-tok-math-rendered .katex { font-size: 1.15em; }
   from { opacity: 0; transform: scale(0.92) translateY(16px); }
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
+
+/* ── Header actions (lang toggle + close) ── */
+.artifact-preview-modal__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.artifact-preview-modal__lang-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.06);
+  color: #6366f1;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.12s;
+}
+
+.artifact-preview-modal__lang-toggle:hover {
+  background: rgba(99, 102, 241, 0.14);
+  transform: scale(1.04);
+}
+
+/* ── Paper card – clickable title link ── */
+.artifact-preview-modal__paper-title a {
+  color: #1a1a2e;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.artifact-preview-modal__paper-title a:hover {
+  color: #6366f1;
+  text-decoration: underline;
+}
+
+.artifact-preview-modal__paper-link-icon {
+  font-size: 11px;
+  color: #6366f1;
+  opacity: 0.6;
+}
+
+/* ── Paper card – method ── */
+.artifact-preview-modal__paper-method {
+  font-size: 12px;
+  color: #555;
+  margin-bottom: 4px;
+}
+
+.artifact-preview-modal__paper-method-label {
+  font-weight: 600;
+  color: #888;
+}
+
+/* ── Paper card – keywords tags ── */
+.artifact-preview-modal__paper-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.artifact-preview-modal__paper-kw-tag {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.08);
+  color: #6366f1;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* ── Paper card – category ── */
+.artifact-preview-modal__paper-category {
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 4px;
+  font-style: italic;
+}
+
+/* ── Paper card – no link warning ── */
+.artifact-preview-modal__paper-no-link {
+  font-size: 11px;
+  color: #d97706;
+  margin-bottom: 4px;
+}
+
+/* ── Paper card – domain label ── */
+.artifact-preview-modal__papers-domain {
+  color: #999;
+}
+
+/* ── Research Brief View ── */
+.research-brief-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.research-brief-view__card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.research-brief-view__field {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.research-brief-view__icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.research-brief-view__label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.research-brief-view__value {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1a1a2e;
+  line-height: 1.5;
+}
+
+.research-brief-view__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.research-brief-view__tag {
+  display: inline-flex;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.1);
+  color: #16a34a;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.research-brief-view__collapsible {
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.research-brief-view__toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  background: rgba(0, 0, 0, 0.02);
+  color: #555;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.research-brief-view__toggle:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.research-brief-view__pre {
+  margin: 0;
+  padding: 12px 16px;
+  font-size: 12px;
+  font-family: var(--font-mono, monospace);
+  color: #555;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: rgba(0, 0, 0, 0.02);
+  border-top: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.research-brief-view__rules {
+  padding: 14px 16px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
+}
+
+.research-brief-view__rules ol {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  font-size: 13px;
+  color: #555;
+  line-height: 1.65;
+}
+
+/* ── Idea Board View ── */
+.idea-board-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.idea-board-view__header {
+  font-size: 13px;
+  font-weight: 600;
+  color: #888;
+}
+
+.idea-board-view__grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.idea-board-view__card {
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+}
+
+.idea-board-view__card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.idea-board-view__card.is-selected {
+  border-color: rgba(34, 197, 94, 0.4);
+  background: rgba(240, 253, 244, 0.6);
+}
+
+.idea-board-view__card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.idea-board-view__card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a2e;
+  flex: 1;
+}
+
+.idea-board-view__card-score {
+  color: #f59e0b;
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+
+.idea-board-view__selected-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.12);
+  color: #16a34a;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.idea-board-view__card-desc {
+  font-size: 13px;
+  color: #666;
+  line-height: 1.55;
+  margin-bottom: 6px;
+}
+
+.idea-board-view__card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.idea-board-view__tag {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.08);
+  color: #6366f1;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.idea-board-view__card-extra {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.08);
+}
+
+.idea-board-view__extra-row {
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.idea-board-view__extra-key {
+  font-weight: 600;
+  color: #888;
+  flex-shrink: 0;
+}
+
+.idea-board-view__extra-val {
+  color: #555;
+  word-break: break-word;
+}
+
+.idea-board-view__empty {
+  text-align: center;
+  padding: 32px;
+  color: #999;
+  font-size: 14px;
+}
+
+/* ── JSON Tree View ── */
+.artifact-preview-modal__json-tree {
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  line-height: 1.6;
+  color: #333;
+}
+
+.json-tree__node {
+  display: inline;
+}
+
+.json-tree__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: #888;
+  cursor: pointer;
+  transition: color 0.12s;
+}
+
+.json-tree__toggle:hover {
+  color: #6366f1;
+}
+
+.json-tree__children {
+  display: block;
+  padding-left: 20px;
+  border-left: 1px solid rgba(0, 0, 0, 0.06);
+  margin-left: 4px;
+}
+
+.json-tree__entry {
+  display: block;
+}
+
+.json-tree__key {
+  color: #6366f1;
+  font-weight: 600;
+}
+
+.json-tree__index {
+  color: #999;
+}
+
+.json-tree__string {
+  color: #16a34a;
+}
+
+.json-tree__number {
+  color: #2563eb;
+}
+
+.json-tree__bool {
+  color: #d97706;
+  font-weight: 600;
+}
+
+.json-tree__null {
+  color: #999;
+  font-style: italic;
+}
+
+.json-tree__bracket {
+  color: #888;
+}
+
+.json-tree__count {
+  color: #bbb;
+  font-size: 11px;
+  font-style: italic;
+  margin: 0 4px;
+}
+

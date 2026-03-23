@@ -48,6 +48,17 @@ function normalizeTaskStatus(raw: string): string {
   return STATUS_ALIASES[raw.trim().toLowerCase().replace(/_/g, "-")] ?? raw.trim();
 }
 
+function cleanTaskDescription(raw: string): string {
+  // Remove technical tool output markers
+  return raw
+    .replace(/\[Result\][\s\S]*?\[\/Result\]/g, '')
+    .replace(/\[Tool:\s*\w+\]/g, '')
+    .replace(/\[ToolUseId:\s*[\w_]+\]/g, '')
+    .replace(/\[Args\][\s\S]*?\[\/Args\]/g, '')
+    .replace(/\[Status:\s*\w+\]/g, '')
+    .trim();
+}
+
 function formatTaskStatus(task: ResearchTask, isZh: boolean) {
   const status = normalizeTaskStatus(task.status);
   if (!isZh) {
@@ -250,7 +261,7 @@ function TaskInspector({
     <div className="research-inspector__section">
       <div className="research-inspector__eyebrow">{task.stage}</div>
       <h3>{task.title}</h3>
-      <p>{task.description}</p>
+      <p>{cleanTaskDescription(task.description)}</p>
       <div className="research-inspector__meta">
         <span>{isZh ? "状态" : "Status"}: {formatTaskStatus(task, isZh)}</span>
         <span>{isZh ? "优先级" : "Priority"}: {formatPriority(task, isZh)}</span>
@@ -715,7 +726,8 @@ export function ResearchCanvas({
 
                   {/* Task nodes */}
                   {!isCollapsed && group.tasks.map((task, taskIndex) => {
-                    const isActive = task.id === activeTaskId || task.id === localizedResearch.nextTask?.id;
+                    const isActive = normalizeTaskStatus(task.status) !== "done"
+                      && (task.id === activeTaskId || task.id === localizedResearch.nextTask?.id);
                     const isSelected = selectionId === `task:${task.id}`;
                     const isLast = taskIndex === group.tasks.length - 1 && groupIndex === stageGroups.length - 1;
 
