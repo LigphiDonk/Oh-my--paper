@@ -766,9 +766,7 @@ fn build_assistant_message_content(
                     lines.push(args.clone());
                     lines.push("[/Args]".into());
                 }
-                if status != "completed" {
-                    lines.push(format!("[Status: {status}]"));
-                }
+                lines.push(format!("[Status: {status}]"));
                 if !preview.is_empty() {
                     lines.push("[Result]".into());
                     lines.push(preview.clone());

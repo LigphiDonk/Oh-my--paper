@@ -873,6 +873,7 @@ function AssistantMessage({ msg, streaming }: {
   const thinkingHistoryText = streaming?.thinkingHistoryText?.trim() ?? "";
   const thoughtText = thinkingText || thinkingHistoryText || parsed.thoughtText;
   const runningToolCalls = toolCalls.filter((call) => call.status === "running").length;
+  const lastBlockIsTool = blocks.length > 0 && blocks[blocks.length - 1].kind === "tool";
   const streamStatusLabel = streaming
     ? streamError
       ? "响应出错"
@@ -880,11 +881,11 @@ function AssistantMessage({ msg, streaming }: {
         ? streaming.subagentLabel
         : streaming.statusMessage
           ? streaming.statusMessage
-          : clean
+          : clean && !lastBlockIsTool
             ? "正在生成"
             : runningToolCalls > 0
               ? "正在处理"
-              : thinkingText
+              : thinkingText || lastBlockIsTool
                 ? "正在思考"
                 : "已发送"
     : "";
@@ -912,7 +913,7 @@ function AssistantMessage({ msg, streaming }: {
       )}
       {streaming && (
         <div className="ag-stream-status" aria-live="polite">
-          {runningToolCalls > 0 ? (
+          {runningToolCalls > 0 || lastBlockIsTool ? (
             <ScrambleIndicator />
           ) : clean ? (
             <span className="ag-cursor-blink" />
