@@ -152,6 +152,19 @@ fn status_rank(status: &str) -> usize {
     }
 }
 
+fn normalize_status(raw: &str) -> String {
+    match raw.trim().to_lowercase().replace('_', "-").as_str() {
+        "done" | "completed" | "complete" | "finished" => "done",
+        "in-progress" | "in progress" | "running" | "active" | "started" => "in-progress",
+        "pending" | "todo" | "not-started" | "not started" | "queued" | "waiting" => "pending",
+        "review" | "in-review" | "in review" => "review",
+        "deferred" | "blocked" | "on-hold" | "on hold" => "deferred",
+        "cancelled" | "canceled" | "removed" | "skipped" => "cancelled",
+        _ => return raw.trim().to_string(),
+    }
+    .to_string()
+}
+
 fn task_is_open(task: &ResearchTask) -> bool {
     matches!(
         task.status.as_str(),
@@ -441,7 +454,7 @@ fn apply_task_changes(
         .map(|value| value.trim())
         .filter(|value| !value.is_empty())
     {
-        task.status = status.to_string();
+        task.status = normalize_status(status);
     }
     if let Some(stage) = changes.stage.as_deref() {
         task.stage = normalize_stage(Some(stage));
@@ -1267,9 +1280,11 @@ pub fn load_research_snapshot(root: &Path) -> Result<ResearchCanvasSnapshot> {
     let mut tasks = read_tasks(&tasks_path)
         .into_iter()
         .map(|mut task| {
-            if task.status.trim().is_empty() {
-                task.status = "pending".into();
-            }
+            task.status = if task.status.trim().is_empty() {
+                "pending".into()
+            } else {
+                normalize_status(&task.status)
+            };
             task.stage = normalize_stage(Some(&task.stage));
             if task.task_prompt.trim().is_empty() {
                 task.task_prompt = default_task_prompt(

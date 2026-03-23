@@ -35,9 +35,23 @@ interface ResearchCanvasProps {
 
 /* ─── Helpers ─── */
 
+const STATUS_ALIASES: Record<string, string> = {
+  done: "done", completed: "done", complete: "done", finished: "done",
+  "in-progress": "in-progress", running: "in-progress", active: "in-progress", started: "in-progress",
+  pending: "pending", todo: "pending", "not-started": "pending", queued: "pending", waiting: "pending",
+  review: "review", "in-review": "review",
+  deferred: "deferred", blocked: "deferred", "on-hold": "deferred",
+  cancelled: "cancelled", canceled: "cancelled", removed: "cancelled", skipped: "cancelled",
+};
+
+function normalizeTaskStatus(raw: string): string {
+  return STATUS_ALIASES[raw.trim().toLowerCase().replace(/_/g, "-")] ?? raw.trim();
+}
+
 function formatTaskStatus(task: ResearchTask, isZh: boolean) {
+  const status = normalizeTaskStatus(task.status);
   if (!isZh) {
-    return task.status;
+    return status;
   }
   return ({
     pending: "待开始",
@@ -46,7 +60,7 @@ function formatTaskStatus(task: ResearchTask, isZh: boolean) {
     review: "待检查",
     deferred: "已延后",
     cancelled: "已取消",
-  }[task.status] ?? task.status);
+  }[status] ?? status);
 }
 
 function formatPriority(task: ResearchTask, isZh: boolean) {
@@ -68,27 +82,27 @@ interface ResearchTaskExecutionState {
 function resolveResearchTaskExecutionState(research: ResearchCanvasSnapshot): ResearchTaskExecutionState {
   const doneIds = new Set(
     research.tasks
-      .filter((task) => task.status === "done")
+      .filter((task) => normalizeTaskStatus(task.status) === "done")
       .map((task) => task.id),
   );
   const executableTaskIds = new Set(
     research.tasks
       .filter((task) => task.stage === research.currentStage)
-      .filter((task) => ["in-progress", "review"].includes(task.status))
+      .filter((task) => ["in-progress", "review"].includes(normalizeTaskStatus(task.status)))
       .map((task) => task.id),
   );
 
   if (executableTaskIds.size === 0) {
     research.tasks
       .filter((task) => task.stage === research.currentStage)
-      .filter((task) => ["pending", "review", ""].includes(task.status))
+      .filter((task) => ["pending", "review", ""].includes(normalizeTaskStatus(task.status)))
       .filter((task) => task.dependencies.every((dependencyId) => doneIds.has(dependencyId)))
       .forEach((task) => executableTaskIds.add(task.id));
   }
 
   const blockedTaskIds = new Set(
     research.tasks
-      .filter((task) => task.status !== "done" && !executableTaskIds.has(task.id))
+      .filter((task) => normalizeTaskStatus(task.status) !== "done" && !executableTaskIds.has(task.id))
       .filter((task) => task.dependencies.some((dependencyId) => !doneIds.has(dependencyId)))
       .map((task) => task.id),
   );
@@ -198,11 +212,12 @@ function TaskInspector({
   const isZh = locale === "zh-CN";
 
   /* Resolve button state based on actual task status */
-  const isDone = task.status === "done";
-  const isInProgress = task.status === "in-progress";
-  const isReview = task.status === "review";
-  const isCancelled = task.status === "cancelled";
-  const isDeferred = task.status === "deferred";
+  const normalized = normalizeTaskStatus(task.status);
+  const isDone = normalized === "done";
+  const isInProgress = normalized === "in-progress";
+  const isReview = normalized === "review";
+  const isCancelled = normalized === "cancelled";
+  const isDeferred = normalized === "deferred";
   const isClosed = isDone || isCancelled || isDeferred;
 
   let buttonLabel: string;
@@ -488,12 +503,13 @@ function TaskComposerDialog({
 /* ─── Git Task Tree View (NEW) ─── */
 
 function TaskTreeNodeDot({ status, isActive }: { status: string; isActive: boolean }) {
+  const normalized = normalizeTaskStatus(status);
   const colorClass =
-    status === "done"
+    normalized === "done"
       ? "is-done"
-      : status === "in-progress" || status === "review"
+      : normalized === "in-progress" || normalized === "review"
         ? "is-active"
-        : status === "cancelled" || status === "deferred"
+        : normalized === "cancelled" || normalized === "deferred"
           ? "is-dimmed"
           : "is-pending";
   return (
@@ -582,7 +598,7 @@ export function ResearchCanvas({
   const resolved = selectionToEntity(localizedResearch, selectionId);
 
   const totalTasks = localizedResearch.tasks.length;
-  const doneTasks = localizedResearch.tasks.filter((t) => t.status === "done").length;
+  const doneTasks = localizedResearch.tasks.filter((t) => normalizeTaskStatus(t.status) === "done").length;
   const completion = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
   const taskComposerDependencyOptions = taskComposer
