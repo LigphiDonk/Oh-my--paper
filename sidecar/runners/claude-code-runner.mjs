@@ -83,10 +83,22 @@ async function buildSdkOptions(request) {
     options.resume = request.remoteSessionId;
   }
 
-  // Inject skill prompts if present
+  // Inject skill prompts + conciseness instruction
+  const conciseInstruction = [
+    "<INTERACTION_STYLE>",
+    "When responding in Chinese, follow these rules:",
+    "- Be concise. Reduce redundant acknowledgments and repetitions.",
+    "- Do NOT start with verbose openers like 'OK understood', 'Sure I will help you', etc. A brief one-line acknowledgment is fine, but do NOT be verbose.",
+    "- Do NOT repeat the user's request back. Jump straight into analysis and action.",
+    "- Focus on valuable information and concrete actions.",
+    "</INTERACTION_STYLE>",
+  ].join("\n");
+
+  const systemParts = [conciseInstruction];
   if (request.systemPrompt && request.systemPrompt.trim()) {
-    options.appendSystemPrompt = request.systemPrompt;
+    systemParts.push(request.systemPrompt.trim());
   }
+  options.appendSystemPrompt = systemParts.join("\n\n");
 
   // ── NEW: Enable full SDK event stream ──────────────────────
   // Include partial/streaming message events so we can extract
@@ -151,6 +163,7 @@ export async function runClaudeCode(request) {
   // Track tool_use IDs we've already emitted so partial messages don't
   // double-emit tool starts that were already handled by `tool_use` events.
   const emittedToolUseIds = new Set();
+  const completedToolUseIds = new Set();
 
   try {
     await streamQuery(options);
@@ -241,6 +254,17 @@ export async function runClaudeCode(request) {
                   args: block.input || {},
                 });
               }
+              // Auto-close: if this tool_use never received a tool_result,
+              // emit an empty completed result so the card stops spinning.
+              if (!completedToolUseIds.has(block.id)) {
+                completedToolUseIds.add(block.id);
+                emit({
+                  type: "tool_call_result",
+                  toolId: block.name || "tool",
+                  output: "",
+                  status: "completed",
+                });
+              }
             }
           }
         }
@@ -324,6 +348,8 @@ export async function runClaudeCode(request) {
       }
 
       case "tool_result": {
+        const toolResultId = event.tool_use_id || event.id;
+        if (toolResultId) completedToolUseIds.add(toolResultId);
         const toolName = event.name || event.tool_name || "tool";
         const output =
           typeof event.output === "string"
