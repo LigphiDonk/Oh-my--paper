@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::Path;
-use std::time::Instant;
+use std::sync::atomic::Ordering;
+use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -1251,3 +1252,206 @@ pub fn count_literature_for_task(
     let conn = state.db.lock().map_err(|err| err.to_string())?;
     literature::count_for_task(&conn, &task_id)
 }
+
+// ── Compute Node Commands ──
+
+#[tauri::command]
+pub fn load_compute_nodes() -> Result<crate::services::compute_node::ComputeNodeStore, String> {
+    crate::services::compute_node::load_compute_nodes()
+}
+
+#[tauri::command]
+pub fn save_compute_node(
+    node: crate::services::compute_node::ComputeNodeConfig,
+) -> Result<(), String> {
+    crate::services::compute_node::save_compute_node(node)
+}
+
+#[tauri::command]
+pub fn delete_compute_node(node_id: String) -> Result<(), String> {
+    crate::services::compute_node::delete_compute_node(&node_id)
+}
+
+#[tauri::command]
+pub fn set_active_compute_node(node_id: String) -> Result<(), String> {
+    crate::services::compute_node::set_active_compute_node(&node_id)
+}
+
+#[tauri::command]
+pub fn test_compute_node(node_id: String) -> Result<serde_json::Value, String> {
+    crate::services::compute_node::test_compute_node(&node_id)
+}
+
+// ── WeChat Bridge Commands ──
+
+use crate::services::wechat_bridge;
+
+#[tauri::command]
+pub fn load_wechat_config() -> Result<wechat_bridge::WeChatConfig, String> {
+    wechat_bridge::load_wechat_config()
+}
+
+#[tauri::command]
+pub fn save_wechat_config_cmd(
+    config: wechat_bridge::WeChatConfig,
+) -> Result<(), String> {
+    wechat_bridge::save_wechat_config(&config)
+}
+
+#[tauri::command]
+pub fn get_wechat_status(
+    state: State<'_, wechat_bridge::WeChatBridgeState>,
+) -> Result<wechat_bridge::WeChatStatus, String> {
+    let status = state.status.lock().map_err(|e| e.to_string())?;
+    Ok(status.clone())
+}
+
+#[tauri::command]
+pub async fn start_wechat_binding(
+    api_url: Option<String>,
+) -> Result<wechat_bridge::QrCodeInfo, String> {
+    let config = wechat_bridge::load_wechat_config()?;
+    let url = api_url.unwrap_or(config.api_url);
+    tauri::async_runtime::spawn_blocking(move || wechat_bridge::request_qr_code(&url))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn poll_wechat_binding_status(
+    scan_ticket: String,
+    api_url: Option<String>,
+) -> Result<Option<String>, String> {
+    let config = wechat_bridge::load_wechat_config()?;
+    let url = api_url.unwrap_or(config.api_url);
+    tauri::async_runtime::spawn_blocking(move || {
+        wechat_bridge::poll_scan_status(&url, &scan_ticket)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub fn start_wechat_listener(
+    app_handle: AppHandle,
+    bridge_state: State<'_, wechat_bridge::WeChatBridgeState>,
+) -> Result<(), String> {
+    let config = wechat_bridge::load_wechat_config()?;
+    if config.token.trim().is_empty() {
+        return Err("WeChat token is not configured. Please bind via QR scan first.".into());
+    }
+
+    if bridge_state.running.load(Ordering::SeqCst) {
+        return Ok(()); // Already running
+    }
+
+    bridge_state.running.store(true, Ordering::SeqCst);
+    {
+        let mut status = bridge_state.status.lock().map_err(|e| e.to_string())?;
+        status.state = "connected".into();
+        status.message = "Listening for WeChat messages...".into();
+    }
+
+    let running = bridge_state.running.clone();
+    let status_ref = bridge_state.status.clone();
+    let ctx_token_ref = bridge_state.context_token.clone();
+    let offset_ref = bridge_state.update_offset.clone();
+    let app = app_handle.clone();
+
+    // Spawn the long-poll listener on a background thread.
+    tauri::async_runtime::spawn_blocking(move || {
+        while running.load(Ordering::SeqCst) {
+            let offset = {
+                let guard = offset_ref.lock().unwrap_or_else(|e| e.into_inner());
+                *guard
+            };
+
+            match wechat_bridge::get_updates(
+                &config.api_url,
+                &config.token,
+                offset,
+                config.poll_timeout_ms,
+            ) {
+                Ok((messages, new_offset)) => {
+                    {
+                        let mut guard =
+                            offset_ref.lock().unwrap_or_else(|e| e.into_inner());
+                        *guard = new_offset;
+                    }
+
+                    for msg in messages {
+                        // Check allow_from whitelist
+                        if !wechat_bridge::is_user_allowed(&config.allow_from, &msg.from_user) {
+                            continue;
+                        }
+
+                        // Cache context_token for replies
+                        if let Some(ref ctx) = msg.context_token {
+                            let mut guard =
+                                ctx_token_ref.lock().unwrap_or_else(|e| e.into_inner());
+                            *guard = Some(ctx.clone());
+                        }
+
+                        // Emit the incoming message to the frontend
+                        let _ = app.emit("wechat:message", &msg);
+                    }
+                }
+                Err(err) => {
+                    let _ = app.emit(
+                        "wechat:error",
+                        serde_json::json!({ "message": err }),
+                    );
+                    // Brief pause before retry on error
+                    std::thread::sleep(Duration::from_secs(5));
+                }
+            }
+        }
+
+        // Update status when stopped
+        if let Ok(mut status) = status_ref.lock() {
+            status.state = "disconnected".into();
+            status.message = "Listener stopped".into();
+        }
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn stop_wechat_listener(
+    bridge_state: State<'_, wechat_bridge::WeChatBridgeState>,
+) -> Result<(), String> {
+    bridge_state.running.store(false, Ordering::SeqCst);
+    {
+        let mut status = bridge_state.status.lock().map_err(|e| e.to_string())?;
+        status.state = "disconnected".into();
+        status.message = "Listener stopped".into();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn send_wechat_reply(
+    bridge_state: State<'_, wechat_bridge::WeChatBridgeState>,
+    text: String,
+) -> Result<(), String> {
+    let config = wechat_bridge::load_wechat_config()?;
+    if config.token.trim().is_empty() {
+        return Err("WeChat token is not configured".into());
+    }
+    let ctx_token = {
+        let guard = bridge_state
+            .context_token
+            .lock()
+            .map_err(|e| e.to_string())?;
+        guard.clone()
+    };
+    let api_url = config.api_url.clone();
+    let token = config.token.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        wechat_bridge::send_message(&api_url, &token, &text, ctx_token.as_deref())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+

@@ -558,6 +558,63 @@ export const desktop = {
       "test_compute_node", { nodeId }, () => Promise.resolve({ success: true, message: "ok" }),
     );
   },
+
+  // ─── WeChat Remote Bridge ───
+  loadWeChatConfig() {
+    return runOrMock<{
+      token: string;
+      apiUrl: string;
+      allowFrom: string;
+      autoStart: boolean;
+      pollTimeoutMs: number;
+    }>("load_wechat_config", {}, () =>
+      Promise.resolve({
+        token: "",
+        apiUrl: "https://ilinkai.weixin.qq.com",
+        allowFrom: "",
+        autoStart: false,
+        pollTimeoutMs: 35000,
+      }),
+    );
+  },
+  saveWeChatConfig(config: {
+    token: string;
+    apiUrl: string;
+    allowFrom: string;
+    autoStart: boolean;
+    pollTimeoutMs: number;
+  }) {
+    return runOrMock("save_wechat_config_cmd", { config }, () => Promise.resolve());
+  },
+  getWeChatStatus() {
+    return runOrMock<{ state: string; message: string; boundUser?: string }>(
+      "get_wechat_status", {}, () =>
+        Promise.resolve({ state: "disconnected", message: "Not connected" }),
+    );
+  },
+  startWeChatBinding(apiUrl?: string) {
+    return runOrMock<{ qrUrl: string; scanTicket: string }>(
+      "start_wechat_binding", { apiUrl }, () =>
+        Promise.reject(new Error("WeChat binding only available in desktop")),
+    );
+  },
+  pollWeChatBindingStatus(scanTicket: string, apiUrl?: string) {
+    return runOrMock<string | null>(
+      "poll_wechat_binding_status", { scanTicket, apiUrl }, () =>
+        Promise.resolve(null),
+    );
+  },
+  startWeChatListener() {
+    return runOrMock("start_wechat_listener", {}, () =>
+      Promise.reject(new Error("WeChat listener only available in desktop")),
+    );
+  },
+  stopWeChatListener() {
+    return runOrMock("stop_wechat_listener", {}, () => Promise.resolve());
+  },
+  sendWeChatReply(text: string) {
+    return runOrMock("send_wechat_reply", { text }, () => Promise.resolve());
+  },
 };
 
 export type { WorkspaceSnapshot };

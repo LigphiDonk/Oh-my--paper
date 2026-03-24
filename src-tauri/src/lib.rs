@@ -72,6 +72,7 @@ pub fn run() {
                 active_sidecar: Mutex::new(None),
                 sidecar_cancelled: std::sync::atomic::AtomicBool::new(false),
             });
+            app.manage(services::wechat_bridge::WeChatBridgeState::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -146,7 +147,22 @@ pub fn run() {
             commands::import_zotero_literature,
             commands::ingest_literature,
             commands::export_paper_bank,
-            commands::count_literature_for_task
+            commands::count_literature_for_task,
+            // Compute nodes
+            commands::load_compute_nodes,
+            commands::save_compute_node,
+            commands::delete_compute_node,
+            commands::set_active_compute_node,
+            commands::test_compute_node,
+            // WeChat remote bridge
+            commands::load_wechat_config,
+            commands::save_wechat_config_cmd,
+            commands::get_wechat_status,
+            commands::start_wechat_binding,
+            commands::poll_wechat_binding_status,
+            commands::start_wechat_listener,
+            commands::stop_wechat_listener,
+            commands::send_wechat_reply,
         ])
         .run(tauri::generate_context!())
         .expect("failed to start ViewerLeaf");
