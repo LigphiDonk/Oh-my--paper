@@ -11,7 +11,7 @@ use crate::models::{
     AgentContext, AgentMcpServerConfig, AgentMessage, AgentProvider, AgentRequest, AgentRunResult,
     AgentSessionSummary, AgentTaskContext, StreamChunk, UsageInfo,
 };
-use crate::services::{profile, provider, sidecar, skill};
+use crate::services::{compute_node, profile, provider, sidecar, skill};
 use crate::state::AppState;
 
 use std::sync::atomic::Ordering;
@@ -166,7 +166,7 @@ pub fn run_agent(
     let prov = provider::get_provider(&conn, &profile.provider_id).map_err(anyhow::Error::msg)?;
     let remote_session_id = read_remote_session_id(&conn, session_id)?;
     // Load skill prompts for injection (CLI runners use them as appendSystemPrompt)
-    let system_prompt = skill::load_skill_prompts(
+    let mut system_prompt = skill::load_skill_prompts(
         &conn,
         &prov.vendor,
         Path::new(&project_root),
@@ -175,6 +175,31 @@ pub fn run_agent(
     )
     .map_err(anyhow::Error::msg)?;
     drop(conn);
+
+    // Inject active compute node info so the AI can SSH into the server
+    if let Some(node) = compute_node::get_active_node() {
+        let auth_info = if node.auth_method == "key" && !node.key_path.is_empty() {
+            format!("SSH 密钥 ({})", node.key_path)
+        } else {
+            "密码认证".to_string()
+        };
+        let node_block = format!(
+            "\n\n<compute_node>\n\
+             你有一台可用的远程计算节点，可以通过 SSH 执行远程命令：\n\
+             - 名称: {}\n\
+             - 地址: {}@{}:{}\n\
+             - 认证方式: {}\n\
+             - 工作目录: {}\n\
+             连接命令: ssh -p {} {}@{}\n\
+             当用户要求你在远程服务器上执行操作（如跑实验、训练模型、查看 GPU 状态等），\n\
+             请使用上述 SSH 命令连接服务器并执行。\n\
+             </compute_node>",
+            node.name, node.user, node.host, node.port,
+            auth_info, node.work_dir,
+            node.port, node.user, node.host,
+        );
+        system_prompt.push_str(&node_block);
+    }
 
     let user_message = user_message
         .filter(|value| !value.trim().is_empty())

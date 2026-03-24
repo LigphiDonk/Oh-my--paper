@@ -4,7 +4,7 @@
 //! Allows users to remotely control the local AI agent via WeChat messages.
 //!
 //! Protocol summary:
-//!   - `get_bot_qrcode` → generate QR code for WeChat scan login
+//!   - `get_bot_qrcode` → GET request to obtain QR code for WeChat scan login
 //!   - `getUpdates` → long-poll for incoming messages
 //!   - `sendMessage` → push agent replies back to WeChat
 
@@ -161,16 +161,12 @@ fn make_agent(timeout: Duration) -> ureq::Agent {
 
 /// Request a QR code from the ilink gateway for WeChat scan login.
 pub fn request_qr_code(api_url: &str) -> Result<QrCodeInfo, String> {
-    let url = format!("{}/cgi-bin/bot/get_bot_qrcode", api_url.trim_end_matches('/'));
+    let url = format!("{}/ilink/bot/get_bot_qrcode?bot_type=3", api_url.trim_end_matches('/'));
     let agent = make_agent(Duration::from_secs(30));
 
-    let body = serde_json::json!({
-        "bot_type": 3
-    });
-
     let response = agent
-        .post(&url)
-        .send_json(&body)
+        .get(&url)
+        .call()
         .map_err(|e| format!("QR code request failed: {e}"))?;
 
     let response_body: serde_json::Value = response
@@ -210,7 +206,7 @@ pub fn request_qr_code(api_url: &str) -> Result<QrCodeInfo, String> {
 /// Returns the bearer token on success.
 pub fn poll_scan_status(api_url: &str, ticket: &str) -> Result<Option<String>, String> {
     let url = format!(
-        "{}/cgi-bin/bot/check_login",
+        "{}/ilink/bot/get_qrcode_status",
         api_url.trim_end_matches('/')
     );
     let agent = make_agent(Duration::from_secs(10));
@@ -257,7 +253,7 @@ pub fn get_updates(
     timeout_ms: u64,
 ) -> Result<(Vec<WeChatIncomingMessage>, i64), String> {
     let url = format!(
-        "{}/cgi-bin/bot/getUpdates",
+        "{}/ilink/bot/getupdates",
         api_url.trim_end_matches('/')
     );
 
@@ -366,7 +362,7 @@ pub fn send_message(
     context_token: Option<&str>,
 ) -> Result<(), String> {
     let url = format!(
-        "{}/cgi-bin/bot/sendMessage",
+        "{}/ilink/bot/sendmessage",
         api_url.trim_end_matches('/')
     );
 
