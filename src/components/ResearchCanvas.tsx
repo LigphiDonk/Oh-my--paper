@@ -880,6 +880,54 @@ export function ResearchCanvas({
             })}
           </div>
         </div>
+
+        {/* ── Experiment Quick-Start Bar (always visible when experimentLoop exists) ── */}
+        {localizedResearch.experimentLoop && (
+          <div className="experiment-quick-bar">
+            <div className="experiment-quick-bar__info">
+              <span className={`task-tree__dot ${
+                autoExperiment.runState?.status === "running" ? "is-active is-current"
+                : autoExperiment.runState?.status === "paused" ? "is-pending"
+                : autoExperiment.runState?.status === "completed" ? "is-done"
+                : ""
+              }`} style={{ display: "inline-block" }} />
+              <span className="experiment-quick-bar__label">🧪 {isZh ? "自动实验" : "Auto Experiment"}</span>
+              {autoExperiment.runState && autoExperiment.runState.status !== "stopped" && (
+                <span className="experiment-quick-bar__metric">
+                  {autoExperiment.runState.iterations}/{localizedResearch.experimentLoop.maxIterations}
+                  {autoExperiment.runState.bestMetricValue != null && (
+                    <> · {localizedResearch.experimentLoop.successMetric}: {autoExperiment.runState.bestMetricValue}</>
+                  )}
+                </span>
+              )}
+            </div>
+            <div className="experiment-quick-bar__actions">
+              {autoExperiment.runState?.status === "running" ? (
+                <>
+                  <button type="button" className="experiment-quick-bar__btn" onClick={() => void autoExperiment.pauseExperiment()} title={isZh ? "暂停" : "Pause"}>⏸</button>
+                  <button type="button" className="experiment-quick-bar__btn experiment-quick-bar__btn--stop" onClick={() => void autoExperiment.stopExperiment()} title={isZh ? "停止" : "Stop"}>⏹</button>
+                </>
+              ) : autoExperiment.runState?.status === "paused" ? (
+                <>
+                  <button type="button" className="experiment-quick-bar__btn experiment-quick-bar__btn--start" onClick={() => void autoExperiment.resumeExperiment()} title={isZh ? "继续" : "Resume"}>▶</button>
+                  <button type="button" className="experiment-quick-bar__btn experiment-quick-bar__btn--stop" onClick={() => void autoExperiment.stopExperiment()} title={isZh ? "停止" : "Stop"}>⏹</button>
+                </>
+              ) : autoExperiment.runState?.status === "completed" ? (
+                <span className="experiment-quick-bar__done">{isZh ? "✅ 达标" : "✅ Goal met"}</span>
+              ) : (
+                <button
+                  type="button"
+                  className="experiment-quick-bar__btn experiment-quick-bar__btn--start"
+                  disabled={!localizedResearch.experimentLoop.enabled}
+                  onClick={() => void autoExperiment.startExperiment(localizedResearch.experimentLoop!)}
+                  title={isZh ? "开始自动实验" : "Start Auto Experiment"}
+                >
+                  {isZh ? "▶ 启动" : "▶ Start"}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Right: Inspector */}

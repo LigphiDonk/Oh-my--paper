@@ -622,6 +622,45 @@ fn build_project_stage_context(
                     lines.extend(rule_lines);
                 }
             }
+
+            // Inject auto-experiment loop awareness when in experiment stage
+            if current_stage == "experiment" {
+                if let Some(exp_loop) = value.get("experimentLoop") {
+                    let enabled = exp_loop
+                        .get("enabled")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+                    let eval_cmd = exp_loop
+                        .get("evalCommand")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let metric = exp_loop
+                        .get("successMetric")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let threshold = exp_loop
+                        .get("successThreshold")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.0);
+                    let direction = exp_loop
+                        .get("successDirection")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("max");
+                    let max_iter = exp_loop
+                        .get("maxIterations")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0);
+                    lines.push(format!(
+                        "autoExperimentLoop: 本项目配置了自动实验编排系统。\
+                         enabled={enabled}, metric={metric}, direction={direction}, \
+                         threshold={threshold}, maxIterations={max_iter}, \
+                         evalCommand={eval_cmd}。\
+                         当你完成实验代码的编写和调试后，请提醒用户：\
+                         \"实验代码已就绪，你可以在研究画布底部点击'🧪 自动实验'来启动自动化实验循环。\
+                         系统会自动迭代调用 AI 修改代码 → 远程执行 → 评估指标，直到达标或达到轮次上限。\""
+                    ));
+                }
+            }
         }
     }
 

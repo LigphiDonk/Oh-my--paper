@@ -177,13 +177,24 @@ pub fn request_qr_code(api_url: &str) -> Result<QrCodeInfo, String> {
         .map_err(|e| format!("Failed to parse QR response: {e}"))?;
 
     // Extract QR code URL and ticket from the ilink response.
-    let qr_url = response_body
+    let qr_url_raw = response_body
         .get("qrcode_img_content")
         .or_else(|| response_body.get("qrcode_url"))
         .or_else(|| response_body.get("url"))
         .and_then(|v: &serde_json::Value| v.as_str())
         .unwrap_or_default()
         .to_string();
+
+    // If it looks like raw base64 (not a URL or data URI), prepend the
+    // data URI prefix so the frontend <img src="..."> can render it.
+    let qr_url = if !qr_url_raw.is_empty()
+        && !qr_url_raw.starts_with("http")
+        && !qr_url_raw.starts_with("data:")
+    {
+        format!("data:image/png;base64,{}", qr_url_raw)
+    } else {
+        qr_url_raw
+    };
 
     let scan_ticket = response_body
         .get("qrcode")

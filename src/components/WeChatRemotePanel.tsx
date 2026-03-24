@@ -232,10 +232,15 @@ export function WeChatRemotePanel({ locale }: WeChatRemotePanelProps) {
                 alt="WeChat QR Code"
                 className="wechat-qr-image"
                 onError={(e) => {
-                  // If image fails, display URL as text
+                  console.error("[WeChat QR] image failed to load, qrUrl:", qrInfo.qrUrl.slice(0, 100));
                   (e.target as HTMLImageElement).style.display = "none";
+                  const fallback = (e.target as HTMLImageElement).parentElement?.querySelector(".wechat-qr-fallback") as HTMLElement;
+                  if (fallback) fallback.style.display = "block";
                 }}
               />
+              <div className="wechat-qr-fallback" style={{ display: "none", wordBreak: "break-all", fontSize: 11, color: "var(--text-secondary)", padding: 8, textAlign: "center" }}>
+                {isZh ? "二维码加载失败，请检查 API 地址是否正确" : "QR code failed to load. Please check API URL."}
+              </div>
             </div>
             <div className="wechat-qr-hint">
               {isZh

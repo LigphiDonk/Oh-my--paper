@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { desktop } from "../lib/desktop";
 import { invoke } from "@tauri-apps/api/core";
 import type { 
@@ -28,7 +28,32 @@ export function useAutoExperiment({
 }: UseAutoExperimentParams) {
   const [runState, setRunState] = useState<ExperimentRunState | null>(null);
 
-  const isExperimentTask = activeTaskContext?.stage === "experiment";
+  // Auto-resolve: if no explicit experiment task is active, pick the first
+  // non-done experiment-stage task from the snapshot so the user can start
+  // the auto-experiment directly from the stage view.
+  const resolvedTaskContext = useMemo<AgentTaskContext | null>(() => {
+    if (activeTaskContext?.stage === "experiment") return activeTaskContext;
+    const tasks = _snapshot?.research?.tasks;
+    if (!tasks) return null;
+    const fallback = tasks.find(
+      (t) => t.stage === "experiment" && t.status !== "done" && t.status !== "cancelled",
+    );
+    if (!fallback) return null;
+    return {
+      taskId: fallback.id,
+      title: fallback.title,
+      stage: fallback.stage,
+      description: fallback.description,
+      nextActionPrompt: fallback.nextActionPrompt,
+      taskPrompt: fallback.taskPrompt,
+      contextNotes: fallback.contextNotes,
+      suggestedSkills: fallback.suggestedSkills,
+      inputsNeeded: fallback.inputsNeeded,
+      artifactPaths: fallback.artifactPaths,
+    };
+  }, [activeTaskContext, _snapshot?.research?.tasks]);
+
+  const isExperimentTask = Boolean(resolvedTaskContext);
   const stateFilePath = projectRoot ? `${projectRoot}/.viewerleaf/research/Experiment/automation/run-state.json` : "";
 
   const loadState = useCallback(async () => {
@@ -78,7 +103,7 @@ export function useAutoExperiment({
           // maintain agent context continuity across app restarts.
           sessionId: runState?.sessionId || sessionId,
           filePath,
-          taskContext: activeTaskContext,
+          taskContext: resolvedTaskContext,
           loopConfig: config,
         }
       });
@@ -90,7 +115,10 @@ export function useAutoExperiment({
   };
 
   const startExperiment = async (config: ExperimentLoopConfig) => {
-    if (!activeTaskContext) return;
+    if (!resolvedTaskContext) {
+      console.warn("No experiment-stage task found – cannot start auto experiment");
+      return;
+    }
 
     // Guard: don't start if an experiment is actively running or paused with live daemon
     if (runState && ["running", "paused"].includes(runState.status)) {
@@ -136,7 +164,7 @@ export function useAutoExperiment({
       const alive: boolean = await invoke("is_experiment_running");
       if (!alive) {
         const config = _snapshot?.research?.experimentLoop;
-        if (config && activeTaskContext) {
+        if (config && resolvedTaskContext) {
           await tryStartDaemon(config);
         }
       }

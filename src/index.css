@@ -8013,6 +8013,111 @@ div.ve-tok-math-rendered .katex { font-size: 1.15em; }
   }
 }
 
+/* ── Experiment Quick-Start Bar ── */
+
+.experiment-quick-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 18px;
+  border-top: 1px solid rgba(228, 231, 236, 0.72);
+  background: linear-gradient(180deg, rgba(250, 251, 255, 0.95), rgba(243, 244, 246, 0.98));
+  flex-shrink: 0;
+}
+
+.experiment-quick-bar__info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.experiment-quick-bar__label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.experiment-quick-bar__metric {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(241, 245, 249, 0.9);
+}
+
+.experiment-quick-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.experiment-quick-bar__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(228, 231, 236, 0.85);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.1s;
+}
+
+.experiment-quick-bar__btn:hover {
+  background: rgba(241, 243, 248, 1);
+  border-color: rgba(148, 163, 184, 0.6);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.experiment-quick-bar__btn:active {
+  transform: scale(0.95);
+}
+
+.experiment-quick-bar__btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+}
+
+.experiment-quick-bar__btn--start {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.12));
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #059669;
+}
+
+.experiment-quick-bar__btn--start:hover {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(5, 150, 105, 0.2));
+  border-color: rgba(16, 185, 129, 0.5);
+}
+
+.experiment-quick-bar__btn--stop {
+  border-color: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.experiment-quick-bar__btn--stop:hover {
+  background: rgba(239, 68, 68, 0.06);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.experiment-quick-bar__done {
+  font-size: 12px;
+  font-weight: 700;
+  color: #10b981;
+}
+
 /* ── Responsive ── */
 
 @media (max-width: 1180px) {
