@@ -217,7 +217,9 @@ pub fn load_skill_prompts(
     skill_ids: &[String],
     task_context: Option<&AgentTaskContext>,
 ) -> Result<String, String> {
-    let skills = resolve_enabled_skills(conn, skill_ids)?;
+    // Determine current research stage for skill filtering
+    let current_stage = read_current_stage(project_root, task_context);
+    let skills = resolve_enabled_skills(conn, skill_ids, current_stage.as_deref())?;
     let mut sections = Vec::new();
 
     let stage_context = build_project_stage_context(project_root, task_context);
@@ -483,6 +485,7 @@ fn extract_body(content: &str) -> Option<String> {
 fn resolve_enabled_skills(
     conn: &Connection,
     skill_ids: &[String],
+    current_stage: Option<&str>,
 ) -> Result<Vec<SkillManifest>, String> {
     let all_skills = list_skills(conn)?;
     let mut requested = if skill_ids.is_empty() {
@@ -499,8 +502,50 @@ fn resolve_enabled_skills(
 
     Ok(all_skills
         .into_iter()
-        .filter(|skill| skill.is_enabled && requested.iter().any(|id| id == &skill.id))
+        .filter(|skill| {
+            if !skill.is_enabled || !requested.iter().any(|id| id == &skill.id) {
+                return false;
+            }
+            // Stage-based filtering: if the skill declares specific stages,
+            // only include it when the current stage matches.
+            // Skills with empty stages are treated as universal (always loaded).
+            if skill.stages.is_empty() {
+                return true;
+            }
+            match current_stage {
+                Some(stage) => skill.stages.iter().any(|s| s.eq_ignore_ascii_case(stage)),
+                None => true, // No stage context → load all enabled skills
+            }
+        })
         .collect())
+}
+
+/// Read the current research pipeline stage from the project brief or task context.
+fn read_current_stage(
+    project_root: &Path,
+    task_context: Option<&AgentTaskContext>,
+) -> Option<String> {
+    // Task context takes priority
+    if let Some(ctx) = task_context {
+        let stage = ctx.stage.trim();
+        if !stage.is_empty() {
+            return Some(stage.to_string());
+        }
+    }
+    // Fall back to research_brief.json
+    let brief_path = project_root
+        .join(".pipeline")
+        .join("docs")
+        .join("research_brief.json");
+    let raw = fs::read_to_string(brief_path).ok()?;
+    let value: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    let pipeline = value.get("pipeline")?;
+    pipeline
+        .get("currentStage")
+        .or_else(|| pipeline.get("startStage"))
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
 }
 
 fn build_project_stage_context(
