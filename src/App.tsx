@@ -93,6 +93,7 @@ import {
 } from "./lib/workspace";
 import { useAgentChat } from "./hooks/useAgentChat";
 import { useCollaborativeDoc } from "./hooks/useCollaborativeDoc";
+import { useAutoExperiment } from "./hooks/useAutoExperiment";
 import { useCompilePipeline } from "./hooks/useCompilePipeline";
 import { useProjectOutline } from "./hooks/useProjectOutline";
 import { useStableCallback as useEffectEvent } from "./hooks/useStableCallback";
@@ -1261,7 +1262,7 @@ function App() {
     projectRoot: snapshot?.projectConfig.rootPath,
     activeTaskContext: activeAgentTaskContext,
     snapshot,
-    profileId: currentProfileId,
+    profileId: activeProfileId,
     sessionId: activeSessionId || "",
     filePath: activeFile?.path || "",
   });
