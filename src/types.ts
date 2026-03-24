@@ -434,7 +434,7 @@ export interface TestResult {
 export type ResearchStage = "survey" | "ideation" | "experiment" | "publication" | "promotion";
 
 export interface ResearchBootstrapState {
-  status: "ready" | "needs-bootstrap" | "missing-brief" | "missing-tasks" | "partial" | string;
+  status: "ready" | "needs-bootstrap" | "missing-brief" | "missing-tasks" | "partial" | "invalid-brief" | string;
   message: string;
   hasInstance: boolean;
   hasTemplates: boolean;

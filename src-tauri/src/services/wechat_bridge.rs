@@ -161,7 +161,10 @@ fn make_agent(timeout: Duration) -> ureq::Agent {
 
 /// Request a QR code from the ilink gateway for WeChat scan login.
 pub fn request_qr_code(api_url: &str) -> Result<QrCodeInfo, String> {
-    let url = format!("{}/ilink/bot/get_bot_qrcode?bot_type=3", api_url.trim_end_matches('/'));
+    let url = format!(
+        "{}/ilink/bot/get_bot_qrcode?bot_type=3",
+        api_url.trim_end_matches('/')
+    );
     let agent = make_agent(Duration::from_secs(30));
 
     let response = agent
@@ -252,10 +255,7 @@ pub fn get_updates(
     offset: i64,
     timeout_ms: u64,
 ) -> Result<(Vec<WeChatIncomingMessage>, i64), String> {
-    let url = format!(
-        "{}/ilink/bot/getupdates",
-        api_url.trim_end_matches('/')
-    );
+    let url = format!("{}/ilink/bot/getupdates", api_url.trim_end_matches('/'));
 
     let body = serde_json::json!({
         "offset": offset,
@@ -294,7 +294,10 @@ pub fn get_updates(
     let mut messages = Vec::new();
     let mut new_offset = offset;
 
-    if let Some(updates) = response_body.get("updates").and_then(|v: &serde_json::Value| v.as_array()) {
+    if let Some(updates) = response_body
+        .get("updates")
+        .and_then(|v: &serde_json::Value| v.as_array())
+    {
         for update in updates {
             let update_id = update
                 .get("update_id")
@@ -361,10 +364,7 @@ pub fn send_message(
     text: &str,
     context_token: Option<&str>,
 ) -> Result<(), String> {
-    let url = format!(
-        "{}/ilink/bot/sendmessage",
-        api_url.trim_end_matches('/')
-    );
+    let url = format!("{}/ilink/bot/sendmessage", api_url.trim_end_matches('/'));
 
     let mut body = serde_json::json!({
         "text": text,
@@ -383,9 +383,8 @@ pub fn send_message(
 
     let status = response.status();
     if status != 200 {
-        let response_body: serde_json::Value = response
-            .into_json()
-            .unwrap_or(serde_json::Value::Null);
+        let response_body: serde_json::Value =
+            response.into_json().unwrap_or(serde_json::Value::Null);
         return Err(format!(
             "sendMessage returned status {}: {}",
             status, response_body
@@ -423,14 +422,26 @@ mod tests {
 
     #[test]
     fn allow_from_whitelist() {
-        assert!(is_user_allowed("alice@im.wechat,bob@im.wechat", "alice@im.wechat"));
-        assert!(is_user_allowed("alice@im.wechat,bob@im.wechat", "bob@im.wechat"));
-        assert!(!is_user_allowed("alice@im.wechat,bob@im.wechat", "eve@im.wechat"));
+        assert!(is_user_allowed(
+            "alice@im.wechat,bob@im.wechat",
+            "alice@im.wechat"
+        ));
+        assert!(is_user_allowed(
+            "alice@im.wechat,bob@im.wechat",
+            "bob@im.wechat"
+        ));
+        assert!(!is_user_allowed(
+            "alice@im.wechat,bob@im.wechat",
+            "eve@im.wechat"
+        ));
     }
 
     #[test]
     fn allow_from_trimming() {
-        assert!(is_user_allowed(" alice@im.wechat , bob@im.wechat ", "alice@im.wechat"));
+        assert!(is_user_allowed(
+            " alice@im.wechat , bob@im.wechat ",
+            "alice@im.wechat"
+        ));
     }
 
     #[test]

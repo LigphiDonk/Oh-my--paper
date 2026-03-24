@@ -1326,9 +1326,7 @@ pub fn load_wechat_config() -> Result<wechat_bridge::WeChatConfig, String> {
 }
 
 #[tauri::command]
-pub fn save_wechat_config_cmd(
-    config: wechat_bridge::WeChatConfig,
-) -> Result<(), String> {
+pub fn save_wechat_config_cmd(config: wechat_bridge::WeChatConfig) -> Result<(), String> {
     wechat_bridge::save_wechat_config(&config)
 }
 
@@ -1408,8 +1406,7 @@ pub fn start_wechat_listener(
             ) {
                 Ok((messages, new_offset)) => {
                     {
-                        let mut guard =
-                            offset_ref.lock().unwrap_or_else(|e| e.into_inner());
+                        let mut guard = offset_ref.lock().unwrap_or_else(|e| e.into_inner());
                         *guard = new_offset;
                     }
 
@@ -1421,8 +1418,7 @@ pub fn start_wechat_listener(
 
                         // Cache context_token for replies
                         if let Some(ref ctx) = msg.context_token {
-                            let mut guard =
-                                ctx_token_ref.lock().unwrap_or_else(|e| e.into_inner());
+                            let mut guard = ctx_token_ref.lock().unwrap_or_else(|e| e.into_inner());
                             *guard = Some(ctx.clone());
                         }
 
@@ -1431,10 +1427,7 @@ pub fn start_wechat_listener(
                     }
                 }
                 Err(err) => {
-                    let _ = app.emit(
-                        "wechat:error",
-                        serde_json::json!({ "message": err }),
-                    );
+                    let _ = app.emit("wechat:error", serde_json::json!({ "message": err }));
                     // Brief pause before retry on error
                     std::thread::sleep(Duration::from_secs(5));
                 }
@@ -1488,4 +1481,3 @@ pub async fn send_wechat_reply(
     .await
     .map_err(|e| e.to_string())?
 }
-

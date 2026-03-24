@@ -446,10 +446,7 @@ pub enum StreamChunk {
         mode: String,
     },
     #[serde(rename = "elicitation_response")]
-    ElicitationResponse {
-        request_id: String,
-        action: String,
-    },
+    ElicitationResponse { request_id: String, action: String },
     #[serde(rename = "interactive_question")]
     InteractiveQuestion {
         request_id: String,
@@ -670,7 +667,11 @@ pub struct ResearchTaskDraft {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase", rename_all_fields = "camelCase", tag = "type")]
+#[serde(
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    tag = "type"
+)]
 pub enum ResearchTaskPlanOperation {
     Update {
         task_id: String,

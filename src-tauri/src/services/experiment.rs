@@ -1,9 +1,9 @@
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
-use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
-use crate::models::{AgentTaskContext, AgentMessage};
+use crate::models::{AgentMessage, AgentTaskContext};
 use crate::services::agent;
 use crate::state::AppState;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -81,7 +81,10 @@ fn shell_quote(s: &str) -> String {
 
 pub fn run_auto_experiment(app_handle: AppHandle, payload: AutomatePayload) -> Result<(), String> {
     // Single-instance guard
-    if EXPERIMENT_RUNNING.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() {
+    if EXPERIMENT_RUNNING
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
         return Err("An experiment is already running".into());
     }
 
@@ -104,8 +107,9 @@ pub fn run_auto_experiment(app_handle: AppHandle, payload: AutomatePayload) -> R
         }
 
         let task_id = payload.task_context.task_id.clone();
-        
-        let run_state_path = Path::new(&root_path).join(".viewerleaf/research/Experiment/automation/run-state.json");
+
+        let run_state_path =
+            Path::new(&root_path).join(".viewerleaf/research/Experiment/automation/run-state.json");
         if let Some(parent) = run_state_path.parent() {
             let _ = fs::create_dir_all(parent);
         }
@@ -133,44 +137,64 @@ pub fn run_auto_experiment(app_handle: AppHandle, payload: AutomatePayload) -> R
                     std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap()
-                        .as_millis()
+                        .as_millis(),
                 ),
             };
-            let _ = fs::write(&run_state_path, serde_json::to_string_pretty(&initial).unwrap());
+            let _ = fs::write(
+                &run_state_path,
+                serde_json::to_string_pretty(&initial).unwrap(),
+            );
         }
 
         loop {
             // ── Check stop flag at top of every iteration ──
             if EXPERIMENT_STOP_FLAG.load(Ordering::SeqCst) {
                 let mut run_state: ExperimentRunState =
-                    serde_json::from_str(&fs::read_to_string(&run_state_path).unwrap_or_default()).unwrap_or_default();
+                    serde_json::from_str(&fs::read_to_string(&run_state_path).unwrap_or_default())
+                        .unwrap_or_default();
                 run_state.status = "stopped".into();
-                let _ = fs::write(&run_state_path, serde_json::to_string_pretty(&run_state).unwrap());
+                let _ = fs::write(
+                    &run_state_path,
+                    serde_json::to_string_pretty(&run_state).unwrap(),
+                );
                 break;
             }
 
             // 1. Load current run-state (always exists because we wrote it above)
             let mut run_state: ExperimentRunState =
-                serde_json::from_str(&fs::read_to_string(&run_state_path).unwrap_or_default()).unwrap_or_default();
-            let active_session_id = run_state.session_id.clone().unwrap_or_else(|| stable_session_id.clone());
+                serde_json::from_str(&fs::read_to_string(&run_state_path).unwrap_or_default())
+                    .unwrap_or_default();
+            let active_session_id = run_state
+                .session_id
+                .clone()
+                .unwrap_or_else(|| stable_session_id.clone());
 
             // Exit or pause conditions
             // Check pause FLAG (set by frontend command, not file)
             if EXPERIMENT_PAUSE_FLAG.load(Ordering::SeqCst) {
                 run_state.status = "paused".into();
-                let _ = fs::write(&run_state_path, serde_json::to_string_pretty(&run_state).unwrap());
+                let _ = fs::write(
+                    &run_state_path,
+                    serde_json::to_string_pretty(&run_state).unwrap(),
+                );
                 // Sleep-poll while paused; daemon stays alive so Resume works
                 loop {
                     std::thread::sleep(std::time::Duration::from_secs(2));
                     if EXPERIMENT_STOP_FLAG.load(Ordering::SeqCst) {
                         run_state.status = "stopped".into();
-                        let _ = fs::write(&run_state_path, serde_json::to_string_pretty(&run_state).unwrap());
+                        let _ = fs::write(
+                            &run_state_path,
+                            serde_json::to_string_pretty(&run_state).unwrap(),
+                        );
                         break;
                     }
                     if !EXPERIMENT_PAUSE_FLAG.load(Ordering::SeqCst) {
                         // Resume flag cleared — write running and continue
                         run_state.status = "running".into();
-                        let _ = fs::write(&run_state_path, serde_json::to_string_pretty(&run_state).unwrap());
+                        let _ = fs::write(
+                            &run_state_path,
+                            serde_json::to_string_pretty(&run_state).unwrap(),
+                        );
                         break;
                     }
                 }
@@ -181,12 +205,20 @@ pub fn run_auto_experiment(app_handle: AppHandle, payload: AutomatePayload) -> R
             }
             if run_state.iterations >= payload.loop_config.max_iterations {
                 run_state.status = "stopped".into();
-                let _ = fs::write(&run_state_path, serde_json::to_string_pretty(&run_state).unwrap());
+                let _ = fs::write(
+                    &run_state_path,
+                    serde_json::to_string_pretty(&run_state).unwrap(),
+                );
                 break;
             }
-            if run_state.current_failures >= payload.loop_config.max_failures && payload.loop_config.max_failures > 0 {
+            if run_state.current_failures >= payload.loop_config.max_failures
+                && payload.loop_config.max_failures > 0
+            {
                 run_state.status = "failed".into();
-                let _ = fs::write(&run_state_path, serde_json::to_string_pretty(&run_state).unwrap());
+                let _ = fs::write(
+                    &run_state_path,
+                    serde_json::to_string_pretty(&run_state).unwrap(),
+                );
                 break;
             }
             if let Some(start) = run_state.start_time_ms {
@@ -195,9 +227,14 @@ pub fn run_auto_experiment(app_handle: AppHandle, payload: AutomatePayload) -> R
                     .unwrap()
                     .as_millis();
                 let elapsed_mins = (current_time.saturating_sub(start)) as f64 / 60000.0;
-                if elapsed_mins >= payload.loop_config.max_duration_minutes as f64 && payload.loop_config.max_duration_minutes > 0 {
+                if elapsed_mins >= payload.loop_config.max_duration_minutes as f64
+                    && payload.loop_config.max_duration_minutes > 0
+                {
                     run_state.status = "stopped".into();
-                    let _ = fs::write(&run_state_path, serde_json::to_string_pretty(&run_state).unwrap());
+                    let _ = fs::write(
+                        &run_state_path,
+                        serde_json::to_string_pretty(&run_state).unwrap(),
+                    );
                     break;
                 }
             }
@@ -209,12 +246,24 @@ pub fn run_auto_experiment(app_handle: AppHandle, payload: AutomatePayload) -> R
                 payload.loop_config.max_iterations
             );
             if let Some(best) = run_state.best_metric_value {
-                prompt.push_str(&format!("Current best metric ({}) value so far: {}\n", payload.loop_config.success_metric, best));
+                prompt.push_str(&format!(
+                    "Current best metric ({}) value so far: {}\n",
+                    payload.loop_config.success_metric, best
+                ));
             }
-            prompt.push_str(&format!("Goal Threshold: {} ({})\n", payload.loop_config.success_threshold, payload.loop_config.success_direction));
-            prompt.push_str(&format!("Evaluation Command to run on the compute node: `{}`\n", payload.loop_config.eval_command));
+            prompt.push_str(&format!(
+                "Goal Threshold: {} ({})\n",
+                payload.loop_config.success_threshold, payload.loop_config.success_direction
+            ));
+            prompt.push_str(&format!(
+                "Evaluation Command to run on the compute node: `{}`\n",
+                payload.loop_config.eval_command
+            ));
             if !payload.loop_config.result_paths.is_empty() {
-                prompt.push_str(&format!("Paths to sync/fetch after experiment: {}\n", payload.loop_config.result_paths.join(", ")));
+                prompt.push_str(&format!(
+                    "Paths to sync/fetch after experiment: {}\n",
+                    payload.loop_config.result_paths.join(", ")
+                ));
             }
             prompt.push_str("Execute your workflow using remote tools.\n");
             prompt.push_str(&format!(
@@ -246,7 +295,10 @@ pub fn run_auto_experiment(app_handle: AppHandle, payload: AutomatePayload) -> R
             // ── Check stop flag after agent returns ──
             if EXPERIMENT_STOP_FLAG.load(Ordering::SeqCst) {
                 run_state.status = "stopped".into();
-                let _ = fs::write(&run_state_path, serde_json::to_string_pretty(&run_state).unwrap());
+                let _ = fs::write(
+                    &run_state_path,
+                    serde_json::to_string_pretty(&run_state).unwrap(),
+                );
                 break;
             }
 
@@ -255,13 +307,20 @@ pub fn run_auto_experiment(app_handle: AppHandle, payload: AutomatePayload) -> R
             } else {
                 // Orchestrator native evaluation via SSH
                 if let Some(node) = crate::services::compute_node::get_active_node() {
-                    let project_name = std::path::Path::new(&root_path).file_name().unwrap_or_default().to_string_lossy();
+                    let project_name = std::path::Path::new(&root_path)
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy();
                     let remote_dir = if node.work_dir.is_empty() {
                         project_name.to_string()
                     } else {
                         format!("{}/{}", node.work_dir, project_name)
                     };
-                    let full_cmd = format!("cd {} && {}", shell_quote(&remote_dir), payload.loop_config.eval_command);
+                    let full_cmd = format!(
+                        "cd {} && {}",
+                        shell_quote(&remote_dir),
+                        payload.loop_config.eval_command
+                    );
 
                     match execute_eval_command(&node, &full_cmd) {
                         Ok(child) => {
@@ -276,20 +335,29 @@ pub fn run_auto_experiment(app_handle: AppHandle, payload: AutomatePayload) -> R
 
                             match output_result {
                                 Ok(output) if output.status.success() => {
-                                    let eval_output = String::from_utf8_lossy(&output.stdout).to_string();
+                                    let eval_output =
+                                        String::from_utf8_lossy(&output.stdout).to_string();
                                     let mut parsed_val = None;
-                                    
+
                                     for line in eval_output.lines() {
-                                        if let Ok(json) = serde_json::from_str::<serde_json::Value>(line.trim()) {
-                                            if let Some(v) = json.get(&payload.loop_config.success_metric).and_then(|val| val.as_f64()) {
+                                        if let Ok(json) =
+                                            serde_json::from_str::<serde_json::Value>(line.trim())
+                                        {
+                                            if let Some(v) = json
+                                                .get(&payload.loop_config.success_metric)
+                                                .and_then(|val| val.as_f64())
+                                            {
                                                 parsed_val = Some(v);
                                             }
                                         }
                                     }
-                                    
+
                                     if let Some(val) = parsed_val {
                                         run_state.current_failures = 0;
-                                        let is_better = match (run_state.best_metric_value, payload.loop_config.success_direction.as_str()) {
+                                        let is_better = match (
+                                            run_state.best_metric_value,
+                                            payload.loop_config.success_direction.as_str(),
+                                        ) {
                                             (None, _) => true,
                                             (Some(best), "max") => val > best,
                                             (Some(best), "min") => val < best,
@@ -298,13 +366,14 @@ pub fn run_auto_experiment(app_handle: AppHandle, payload: AutomatePayload) -> R
                                         if is_better {
                                             run_state.best_metric_value = Some(val);
                                         }
-                                        
-                                        let meets_goal = if payload.loop_config.success_direction == "max" {
-                                            val >= payload.loop_config.success_threshold
-                                        } else {
-                                            val <= payload.loop_config.success_threshold
-                                        };
-                                        
+
+                                        let meets_goal =
+                                            if payload.loop_config.success_direction == "max" {
+                                                val >= payload.loop_config.success_threshold
+                                            } else {
+                                                val <= payload.loop_config.success_threshold
+                                            };
+
                                         if meets_goal {
                                             run_state.status = "completed".into();
                                             mark_experiment_task_done(&root_path, &task_id);
@@ -327,8 +396,11 @@ pub fn run_auto_experiment(app_handle: AppHandle, payload: AutomatePayload) -> R
                 }
             }
 
-            let _ = fs::write(&run_state_path, serde_json::to_string_pretty(&run_state).unwrap());
-            
+            let _ = fs::write(
+                &run_state_path,
+                serde_json::to_string_pretty(&run_state).unwrap(),
+            );
+
             // Allow state to flush and avoid runaway loops if they instantly exit
             std::thread::sleep(std::time::Duration::from_secs(2));
         }
@@ -351,7 +423,9 @@ pub fn stop_auto_experiment() {
     let eval_pid = ACTIVE_EVAL_PID.swap(0, Ordering::SeqCst);
     if eval_pid != 0 {
         #[cfg(unix)]
-        unsafe { libc::kill(eval_pid as i32, libc::SIGKILL); }
+        unsafe {
+            libc::kill(eval_pid as i32, libc::SIGKILL);
+        }
     }
 
     // 3. Kill the experiment's own sidecar agent process (NOT the global cancel_agent)
@@ -383,7 +457,10 @@ pub fn resume_auto_experiment() {
     EXPERIMENT_PAUSE_FLAG.store(false, Ordering::SeqCst);
 }
 
-fn execute_eval_command(node: &crate::services::compute_node::ComputeNodeConfig, eval_cmd: &str) -> Result<std::process::Child, String> {
+fn execute_eval_command(
+    node: &crate::services::compute_node::ComputeNodeConfig,
+    eval_cmd: &str,
+) -> Result<std::process::Child, String> {
     use std::process::{Command, Stdio};
     let mut cmd = if !node.password.is_empty() {
         let mut c = Command::new("sshpass");
@@ -393,8 +470,10 @@ fn execute_eval_command(node: &crate::services::compute_node::ComputeNodeConfig,
         Command::new("ssh")
     };
 
-    cmd.arg("-o").arg("StrictHostKeyChecking=accept-new")
-       .arg("-p").arg(node.port.to_string());
+    cmd.arg("-o")
+        .arg("StrictHostKeyChecking=accept-new")
+        .arg("-p")
+        .arg(node.port.to_string());
 
     if node.auth_method == "key" && !node.key_path.is_empty() {
         let home = dirs::home_dir()
@@ -408,8 +487,7 @@ fn execute_eval_command(node: &crate::services::compute_node::ComputeNodeConfig,
     cmd.arg(format!("{}@{}", node.user, node.host));
     cmd.arg(eval_cmd);
 
-    cmd.stdout(Stdio::piped())
-       .stderr(Stdio::piped());
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
     cmd.spawn().map_err(|e| e.to_string())
 }
@@ -417,18 +495,20 @@ fn execute_eval_command(node: &crate::services::compute_node::ComputeNodeConfig,
 /// Mark the specific experiment task as done in tasks.json.
 fn mark_experiment_task_done(root_path: &str, task_id: &str) {
     let tasks_path = Path::new(root_path).join(".pipeline/tasks/tasks.json");
-    if !tasks_path.exists() { return; }
-    
+    if !tasks_path.exists() {
+        return;
+    }
+
     let raw = match fs::read_to_string(&tasks_path) {
         Ok(r) => r,
         Err(_) => return,
     };
-    
+
     let mut doc: serde_json::Value = match serde_json::from_str(&raw) {
         Ok(v) => v,
         Err(_) => return,
     };
-    
+
     if let Some(tasks) = doc.get_mut("tasks").and_then(|t| t.as_array_mut()) {
         for task in tasks.iter_mut() {
             let id = task.get("id").and_then(|s| s.as_str()).unwrap_or("");
@@ -440,6 +520,9 @@ fn mark_experiment_task_done(root_path: &str, task_id: &str) {
             }
         }
     }
-    
-    let _ = fs::write(&tasks_path, serde_json::to_string_pretty(&doc).unwrap_or_default());
+
+    let _ = fs::write(
+        &tasks_path,
+        serde_json::to_string_pretty(&doc).unwrap_or_default(),
+    );
 }

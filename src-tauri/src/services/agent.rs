@@ -185,7 +185,10 @@ pub fn run_agent(
             "密码认证".to_string()
         };
         let ssh_cmd = if node.auth_method == "key" && !node.key_path.is_empty() {
-            format!("ssh -i {} -p {} {}@{}", node.key_path, node.port, node.user, node.host)
+            format!(
+                "ssh -i {} -p {} {}@{}",
+                node.key_path, node.port, node.user, node.host
+            )
         } else {
             format!("ssh -p {} {}@{}", node.port, node.user, node.host)
         };
@@ -200,9 +203,7 @@ pub fn run_agent(
              当用户要求你在远程服务器上执行操作（如跑实验、训练模型、查看 GPU 状态等），\n\
              请使用上述 SSH 命令连接服务器并执行。\n\
              </compute_node>",
-            node.name, node.user, node.host, node.port,
-            auth_info, node.work_dir,
-            ssh_cmd,
+            node.name, node.user, node.host, node.port, auth_info, node.work_dir, ssh_cmd,
         );
         system_prompt.push_str(&node_block);
     }
@@ -356,7 +357,11 @@ pub fn run_agent(
                     last_error = Some(message.clone());
                     let _ = app_handle.emit("agent:stream", &chunk);
                 }
-                StreamChunk::ToolCallStart { tool_id, tool_use_id, args } => {
+                StreamChunk::ToolCallStart {
+                    tool_id,
+                    tool_use_id,
+                    args,
+                } => {
                     assistant_timeline.push(AssistantTimelineItem::Tool {
                         tool_id: tool_id.clone(),
                         tool_use_id: tool_use_id.clone(),

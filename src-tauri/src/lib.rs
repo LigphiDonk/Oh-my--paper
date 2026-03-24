@@ -360,10 +360,7 @@ fn has_skills_entry(path: &Path) -> bool {
             .any(|e| e.file_name() == "SKILL.md")
 }
 
-pub(crate) fn resolve_skills_dir(
-    app: &tauri::AppHandle,
-    app_root: &std::path::Path,
-) -> PathBuf {
+pub(crate) fn resolve_skills_dir(app: &tauri::AppHandle, app_root: &std::path::Path) -> PathBuf {
     let mut candidates: Vec<PathBuf> = Vec::new();
 
     if let Ok(explicit) = std::env::var("VIEWERLEAF_SKILLS_DIR") {

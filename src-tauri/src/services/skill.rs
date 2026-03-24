@@ -273,12 +273,16 @@ pub fn load_skill_prompts(
         }
     );
 
-    let single_task_rule = "\n\n[IMPORTANT CONSTRAINT] You must focus on completing ONE SINGLE task per interaction. \
+    let single_task_rule =
+        "\n\n[IMPORTANT CONSTRAINT] You must focus on completing ONE SINGLE task per interaction. \
 Do not attempt to complete multiple tasks at once. If there are multiple pending tasks, \
 finish the current one first, then clearly inform the user what the next steps or tasks \
 would be. Wait for the user to explicitly request the next task before proceeding.";
 
-    Ok(format!("{preamble}\n\n{}{single_task_rule}", sections.join("\n\n---\n\n")))
+    Ok(format!(
+        "{preamble}\n\n{}{single_task_rule}",
+        sections.join("\n\n---\n\n")
+    ))
 }
 
 pub fn import_skill_from_git(

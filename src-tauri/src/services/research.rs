@@ -26,7 +26,7 @@ const CLAUDE_TEMPLATE: &str = include_str!("../../../templates/research/CLAUDE.m
 const RESEARCH_SCOPE_FIXTURE: &str = include_str!("../../../skills/research-scope.json");
 const RESEARCH_STAGE_MAP_FIXTURE: &str = include_str!("../../../skills/research-stage-map.json");
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct PipelineMeta {
     start_stage: Option<String>,
@@ -34,7 +34,7 @@ struct PipelineMeta {
     initialized_stages: Option<Vec<String>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct BriefMeta {
     topic: Option<String>,
@@ -43,6 +43,12 @@ struct BriefMeta {
     system_prompt: Option<String>,
     working_memory: Option<String>,
     interaction_rules: Option<Vec<String>>,
+}
+
+enum BriefReadResult {
+    Missing,
+    InvalidJson,
+    Valid(Value, BriefMeta),
 }
 
 #[derive(Clone, Copy)]
@@ -355,7 +361,23 @@ fn default_research_brief(project_title: &str, start_stage: &str) -> Value {
             "experiment": "Plan implementation, metrics, ablations, and analysis.",
             "publication": "Draft the paper in the main LaTeX workspace.",
             "promotion": "Prepare slides, summaries, and follow-up deliverables."
-        }
+        },
+        "experimentLoop": default_experiment_loop()
+    })
+}
+
+fn default_experiment_loop() -> Value {
+    json!({
+        "enabled": false,
+        "remoteNode": "active",
+        "evalCommand": "",
+        "successMetric": "primaryMetric",
+        "successDirection": "max",
+        "successThreshold": 0,
+        "maxIterations": 10,
+        "maxFailures": 3,
+        "maxDurationMinutes": 60,
+        "resultPaths": []
     })
 }
 
@@ -1082,11 +1104,49 @@ fn read_json_file(path: &Path) -> Option<Value> {
     serde_json::from_str::<Value>(&raw).ok()
 }
 
-fn read_brief(path: &Path) -> Option<(Value, BriefMeta)> {
-    let raw = fs::read_to_string(path).ok()?;
-    let value = serde_json::from_str::<Value>(&raw).ok()?;
-    let meta = serde_json::from_value::<BriefMeta>(value.clone()).ok()?;
-    Some((value, meta))
+fn read_brief(path: &Path) -> BriefReadResult {
+    if !path.exists() {
+        return BriefReadResult::Missing;
+    }
+    let Ok(raw) = fs::read_to_string(path) else {
+        return BriefReadResult::InvalidJson;
+    };
+    let Ok(value) = serde_json::from_str::<Value>(&raw) else {
+        return BriefReadResult::InvalidJson;
+    };
+    let meta = serde_json::from_value::<BriefMeta>(value.clone()).unwrap_or_default();
+    BriefReadResult::Valid(value, meta)
+}
+
+fn merged_experiment_loop(brief_value: &Value) -> Value {
+    let mut merged = default_experiment_loop();
+    let Some(merged_obj) = merged.as_object_mut() else {
+        return merged;
+    };
+
+    if let Some(overrides) = brief_value.get("experimentLoop").and_then(Value::as_object) {
+        for (key, value) in overrides {
+            merged_obj.insert(key.clone(), value.clone());
+        }
+    }
+
+    merged
+}
+
+impl BriefReadResult {
+    fn meta(&self) -> Option<&BriefMeta> {
+        match self {
+            BriefReadResult::Valid(_, meta) => Some(meta),
+            _ => None,
+        }
+    }
+
+    fn value(&self) -> Option<&Value> {
+        match self {
+            BriefReadResult::Valid(value, _) => Some(value),
+            _ => None,
+        }
+    }
 }
 
 fn read_tasks(path: &Path) -> Vec<ResearchTask> {
@@ -1203,6 +1263,8 @@ pub fn load_research_snapshot(root: &Path) -> Result<ResearchCanvasSnapshot> {
     let has_tasks = tasks_path.exists();
     let has_any_scaffold =
         has_instance || has_templates || has_skill_views || has_brief || has_tasks;
+    let brief = read_brief(&brief_path);
+    let brief_is_invalid = matches!(&brief, BriefReadResult::InvalidJson);
 
     let bootstrap = {
         let (status, message) = if !has_any_scaffold {
@@ -1214,6 +1276,11 @@ pub fn load_research_snapshot(root: &Path) -> Result<ResearchCanvasSnapshot> {
             (
                 "missing-brief",
                 "The research scaffold exists but the research brief is missing.",
+            )
+        } else if brief_is_invalid {
+            (
+                "invalid-brief",
+                "The research brief exists but contains invalid JSON. Research brief features, including auto experiment, are unavailable until it is fixed.",
             )
         } else if !has_tasks {
             (
@@ -1240,11 +1307,10 @@ pub fn load_research_snapshot(root: &Path) -> Result<ResearchCanvasSnapshot> {
         }
     };
 
-    let brief = read_brief(&brief_path);
-    let brief_value = brief.as_ref().map(|(value, _)| value.clone());
+    let brief_value = brief.value().cloned();
     let brief_topic = brief
-        .as_ref()
-        .and_then(|(_, meta)| meta.topic.clone())
+        .meta()
+        .and_then(|meta| meta.topic.clone())
         .unwrap_or_else(|| {
             root.file_name()
                 .and_then(|value| value.to_str())
@@ -1252,28 +1318,28 @@ pub fn load_research_snapshot(root: &Path) -> Result<ResearchCanvasSnapshot> {
                 .to_string()
         });
     let brief_goal = brief
-        .as_ref()
-        .and_then(|(_, meta)| meta.goal.clone())
+        .meta()
+        .and_then(|meta| meta.goal.clone())
         .unwrap_or_else(|| "Turn this topic into a traceable research workflow.".into());
     let system_prompt = brief
-        .as_ref()
-        .and_then(|(_, meta)| meta.system_prompt.clone())
+        .meta()
+        .and_then(|meta| meta.system_prompt.clone())
         .unwrap_or_default();
     let working_memory = brief
-        .as_ref()
-        .and_then(|(_, meta)| meta.working_memory.clone())
+        .meta()
+        .and_then(|meta| meta.working_memory.clone())
         .unwrap_or_default();
     let start_stage = brief
-        .as_ref()
-        .and_then(|(_, meta)| meta.pipeline.as_ref())
+        .meta()
+        .and_then(|meta| meta.pipeline.as_ref())
         .and_then(|pipeline| pipeline.start_stage.as_deref())
         .map(Some)
         .map(normalize_stage)
         .unwrap_or_else(|| "survey".into());
     let initialized_stages = normalize_stage_list(
         brief
-            .as_ref()
-            .and_then(|(_, meta)| meta.pipeline.as_ref())
+            .meta()
+            .and_then(|meta| meta.pipeline.as_ref())
             .and_then(|pipeline| pipeline.initialized_stages.as_deref()),
     );
 
@@ -1350,8 +1416,8 @@ pub fn load_research_snapshot(root: &Path) -> Result<ResearchCanvasSnapshot> {
         .map(|task| task.stage.clone())
         .or_else(|| {
             brief
-                .as_ref()
-                .and_then(|(_, meta)| meta.pipeline.as_ref())
+                .meta()
+                .and_then(|meta| meta.pipeline.as_ref())
                 .and_then(|pipeline| pipeline.current_stage.as_deref())
                 .map(Some)
                 .map(normalize_stage)
@@ -1465,7 +1531,7 @@ pub fn load_research_snapshot(root: &Path) -> Result<ResearchCanvasSnapshot> {
         brief_goal,
         system_prompt,
         working_memory,
-        experiment_loop: brief_value.as_ref().and_then(|value| value.get("experimentLoop").cloned()),
+        experiment_loop: brief_value.as_ref().map(merged_experiment_loop),
         pipeline_artifacts: collect_pipeline_artifacts(root),
     })
 }
@@ -1671,6 +1737,94 @@ mod tests {
         assert_eq!(snapshot.current_stage, "publication");
         assert!(snapshot.handoff_to_writing);
         assert_eq!(snapshot.stage_summaries.len(), STAGE_ORDER.len());
+        assert_eq!(
+            snapshot
+                .experiment_loop
+                .as_ref()
+                .and_then(|value| value.get("enabled"))
+                .and_then(Value::as_bool),
+            Some(false)
+        );
+    }
+
+    #[test]
+    fn default_brief_includes_experiment_loop() {
+        let brief = default_research_brief("demo", "survey");
+        let loop_config = brief
+            .get("experimentLoop")
+            .expect("default experiment loop");
+        assert_eq!(
+            loop_config.get("enabled").and_then(Value::as_bool),
+            Some(false)
+        );
+        assert_eq!(
+            loop_config.get("maxIterations").and_then(Value::as_u64),
+            Some(10)
+        );
+    }
+
+    #[test]
+    fn snapshot_backfills_partial_experiment_loop() {
+        let root = make_temp_project("research-experiment-loop-backfill");
+        let app_root = make_app_root();
+        ensure_research_scaffold(&app_root, &root, Some("experiment")).expect("scaffold");
+
+        let brief_path = root.join(".pipeline/docs/research_brief.json");
+        fs::write(
+            &brief_path,
+            serde_json::to_string_pretty(&json!({
+                "topic": "legacy brief",
+                "goal": "legacy goal",
+                "pipeline": {
+                    "startStage": "experiment",
+                    "currentStage": "experiment",
+                    "initializedStages": ["survey", "ideation", "experiment"]
+                },
+                "experimentLoop": {
+                    "enabled": true,
+                    "maxIterations": 5
+                }
+            }))
+            .expect("serialize brief"),
+        )
+        .expect("write brief");
+
+        let snapshot = load_research_snapshot(&root).expect("snapshot");
+        let loop_config = snapshot.experiment_loop.expect("experiment loop");
+        assert_eq!(
+            loop_config.get("enabled").and_then(Value::as_bool),
+            Some(true)
+        );
+        assert_eq!(
+            loop_config.get("maxIterations").and_then(Value::as_u64),
+            Some(5)
+        );
+        assert_eq!(
+            loop_config.get("maxFailures").and_then(Value::as_u64),
+            Some(3)
+        );
+        assert_eq!(
+            loop_config.get("successMetric").and_then(Value::as_str),
+            Some("primaryMetric")
+        );
+    }
+
+    #[test]
+    fn invalid_brief_sets_bootstrap_error_and_hides_experiment_loop() {
+        let root = make_temp_project("research-invalid-brief");
+        let app_root = make_app_root();
+        ensure_research_scaffold(&app_root, &root, Some("experiment")).expect("scaffold");
+
+        fs::write(
+            root.join(".pipeline/docs/research_brief.json"),
+            "{ invalid json }",
+        )
+        .expect("write invalid brief");
+
+        let snapshot = load_research_snapshot(&root).expect("snapshot");
+        assert_eq!(snapshot.bootstrap.status, "invalid-brief");
+        assert!(snapshot.bootstrap.message.contains("invalid JSON"));
+        assert!(snapshot.experiment_loop.is_none());
     }
 
     #[test]

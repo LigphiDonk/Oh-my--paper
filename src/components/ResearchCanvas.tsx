@@ -170,12 +170,18 @@ function ResearchOnboarding({
 }) {
   const isZh = locale === "zh-CN";
   const status = research?.bootstrap.status ?? "needs-bootstrap";
+  const requiresManualBriefFix = status === "invalid-brief";
+  const needsRepair =
+    status === "missing-brief"
+    || status === "missing-tasks"
+    || status === "partial"
+    || requiresManualBriefFix;
   const title =
-    status === "missing-brief" || status === "missing-tasks" || status === "partial"
+    needsRepair
       ? (isZh ? "修复研究画布脚手架" : "Repair the research canvas scaffold")
       : (isZh ? "启用研究画布" : "Enable the research canvas");
   const buttonLabel =
-    status === "missing-brief" || status === "missing-tasks" || status === "partial"
+    needsRepair
       ? (isZh ? "修复工作流" : "Repair workflow")
       : (isZh ? "初始化工作流" : "Initialize workflow");
 
@@ -191,14 +197,22 @@ function ResearchOnboarding({
           <span>{isZh ? "隐藏研究工作区：`.viewerleaf/research/*`" : "Hidden research workspace: `.viewerleaf/research/*`"}</span>
           <span>{isZh ? "项目技能与 agent skill 视图" : "Project skills and agent skill views"}</span>
         </div>
-        <button
-          type="button"
-          className="research-primary-btn"
-          onClick={() => void onBootstrap()}
-          disabled={isBusy}
-        >
-          {isBusy ? (isZh ? "处理中..." : "Working...") : buttonLabel}
-        </button>
+        {requiresManualBriefFix ? (
+          <div style={{ marginTop: 16, color: "var(--color-red)" }}>
+            {isZh
+              ? "请手动修复 `.pipeline/docs/research_brief.json` 的 JSON 格式，然后重新打开研究画布。"
+              : "Fix the JSON syntax in `.pipeline/docs/research_brief.json` manually, then reopen the research canvas."}
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="research-primary-btn"
+            onClick={() => void onBootstrap()}
+            disabled={isBusy}
+          >
+            {isBusy ? (isZh ? "处理中..." : "Working...") : buttonLabel}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -525,6 +539,7 @@ function AutoExperimentCard({
 }) {
   const isZh = locale === "zh-CN";
   const { runState, startExperiment, pauseExperiment, resumeExperiment, stopExperiment } = autoExperiment;
+  const isEnabled = config.enabled;
 
   const isRunning = runState?.status === "running";
   const isPaused = runState?.status === "paused";
@@ -547,7 +562,13 @@ function AutoExperimentCard({
 
       <div style={{ padding: "12px", background: "var(--bg-primary)", borderRadius: 6, fontSize: 13, color: "var(--text-secondary)", marginBottom: 16, border: "1px solid var(--border-color)" }}>
         <div style={{ marginBottom: 4 }}><strong>{isZh ? "评估命令" : "Eval Command"}:</strong> <code>{config.evalCommand}</code></div>
-        {runState ? (
+        {!isEnabled ? (
+          <div style={{ marginTop: 12, borderTop: "1px solid var(--border-color)", paddingTop: 8 }}>
+            {isZh
+              ? "自动实验配置已存在，但当前处于关闭状态。请在 research_brief.json 中将 experimentLoop.enabled 设为 true，并补全评估命令后再启动。"
+              : "Auto experiment is configured but currently disabled. Set experimentLoop.enabled to true in research_brief.json and fill in a valid eval command before starting."}
+          </div>
+        ) : runState ? (
           <div style={{ marginTop: 12, borderTop: "1px solid var(--border-color)", paddingTop: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
               <span><strong>{isZh ? "当前轮次" : "Current Iteration"}:</strong> {runState.iterations} / {config.maxIterations}</span>
@@ -571,7 +592,13 @@ function AutoExperimentCard({
       </div>
 
       <div className="research-inspector__actions" style={{ marginTop: 0 }}>
-        {!runState || ["completed", "failed", "stopped", "interrupted"].includes(runState.status) ? (
+        {!isEnabled ? (
+          <span style={{ color: "var(--text-secondary)", fontSize: 13 }}>
+            {isZh
+              ? "当前项目已具备自动实验模板，但默认关闭。"
+              : "This project includes the auto experiment template, but it is disabled by default."}
+          </span>
+        ) : !runState || ["completed", "failed", "stopped", "interrupted"].includes(runState.status) ? (
           <button type="button" className="research-primary-btn" onClick={() => void startExperiment(config)}>
             {runState?.status === "interrupted"
               ? (isZh ? "重新启动实验" : "Restart Experiment")
@@ -886,7 +913,7 @@ export function ResearchCanvas({
               onOpenArtifact={onOpenArtifact}
               onOpenWriting={onOpenWriting}
             />
-            {resolved.stage.stage === "experiment" && localizedResearch.experimentLoop?.enabled ? (
+            {resolved.stage.stage === "experiment" && localizedResearch.experimentLoop ? (
               <AutoExperimentCard locale={locale} config={localizedResearch.experimentLoop} autoExperiment={autoExperiment} />
             ) : null}
           </>
