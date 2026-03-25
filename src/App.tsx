@@ -1246,6 +1246,7 @@ function App() {
     pendingElicitation,
     pendingPatch,
     pendingInteractiveQuestion,
+    pendingPermissionRequest,
     handleRunAgent: runAgentBase,
     handleSendMessage: sendMessageBase,
     handleNewSession: newSessionBase,
@@ -1255,6 +1256,7 @@ function App() {
     handleCancelAgent,
     handleRespondElicitation,
     handleRespondInteractiveQuestion,
+    handleRespondPermission,
     resetForSnapshot: resetAgentChatForSnapshot,
   } = agentChat;
 
@@ -4245,6 +4247,8 @@ function App() {
                       onSelectSuggestion={(s) => handleSendMessage(s)}
                       pendingInteractiveQuestion={pendingInteractiveQuestion}
                       onRespondInteractiveQuestion={handleRespondInteractiveQuestion}
+                      pendingPermissionRequest={pendingPermissionRequest}
+                      onRespondPermission={handleRespondPermission}
                       collabAuthSession={collabAuthSession}
                       collabConfig={collabConfigState}
                       cloudCollab={snapshot.collab ?? null}

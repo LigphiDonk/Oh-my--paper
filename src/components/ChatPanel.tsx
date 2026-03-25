@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { PendingInteractiveQuestion } from "../hooks/useAgentChat";
+import type { PendingInteractiveQuestion, PendingPermissionRequest } from "../hooks/useAgentChat";
 import ReactMarkdown from "react-markdown";
 import { SkillArsenal } from "./SkillArsenal";
 import { desktop } from "../lib/desktop";
@@ -1784,6 +1784,8 @@ export interface ChatPanelProps {
   onSelectSuggestion?: (suggestion: string) => void;
   pendingInteractiveQuestion?: PendingInteractiveQuestion | null;
   onRespondInteractiveQuestion?: (answers: Record<string, string[]>) => void;
+  pendingPermissionRequest?: PendingPermissionRequest | null;
+  onRespondPermission?: (requestId: string, behavior: "allow" | "deny", message?: string) => void;
 }
 
 export function ChatPanel({
@@ -1807,6 +1809,8 @@ export function ChatPanel({
   onSelectSuggestion,
   pendingInteractiveQuestion,
   onRespondInteractiveQuestion,
+  pendingPermissionRequest,
+  onRespondPermission,
 }: ChatPanelProps) {
   const [inputText, setInputText] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
@@ -2331,6 +2335,54 @@ export function ChatPanel({
             question={pendingInteractiveQuestion}
             onSubmit={(answers) => onRespondInteractiveQuestion?.(answers)}
           />
+        )}
+
+        {/* Permission approval card */}
+        {pendingPermissionRequest && (
+          <div className="ag-permission-card">
+            <div className="ag-permission-header">
+              <span className="ag-permission-icon">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="14" height="14">
+                  <path d="M8 1v6m0 2v.5M3 6.5v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2Z"/>
+                </svg>
+              </span>
+              <span className="ag-permission-title">
+                {pendingPermissionRequest.title || `${pendingPermissionRequest.displayName || pendingPermissionRequest.toolName} 需要授权`}
+              </span>
+            </div>
+            {pendingPermissionRequest.description && (
+              <div className="ag-permission-description">{pendingPermissionRequest.description}</div>
+            )}
+            <div className="ag-permission-tool-info">
+              <span className="ag-permission-tool-name">{pendingPermissionRequest.toolName}</span>
+              {pendingPermissionRequest.args && Object.keys(pendingPermissionRequest.args).length > 0 && (
+                <div className="ag-permission-args">
+                  {Object.entries(pendingPermissionRequest.args).slice(0, 3).map(([key, value]) => (
+                    <div key={key} className="ag-permission-arg-row">
+                      <span className="ag-permission-arg-key">{key}:</span>
+                      <span className="ag-permission-arg-value">
+                        {typeof value === "string" ? (value.length > 120 ? `${value.slice(0, 120)}…` : value) : JSON.stringify(value)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="ag-permission-actions">
+              <button
+                className="ag-permission-btn ag-permission-btn--allow"
+                onClick={() => onRespondPermission?.(pendingPermissionRequest.requestId, "allow")}
+              >
+                ✓ 允许
+              </button>
+              <button
+                className="ag-permission-btn ag-permission-btn--deny"
+                onClick={() => onRespondPermission?.(pendingPermissionRequest.requestId, "deny")}
+              >
+                ✕ 拒绝
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Prompt suggestion chips */}

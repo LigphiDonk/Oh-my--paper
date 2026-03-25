@@ -1,6 +1,6 @@
 import clsx from "clsx";
 import { useEffect, useState } from "react";
-import type { PendingInteractiveQuestion } from "../hooks/useAgentChat";
+import type { PendingInteractiveQuestion, PendingPermissionRequest } from "../hooks/useAgentChat";
 
 import { ChatPanel } from "./ChatPanel";
 import { CommentPanel } from "./CommentPanel";
@@ -90,6 +90,8 @@ interface SidebarProps {
   onSelectSuggestion?: (suggestion: string) => void;
   pendingInteractiveQuestion?: PendingInteractiveQuestion | null;
   onRespondInteractiveQuestion?: (answers: Record<string, string[]>) => void;
+  pendingPermissionRequest?: PendingPermissionRequest | null;
+  onRespondPermission?: (requestId: string, behavior: "allow" | "deny", message?: string) => void;
   // Collab props
   collabAuthSession: CollabAuthSession | null;
   collabConfig: CollabConfig | null;
@@ -226,6 +228,8 @@ export function Sidebar({
   onSelectSuggestion,
   pendingInteractiveQuestion,
   onRespondInteractiveQuestion,
+  pendingPermissionRequest,
+  onRespondPermission,
   collabAuthSession,
   collabConfig: collabConfigProp,
   cloudCollab,
@@ -472,6 +476,8 @@ curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh`}</pre>
             onSelectSuggestion={onSelectSuggestion}
             pendingInteractiveQuestion={pendingInteractiveQuestion}
             onRespondInteractiveQuestion={onRespondInteractiveQuestion}
+            pendingPermissionRequest={pendingPermissionRequest}
+            onRespondPermission={onRespondPermission}
           />
         </div>
       )}

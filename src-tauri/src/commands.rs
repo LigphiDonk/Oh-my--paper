@@ -867,6 +867,44 @@ pub fn cancel_agent(state: State<'_, AppState>) -> Result<bool, String> {
 }
 
 #[tauri::command]
+pub fn respond_permission_request(
+    state: State<'_, AppState>,
+    request_id: String,
+    behavior: String,
+    message: Option<String>,
+) -> Result<bool, String> {
+    use std::io::Write;
+
+    let mut stdin_slot = state
+        .active_sidecar_stdin
+        .lock()
+        .map_err(|err| err.to_string())?;
+
+    let stdin = stdin_slot
+        .as_mut()
+        .ok_or_else(|| "no active sidecar stdin".to_string())?;
+
+    let response = serde_json::json!({
+        "type": "permission_response",
+        "requestId": request_id,
+        "behavior": behavior,
+        "message": message.unwrap_or_default(),
+    });
+
+    let mut line = serde_json::to_string(&response).map_err(|err| err.to_string())?;
+    line.push('\n');
+
+    stdin
+        .write_all(line.as_bytes())
+        .map_err(|err| format!("failed to write permission response: {err}"))?;
+    stdin
+        .flush()
+        .map_err(|err| format!("failed to flush permission response: {err}"))?;
+
+    Ok(true)
+}
+
+#[tauri::command]
 pub async fn import_skill_from_git(
     app_handle: AppHandle,
     url: String,

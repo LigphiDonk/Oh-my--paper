@@ -296,7 +296,7 @@ pub fn run_agent(
             } else {
                 prov.default_model.clone()
             },
-            permission_mode: String::from("acceptEdits"),
+            permission_mode: String::from("default"),
             reasoning_effort: read_provider_reasoning_effort(&prov.meta_json),
             mcp_servers: read_provider_mcp_servers(&prov.meta_json),
         },
@@ -346,10 +346,10 @@ pub fn run_agent(
         }
     }
 
-    let mut child = sidecar::spawn_sidecar(state, "agent", &payload)
+    let (mut child, sidecar_stdin) = sidecar::spawn_sidecar_with_stdin(state, "agent", &payload)
         .with_context(|| "failed to spawn agent sidecar".to_string())?;
 
-    // Store sidecar PID for cancellation support
+    // Store sidecar PID and stdin handle for cancellation / permission response support
     {
         let pid = child.id();
         let mut active = state
@@ -361,6 +361,13 @@ pub fn run_agent(
         if let Some(out) = sidecar_pid_out {
             out.store(pid, Ordering::SeqCst);
         }
+    }
+    {
+        let mut stdin_slot = state
+            .active_sidecar_stdin
+            .lock()
+            .expect("active_sidecar_stdin lock poisoned");
+        *stdin_slot = Some(sidecar_stdin);
     }
 
     let stdout = child.stdout.take().context("sidecar stdout unavailable")?;
@@ -507,13 +514,20 @@ pub fn run_agent(
             if !partial_content.trim().is_empty() {
                 persist_assistant_message(state, &session_id, profile_id, &partial_content)?;
             }
-            // Clear sidecar PID
+            // Clear sidecar PID and stdin
             {
                 let mut active = state
                     .active_sidecar
                     .lock()
                     .expect("active_sidecar lock poisoned");
                 *active = None;
+            }
+            {
+                let mut stdin_slot = state
+                    .active_sidecar_stdin
+                    .lock()
+                    .expect("active_sidecar_stdin lock poisoned");
+                *stdin_slot = None;
             }
             let usage = done_usage.unwrap_or_else(|| UsageInfo {
                 input_tokens: 0,
@@ -601,13 +615,20 @@ pub fn run_agent(
         );
     }
 
-    // Clear sidecar PID
+    // Clear sidecar PID and stdin
     {
         let mut active = state
             .active_sidecar
             .lock()
             .expect("active_sidecar lock poisoned");
         *active = None;
+    }
+    {
+        let mut stdin_slot = state
+            .active_sidecar_stdin
+            .lock()
+            .expect("active_sidecar_stdin lock poisoned");
+        *stdin_slot = None;
     }
 
     let _ = app_handle.emit(

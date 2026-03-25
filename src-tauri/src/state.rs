@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::ChildStdin;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, RwLock};
 
@@ -19,6 +20,9 @@ pub struct AppState {
     pub app_data_dir: PathBuf,
     pub active_sidecar: Mutex<Option<u32>>,
     pub sidecar_cancelled: AtomicBool,
+    /// Stdin handle for the active sidecar process, used to send permission
+    /// responses back to the running Claude Code SDK runner.
+    pub active_sidecar_stdin: Mutex<Option<ChildStdin>>,
 }
 
 pub fn default_compile_result(project_root: &Path, main_tex: &str) -> CompileResult {

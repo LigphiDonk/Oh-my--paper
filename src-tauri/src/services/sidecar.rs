@@ -1,6 +1,6 @@
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Output, Stdio};
+use std::process::{Child, ChildStdin, Command, Output, Stdio};
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
@@ -46,9 +46,51 @@ pub fn spawn_sidecar(state: &AppState, command: &str, payload: &str) -> Result<C
         )
     })?;
 
-    write_payload(&mut child, payload)?;
+    write_payload_and_close(&mut child, payload)?;
 
     Ok(child)
+}
+
+/// Like `spawn_sidecar`, but keeps stdin open and returns the `ChildStdin`
+/// handle so the caller can send further messages (e.g. permission responses)
+/// to the sidecar process during the session.
+pub fn spawn_sidecar_with_stdin(
+    state: &AppState,
+    command: &str,
+    payload: &str,
+) -> Result<(Child, ChildStdin)> {
+    let node = resolve_node_binary()?;
+    let sidecar_entry = resolve_sidecar_entry(state)?;
+
+    let mut process = Command::new(&node);
+    process
+        .arg(&sidecar_entry)
+        .arg(command)
+        .arg("--stdin-payload")
+        .current_dir(&state.sidecar_dir)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        process.process_group(0);
+    }
+
+    #[cfg(target_os = "windows")]
+    process.creation_flags(CREATE_NO_WINDOW);
+
+    let mut child = process.spawn().with_context(|| {
+        format!(
+            "failed to spawn sidecar `{command}` with node {}",
+            node.to_string_lossy()
+        )
+    })?;
+
+    let stdin = write_payload_keep_open(&mut child, payload)?;
+
+    Ok((child, stdin))
 }
 
 pub fn run_sidecar(state: &AppState, command: &str, payload: &str) -> Result<Output> {
@@ -176,7 +218,7 @@ fn common_node_locations() -> Vec<PathBuf> {
     }
 }
 
-fn write_payload(child: &mut Child, payload: &str) -> Result<()> {
+fn write_payload_and_close(child: &mut Child, payload: &str) -> Result<()> {
     let mut stdin = child.stdin.take().context("sidecar stdin unavailable")?;
     if !payload.is_empty() {
         stdin
@@ -185,4 +227,23 @@ fn write_payload(child: &mut Child, payload: &str) -> Result<()> {
     }
     drop(stdin);
     Ok(())
+}
+
+/// Write the payload as a single NDJSON line (terminated by newline) and
+/// return the stdin handle so the caller can send further messages.
+fn write_payload_keep_open(child: &mut Child, payload: &str) -> Result<ChildStdin> {
+    let mut stdin = child.stdin.take().context("sidecar stdin unavailable")?;
+    if !payload.is_empty() {
+        stdin
+            .write_all(payload.as_bytes())
+            .context("failed to write sidecar payload")?;
+        // Ensure a newline terminates the payload line so the sidecar
+        // can detect the boundary between payload and subsequent messages.
+        if !payload.ends_with('\n') {
+            stdin
+                .write_all(b"\n")
+                .context("failed to write payload newline")?;
+        }
+    }
+    Ok(stdin)
 }

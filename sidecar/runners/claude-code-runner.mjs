@@ -1,13 +1,3 @@
-/**
- * Claude Code CLI Runner
- *
- * Uses @anthropic-ai/claude-agent-sdk to interact with the locally installed
- * Claude Code CLI. The SDK handles all tool execution internally — we only
- * need to forward streaming events as NDJSON StreamChunks to the Rust backend.
- *
- * Reference: dr-claw server/claude-sdk.js
- */
-
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { emit } from "../utils/ndjson.mjs";
 import { buildEffectiveMcpServers } from "../utils/mcp-config.mjs";
@@ -15,6 +5,30 @@ import {
   buildCliProcessEnv,
   requireCliExecutable,
 } from "../utils/resolve-cli.mjs";
+import { stdinLineEmitter } from "../index.mjs";
+
+/**
+ * Pending permission request resolvers, keyed by requestId.
+ * When the Rust backend sends a permission_response via stdin,
+ * we look up and resolve the matching Promise.
+ */
+const pendingPermissions = new Map();
+
+// Listen for permission responses from Rust backend via stdin IPC
+stdinLineEmitter.on("line", (rawLine) => {
+  try {
+    const msg = JSON.parse(rawLine);
+    if (msg.type === "permission_response" && msg.requestId) {
+      const resolver = pendingPermissions.get(msg.requestId);
+      if (resolver) {
+        pendingPermissions.delete(msg.requestId);
+        resolver(msg);
+      }
+    }
+  } catch {
+    // Ignore non-JSON lines
+  }
+});
 
 /**
  * Check if a message looks like system/skill prompt content
@@ -55,11 +69,13 @@ async function buildSdkOptions(request) {
     options.effort = request.provider.reasoningEffort;
   }
 
-  // Permission mode
+  // Permission mode — use "default" to enable canUseTool callback
   const permMode = request.provider?.permissionMode || "default";
   if (permMode !== "default") {
     options.permissionMode = permMode;
   }
+  // If permMode is "default", don't set permissionMode so the SDK
+  // uses its default behavior and invokes the canUseTool callback.
 
   // System prompt — use Claude Code's preset so CLAUDE.md is loaded
   options.systemPrompt = {
@@ -78,8 +94,56 @@ async function buildSdkOptions(request) {
     options.mcpServers = mcpServers;
   }
 
-  // Auto-approve to avoid interactive prompts in headless mode
+  // Don't skip permissions — we use canUseTool for interactive approval
   options.allowDangerouslySkipPermissions = false;
+
+  // ── Permission callback ─────────────────────────────────────
+  // When the SDK needs permission for a tool call, emit a
+  // permission_request event via stdout and wait for the Rust
+  // backend to respond via stdin.
+  options.canUseTool = async (toolName, input, callbackOptions) => {
+    const requestId = callbackOptions.toolUseID || `perm-${Date.now()}`;
+
+    // Emit permission request to Rust backend via stdout
+    emit({
+      type: "permission_request",
+      requestId,
+      toolName,
+      title: callbackOptions.title || "",
+      description: callbackOptions.description || "",
+      displayName: callbackOptions.displayName || "",
+      args: input || {},
+    });
+
+    // Wait for the response from Rust backend via stdin
+    const response = await new Promise((resolve, reject) => {
+      pendingPermissions.set(requestId, resolve);
+
+      // Handle abort signal
+      if (callbackOptions.signal) {
+        callbackOptions.signal.addEventListener("abort", () => {
+          pendingPermissions.delete(requestId);
+          reject(new Error("Permission request aborted"));
+        }, { once: true });
+      }
+
+      // Timeout after 5 minutes to prevent indefinite hangs
+      setTimeout(() => {
+        if (pendingPermissions.has(requestId)) {
+          pendingPermissions.delete(requestId);
+          resolve({ behavior: "deny", message: "Permission request timed out" });
+        }
+      }, 5 * 60 * 1000);
+    });
+
+    if (response.behavior === "allow") {
+      return { behavior: "allow" };
+    }
+    return {
+      behavior: "deny",
+      message: response.message || "Permission denied by user",
+    };
+  };
 
   // Resume an existing session
   if (request.remoteSessionId) {

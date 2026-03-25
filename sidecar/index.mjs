@@ -1,28 +1,51 @@
 import process from "node:process";
+import { createInterface } from "node:readline";
+import { EventEmitter } from "node:events";
+
+/**
+ * Shared EventEmitter that fires 'line' events for each NDJSON line
+ * received on stdin after the initial payload line.
+ */
+export const stdinLineEmitter = new EventEmitter();
+
+let _payloadResolve = null;
+const _payloadPromise = new Promise((resolve) => {
+  _payloadResolve = resolve;
+});
+
+// Set up readline on stdin to capture the first line as payload,
+// then emit subsequent lines for runner-level IPC (e.g. permission responses).
+let _firstLineConsumed = false;
+if (!process.stdin.isTTY) {
+  const rl = createInterface({ input: process.stdin, crlfDelay: Infinity });
+  rl.on("line", (line) => {
+    if (!_firstLineConsumed) {
+      _firstLineConsumed = true;
+      try {
+        _payloadResolve(JSON.parse(line));
+      } catch {
+        _payloadResolve({});
+      }
+      return;
+    }
+    // Subsequent lines → emit for runner IPC
+    stdinLineEmitter.emit("line", line);
+  });
+  rl.on("close", () => {
+    if (!_firstLineConsumed) {
+      _payloadResolve({});
+    }
+  });
+} else {
+  _payloadResolve({});
+}
 
 async function parsePayload() {
   const raw = process.argv[3];
   if (raw && raw !== "--stdin-payload") {
     return JSON.parse(raw);
   }
-
-  const stdinPayload = await readStdin();
-  if (!stdinPayload.trim()) {
-    return {};
-  }
-  return JSON.parse(stdinPayload);
-}
-
-async function readStdin() {
-  if (process.stdin.isTTY) {
-    return "";
-  }
-
-  const chunks = [];
-  for await (const chunk of process.stdin) {
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks).toString("utf8");
+  return _payloadPromise;
 }
 
 async function main() {

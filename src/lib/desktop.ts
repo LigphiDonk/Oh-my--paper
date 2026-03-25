@@ -345,6 +345,11 @@ export const desktop = {
     console.debug("[desktop.respondElicitation] stub called:", _requestId, _action);
     return Promise.resolve();
   },
+  respondPermissionRequest(requestId: string, behavior: "allow" | "deny", message?: string) {
+    return runOrMock("respond_permission_request", { requestId, behavior, message }, () =>
+      Promise.resolve(true),
+    );
+  },
   getAgentMessages(sessionId?: string) {
     return runOrMock<AgentMessage[]>("get_agent_messages", { sessionId }, () => mockRuntime.getAgentMessages(sessionId));
   },

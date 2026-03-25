@@ -450,6 +450,19 @@ pub enum StreamChunk {
     },
     #[serde(rename = "elicitation_response")]
     ElicitationResponse { request_id: String, action: String },
+    #[serde(rename = "permission_request")]
+    PermissionRequest {
+        request_id: String,
+        tool_name: String,
+        #[serde(default)]
+        title: String,
+        #[serde(default)]
+        description: String,
+        #[serde(default)]
+        display_name: String,
+        #[serde(default)]
+        args: serde_json::Value,
+    },
     #[serde(rename = "interactive_question")]
     InteractiveQuestion {
         request_id: String,

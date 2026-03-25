@@ -96,6 +96,15 @@ export interface PendingInteractiveQuestion {
   questions: InteractiveQuestionItem[];
 }
 
+export interface PendingPermissionRequest {
+  requestId: string;
+  toolName: string;
+  title: string;
+  description: string;
+  displayName: string;
+  args: Record<string, unknown>;
+}
+
 export interface AgentChatState {
   messages: AgentMessage[];
   agentSessions: AgentSessionSummary[];
@@ -116,6 +125,7 @@ export interface AgentChatState {
   pendingElicitation: { requestId: string; serverName: string; message: string; mode?: string } | null;
   pendingPatch: { filePath: string; content: string; summary: string; diff?: DiffLine[] } | null;
   pendingInteractiveQuestion: PendingInteractiveQuestion | null;
+  pendingPermissionRequest: PendingPermissionRequest | null;
   setActiveProfileId: (profileId: AgentProfileId) => void;
   handleRunAgent: () => Promise<void>;
   handleSendMessage: (
@@ -129,6 +139,7 @@ export interface AgentChatState {
   handleCancelAgent: () => Promise<void>;
   handleRespondElicitation: (requestId: string, action: "accept" | "decline") => Promise<void>;
   handleRespondInteractiveQuestion: (answers: Record<string, string[]>) => void;
+  handleRespondPermission: (requestId: string, behavior: "allow" | "deny", message?: string) => Promise<void>;
   resetForSnapshot: () => void;
 }
 
@@ -161,6 +172,7 @@ export function useAgentChat({
     null,
   );
   const [pendingInteractiveQuestion, setPendingInteractiveQuestion] = useState<PendingInteractiveQuestion | null>(null);
+  const [pendingPermissionRequest, setPendingPermissionRequest] = useState<PendingPermissionRequest | null>(null);
 
   const streamBufferRef = useRef("");
   const streamFlushTimerRef = useRef<number | null>(null);
@@ -512,6 +524,17 @@ export function useAgentChat({
           });
           setStreamStatusMessage("等待用户选择");
           break;
+        case "permission_request":
+          setPendingPermissionRequest({
+            requestId: chunk.requestId,
+            toolName: chunk.toolName,
+            title: chunk.title || "",
+            description: chunk.description || "",
+            displayName: chunk.displayName || "",
+            args: chunk.args || {},
+          });
+          setStreamStatusMessage("等待授权");
+          break;
         case "error":
           appendInterruptedStreamMessage();
           clearThinkingText();
@@ -733,6 +756,17 @@ export function useAgentChat({
           });
           setStreamStatusMessage("等待用户选择");
           break;
+        case "permission_request":
+          setPendingPermissionRequest({
+            requestId: chunk.requestId,
+            toolName: chunk.toolName,
+            title: chunk.title || "",
+            description: chunk.description || "",
+            displayName: chunk.displayName || "",
+            args: chunk.args || {},
+          });
+          setStreamStatusMessage("等待授权");
+          break;
         case "error":
           appendInterruptedStreamMessage();
           clearThinkingText();
@@ -827,6 +861,16 @@ export function useAgentChat({
     }
   });
 
+  const handleRespondPermission = useEffectEvent(async (requestId: string, behavior: "allow" | "deny", message?: string) => {
+    setPendingPermissionRequest(null);
+    setStreamStatusMessage("");
+    try {
+      await desktop.respondPermissionRequest(requestId, behavior, message);
+    } catch (error) {
+      console.error("Failed to respond to permission request:", error);
+    }
+  });
+
   return {
     messages,
     agentSessions,
@@ -847,6 +891,7 @@ export function useAgentChat({
     pendingElicitation,
     pendingPatch,
     pendingInteractiveQuestion,
+    pendingPermissionRequest,
     setActiveProfileId,
     handleRunAgent,
     handleSendMessage,
@@ -857,6 +902,7 @@ export function useAgentChat({
     handleCancelAgent,
     handleRespondElicitation,
     handleRespondInteractiveQuestion,
+    handleRespondPermission,
     resetForSnapshot,
   };
 }

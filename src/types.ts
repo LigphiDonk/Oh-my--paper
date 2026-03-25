@@ -269,6 +269,7 @@ export type StreamChunk =
   | { type: "prompt_suggestion"; suggestion: string }
   | { type: "model_info"; model: string; fastModeState: string }
   | { type: "elicitation_request"; requestId: string; serverName: string; message: string; mode?: string }
+  | { type: "permission_request"; requestId: string; toolName: string; title?: string; description?: string; displayName?: string; args?: Record<string, unknown> }
   | { type: "interactive_question"; requestId: string; title: string; questions: { id: string; label: string; options: string[]; allowCustom?: boolean; multiSelect?: boolean }[] }
   | { type: "done"; usage: { inputTokens: number; outputTokens: number; model: string }; remoteSessionId?: string };
 

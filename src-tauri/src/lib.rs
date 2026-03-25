@@ -71,6 +71,7 @@ pub fn run() {
                 app_data_dir,
                 active_sidecar: Mutex::new(None),
                 sidecar_cancelled: std::sync::atomic::AtomicBool::new(false),
+                active_sidecar_stdin: Mutex::new(None),
             });
             app.manage(services::wechat_bridge::WeChatBridgeState::default());
             Ok(())
@@ -132,6 +133,7 @@ pub fn run() {
             commands::close_terminal,
             commands::prepare_worker_deploy_dir,
             commands::cancel_agent,
+            commands::respond_permission_request,
             commands::import_skill_from_git,
             commands::remove_skill,
             commands::detect_cli_agents,
