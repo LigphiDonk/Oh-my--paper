@@ -742,6 +742,75 @@ fn build_project_stage_context(
         }
     }
 
+    // ── Inject live auto-experiment run state (always, regardless of stage) ──
+    {
+        let run_state_path = project_root
+            .join(".viewerleaf/research/Experiment/automation/run-state.json");
+        if let Ok(raw) = fs::read_to_string(&run_state_path) {
+            if let Ok(rs) = serde_json::from_str::<JsonValue>(&raw) {
+                let status = rs
+                    .get("status")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let iterations = rs
+                    .get("iterations")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
+                // Only inject if there's meaningful state
+                if !status.is_empty() && (iterations > 0 || status == "running") {
+                    let best = rs
+                        .get("bestMetricValue")
+                        .and_then(|v| v.as_f64())
+                        .map(|v| format!("{:.4}", v))
+                        .unwrap_or_else(|| "—".into());
+                    let failures = rs
+                        .get("currentFailures")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0);
+                    // Compact history: last 5 entries
+                    let history_summary = rs
+                        .get("runHistory")
+                        .and_then(|v| v.as_array())
+                        .map(|arr| {
+                            arr.iter()
+                                .rev()
+                                .take(5)
+                                .collect::<Vec<_>>()
+                                .into_iter()
+                                .rev()
+                                .filter_map(|e| {
+                                    let iter_n =
+                                        e.get("iteration").and_then(|v| v.as_u64())?;
+                                    let val = e
+                                        .get("metricValue")
+                                        .and_then(|v| v.as_f64())
+                                        .map(|v| format!("{:.4}", v))
+                                        .unwrap_or_else(|| "fail".into());
+                                    let st = e
+                                        .get("status")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("?");
+                                    Some(format!("iter{}:{}({})", iter_n, val, st))
+                                })
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        })
+                        .unwrap_or_default();
+
+                    lines.push(format!(
+                        "<experiment_progress>\n\
+                         自动实验状态: {status}\n\
+                         已完成迭代: {iterations}\n\
+                         当前最佳指标: {best}\n\
+                         连续失败次数: {failures}\n\
+                         最近历史: [{history_summary}]\n\
+                         </experiment_progress>"
+                    ));
+                }
+            }
+        }
+    }
+
     if let Some(task) = task_context {
         lines.push("taskMode: true".into());
         lines.push(format!("activeTaskId: {}", task.task_id));
