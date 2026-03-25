@@ -347,6 +347,67 @@ pub fn run_agent(
     };
     let payload = serde_json::to_string(&request)?;
 
+    // ── OpenClaw path: bypass sidecar, use WebSocket bridge ──
+    if prov.vendor == "openclaw" {
+        let ws_url = format!("ws://127.0.0.1:{}", crate::services::openclaw_lifecycle::DEFAULT_GATEWAY_PORT);
+        let (full_response, done_usage, remote_sid) =
+            crate::services::openclaw_bridge::send_and_stream(
+                app_handle,
+                &ws_url,
+                &user_message,
+                &request.system_prompt,
+                &project_root,
+                &session_id,
+            )
+            .map_err(|e| anyhow::anyhow!("OpenClaw bridge error: {e}"))?;
+
+        // Persist assistant message
+        if !full_response.trim().is_empty() {
+            persist_assistant_message(state, &session_id, profile_id, &full_response)?;
+        }
+
+        if let Some(rsid) = remote_sid.as_deref() {
+            persist_remote_session_id(state, &session_id, rsid)?;
+        }
+
+        let usage = done_usage.unwrap_or_else(|| UsageInfo {
+            input_tokens: 0,
+            output_tokens: 0,
+            model: "openclaw".into(),
+        });
+
+        {
+            let conn = state.db.lock().expect("db lock poisoned");
+            let _ = conn.execute(
+                "INSERT INTO usage_logs (id, session_id, provider_id, model, input_tokens, output_tokens) VALUES (?1,?2,?3,?4,?5,?6)",
+                params![
+                    Uuid::new_v4().to_string(),
+                    session_id,
+                    profile.provider_id,
+                    usage.model.clone(),
+                    usage.input_tokens,
+                    usage.output_tokens
+                ],
+            );
+        }
+
+        let _ = app_handle.emit(
+            "agent:stream",
+            &StreamChunk::Done {
+                usage,
+                remote_session_id: remote_sid,
+            },
+        );
+
+        return Ok(AgentRunResult {
+            session_id: Some(session_id),
+            message: None,
+            suggested_patch: None,
+            full_output: Some(full_response),
+        });
+    }
+
+    // ── Legacy sidecar path (claude-code / codex) ──
     // Session and user message are already inserted by prepare_user_message().
     // Only insert here if called without a prior prepare (e.g. in tests or
     // direct call path without the command wrapper).
@@ -406,9 +467,6 @@ pub fn run_agent(
     }
 
     let stdout = child.stdout.take().context("sidecar stdout unavailable")?;
-    // Use a small buffer (256 bytes) so that streaming text_delta events
-    // are read and emitted promptly instead of waiting for the default 8KB
-    // BufReader buffer to fill.
     let reader = std::io::BufReader::with_capacity(256, stdout);
     let mut full_response = String::new();
     let mut active_thinking = String::new();
@@ -480,14 +538,11 @@ pub fn run_agent(
                     output,
                     status,
                 } => {
-                    // Append tool output to full_response so experiment metric
-                    // parsing can find JSON metrics in command outputs
                     full_response.push('\n');
                     full_response.push_str(output);
                     full_response.push('\n');
                     let resolved_status = status.as_deref().unwrap_or("completed").to_string();
                     let preview = truncate_preview(output, 240);
-                    // Find matching index — prefer tool_use_id, fallback to name+status
                     let matched_idx = if !tool_use_id.is_empty() {
                         assistant_timeline
                             .iter()
@@ -540,16 +595,13 @@ pub fn run_agent(
         .wait_with_output()
         .context("failed to wait for sidecar")?;
     if !output.status.success() {
-        // Check if this was a user-initiated cancellation
         if state.sidecar_cancelled.load(Ordering::SeqCst) {
-            // User cancelled — treat as a graceful stop, not an error
             let all_thinking = merge_thinking_segments(&committed_thinking, &active_thinking);
             let partial_content =
                 build_assistant_message_content(&all_thinking, &full_response, &assistant_timeline);
             if !partial_content.trim().is_empty() {
                 persist_assistant_message(state, &session_id, profile_id, &partial_content)?;
             }
-            // Clear sidecar PID and stdin
             {
                 let mut active = state
                     .active_sidecar
