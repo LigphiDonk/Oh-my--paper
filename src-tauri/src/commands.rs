@@ -1422,6 +1422,9 @@ pub fn start_wechat_listener(
 
     // Spawn the long-poll listener on a background thread.
     tauri::async_runtime::spawn_blocking(move || {
+        // Use a persistent wechat session ID so conversation context is maintained
+        let wechat_session_id = format!("wechat-{}", uuid::Uuid::new_v4());
+
         while running.load(Ordering::SeqCst) {
             let cursor = {
                 let guard = cursor_ref.lock().unwrap_or_else(|e| e.into_inner());
@@ -1446,14 +1449,123 @@ pub fn start_wechat_listener(
                             continue;
                         }
 
+                        // Skip empty messages
+                        if msg.content.trim().is_empty() {
+                            continue;
+                        }
+
                         // Cache context_token for replies
                         if let Some(ref ctx) = msg.context_token {
                             let mut guard = ctx_token_ref.lock().unwrap_or_else(|e| e.into_inner());
                             *guard = Some(ctx.clone());
                         }
 
-                        // Emit the incoming message to the frontend
+                        // Emit the incoming message to the frontend for visibility
                         let _ = app.emit("wechat:message", &msg);
+
+                        eprintln!(
+                            "[WeChat] Incoming from {}: {}",
+                            msg.from_user,
+                            if msg.content.len() > 80 {
+                                format!("{}…", &msg.content[..80])
+                            } else {
+                                msg.content.clone()
+                            }
+                        );
+
+                        // ── Run Agent with the WeChat message ──
+                        let state = app.state::<crate::state::AppState>();
+
+                        // Get a default profile to use
+                        let profile_id = {
+                            let conn = state.db.lock().unwrap_or_else(|e| e.into_inner());
+                            crate::services::profile::list_profiles(&conn)
+                                .ok()
+                                .and_then(|profiles| profiles.first().map(|p| p.id.clone()))
+                                .unwrap_or_else(|| "default".to_string())
+                        };
+
+                        let project_root = {
+                            let cfg = state.project_config.read().unwrap_or_else(|e| e.into_inner());
+                            cfg.root_path.clone()
+                        };
+
+                        if project_root.trim().is_empty() {
+                            eprintln!("[WeChat] No active project, cannot run agent");
+                            // Send a hint back to the user
+                            let ctx = {
+                                let guard = ctx_token_ref.lock().unwrap_or_else(|e| e.into_inner());
+                                guard.clone()
+                            };
+                            let _ = wechat_bridge::send_message(
+                                &config.api_url,
+                                &config.token,
+                                "⚠️ 当前没有打开的项目，请先在 ViewerLeaf 中打开一个项目。",
+                                ctx.as_deref(),
+                            );
+                            continue;
+                        }
+
+                        // Run the agent and collect the response
+                        match crate::services::agent::run_agent(
+                            &app,
+                            &state,
+                            &profile_id,
+                            Some(&wechat_session_id),
+                            &project_root,   // file_path = project root
+                            "",               // no selected text
+                            Some(&msg.content),
+                            false,            // not task mode
+                            None,             // no task context
+                            None,             // no PID capture
+                        ) {
+                            Ok(result) => {
+                                let reply_text = result
+                                    .full_output
+                                    .as_deref()
+                                    .filter(|s| !s.trim().is_empty())
+                                    .unwrap_or("✅ (agent completed with no text output)");
+
+                                // Get context_token for sending reply
+                                let ctx = {
+                                    let guard = ctx_token_ref.lock().unwrap_or_else(|e| e.into_inner());
+                                    guard.clone()
+                                };
+
+                                // Send reply back to WeChat (split into chunks if too long)
+                                let max_chunk = 3800; // iLink message size limit
+                                let chars: Vec<char> = reply_text.chars().collect();
+                                for chunk in chars.chunks(max_chunk) {
+                                    let chunk_text: String = chunk.iter().collect();
+                                    if let Err(err) = wechat_bridge::send_message(
+                                        &config.api_url,
+                                        &config.token,
+                                        &chunk_text,
+                                        ctx.as_deref(),
+                                    ) {
+                                        eprintln!("[WeChat] Failed to send reply: {}", err);
+                                    }
+                                }
+
+                                eprintln!(
+                                    "[WeChat] Reply sent ({} chars)",
+                                    reply_text.len()
+                                );
+                            }
+                            Err(err) => {
+                                eprintln!("[WeChat] Agent error: {:#}", err);
+                                let ctx = {
+                                    let guard = ctx_token_ref.lock().unwrap_or_else(|e| e.into_inner());
+                                    guard.clone()
+                                };
+                                let _ = wechat_bridge::send_message(
+                                    &config.api_url,
+                                    &config.token,
+                                    &format!("❌ Agent error: {}", err),
+                                    ctx.as_deref(),
+                                );
+                            }
+                        }
                     }
                 }
                 Err(err) => {
