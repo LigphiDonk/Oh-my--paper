@@ -75,6 +75,11 @@ pub fn run() {
             });
             app.manage(services::cc_connect::CcConnectState::default());
 
+            // Start task-file polling watcher if a workspace is open.
+            if let Some(ref root) = workspace_root {
+                services::task_watcher::start_task_watcher(app.handle(), root);
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

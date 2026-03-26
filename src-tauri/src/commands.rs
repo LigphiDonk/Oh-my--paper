@@ -114,12 +114,24 @@ pub async fn switch_project(
     app_handle: AppHandle,
     root_path: String,
 ) -> Result<WorkspaceSnapshot, String> {
-    tauri::async_runtime::spawn_blocking(move || {
+    let root_for_watcher = root_path.clone();
+    let app_for_watcher = app_handle.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
         let state = app_handle.state::<AppState>();
         project::switch_project(&state, Path::new(&root_path)).map_err(|err| err.to_string())
     })
     .await
-    .map_err(|err| err.to_string())?
+    .map_err(|err| err.to_string())?;
+
+    // Restart the task watcher for the new project root.
+    if result.is_ok() {
+        crate::services::task_watcher::start_task_watcher(
+            &app_for_watcher,
+            Path::new(&root_for_watcher),
+        );
+    }
+
+    result
 }
 
 #[tauri::command]

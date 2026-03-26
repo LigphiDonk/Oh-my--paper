@@ -1611,6 +1611,28 @@ function App() {
     })();
   }, [refreshWorkspace]);
 
+  // Auto-refresh research snapshot when task files change externally.
+  useEffect(() => {
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+
+    const unlisten = desktop.onResearchSnapshotChanged(() => {
+      if (cancelled) return;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        if (!cancelled) {
+          void refreshWorkspace();
+        }
+      }, 500);
+    });
+
+    return () => {
+      cancelled = true;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      void unlisten.then((fn) => fn());
+    };
+  }, [refreshWorkspace]);
+
   useEffect(() => {
     if (!isTauriRuntime() || typeof window === "undefined") {
       return;

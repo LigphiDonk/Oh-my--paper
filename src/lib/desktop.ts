@@ -631,6 +631,16 @@ export const desktop = {
       }),
     );
   },
+
+  // ─── Research Snapshot Watcher ───
+  onResearchSnapshotChanged(callback: () => void): Promise<UnlistenFn> {
+    if (!isTauriRuntime()) {
+      return Promise.resolve(() => { });
+    }
+    return listen("research:snapshot-changed", () => {
+      callback();
+    });
+  },
 };
 
 export type { WorkspaceSnapshot };
