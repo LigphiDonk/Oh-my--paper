@@ -14,8 +14,8 @@ use crate::models::{
     UsageRecord, WorkspaceSnapshot, ZoteroSearchResult,
 };
 use crate::services::{
-    agent, compile, figure, literature, profile, project, provider, research, sidecar, skill, sync,
-    terminal, worker,
+    agent, compile, figure, literature, profile, project, provider, research, session_scan, sidecar,
+    skill, sync, terminal, worker,
 };
 use crate::state::AppState;
 
@@ -1566,4 +1566,38 @@ pub fn get_cc_connect_status(
     Ok(cc_connect::get_status(&state))
 }
 
+// ── Session Scanner ────────────────────────────────────────────
 
+#[tauri::command]
+pub async fn scan_sessions() -> Result<Vec<session_scan::SessionMeta>, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        Ok(session_scan::scan_all_sessions())
+    })
+    .await
+    .map_err(|err| err.to_string())?
+}
+
+#[tauri::command]
+pub async fn load_session_detail(
+    provider: String,
+    session_id: String,
+) -> Result<Vec<session_scan::SessionMessage>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        session_scan::load_session_messages(&provider, &session_id)
+    })
+    .await
+    .map_err(|err| err.to_string())?
+}
+
+#[tauri::command]
+pub fn get_session_resume_command(
+    provider: String,
+    session_id: String,
+    project_dir: Option<String>,
+) -> Result<String, String> {
+    Ok(session_scan::get_resume_command(
+        &provider,
+        &session_id,
+        project_dir.as_deref(),
+    ))
+}

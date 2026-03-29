@@ -182,6 +182,10 @@ pub fn run() {
             commands::start_cc_connect,
             commands::stop_cc_connect,
             commands::get_cc_connect_status,
+            // Session Scanner
+            commands::scan_sessions,
+            commands::load_session_detail,
+            commands::get_session_resume_command,
         ])
         .run(tauri::generate_context!())
         .expect("failed to start ViewerLeaf");

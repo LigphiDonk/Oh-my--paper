@@ -13,7 +13,8 @@ export type DrawerTab =
   | "figures"
   | "skills"
   | "usage"
-  | "collab";
+  | "collab"
+  | "sessions";
 export type AppLocale = "zh-CN" | "en-US";
 export type WorkspacePaneMode = "files" | "outline";
 export type WorkspaceSurface = "research" | "writing" | "literature";
@@ -729,4 +730,29 @@ export interface ZoteroSearchResult {
   libraryId: string;
   zoteroVersion: number;
   snippet: string;
+}
+
+/* ── AI Session Browser ── */
+
+export type SessionProvider = "claude" | "codex";
+export type SessionRoleTag = "orchestrator" | "executor" | "research" | "general";
+
+export interface SessionMeta {
+  provider: SessionProvider;
+  sessionId: string;
+  title: string;
+  summary: string;
+  projectDir: string | null;
+  createdAt: number | null;
+  lastActiveAt: number | null;
+  messageCount: number;
+  sourcePath: string;
+  roleTag: SessionRoleTag;
+}
+
+export interface SessionMessage {
+  role: "user" | "assistant" | "tool" | "system" | string;
+  content: string;
+  timestamp: number | null;
+  toolId: string | null;
 }

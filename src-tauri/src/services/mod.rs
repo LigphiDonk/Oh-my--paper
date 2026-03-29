@@ -16,6 +16,7 @@ pub mod skill;
 pub mod sync;
 pub mod terminal;
 pub mod cc_connect;
+pub mod session_scan;
 pub mod task_watcher;
 pub mod worker;
 

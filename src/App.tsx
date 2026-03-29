@@ -14,6 +14,7 @@ import { VisualEditor } from "./components/VisualEditor";
 import { OutlineTree } from "./components/OutlineTree";
 import { PdfPane, type PreviewPaneState } from "./components/PdfPane";
 import { ProjectSidebar } from "./components/ProjectSidebar";
+import { SessionBrowser } from "./components/SessionBrowser";
 import { Sidebar } from "./components/Sidebar";
 import { SyncSidebar } from "./components/SyncSidebar";
 import { TerminalPanel } from "./components/TerminalPanel";
@@ -4119,6 +4120,13 @@ function App() {
                 <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
               </svg>
             </button>
+            <button
+              className={`activity-icon hover-spring ${isDrawerVisible && drawerTab === "sessions" ? "is-active" : ""}`}
+              onClick={() => toggleDrawerTab("sessions")}
+              title={isZh ? "会话浏览器" : "Session Browser"}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            </button>
 
 
             <div style={{ flex: 1 }}></div>
@@ -4197,6 +4205,11 @@ function App() {
                       onCreateProject={() => void handleCreateCloudProject()}
                       onLinkProject={() => void handleLinkCloudProject()}
                       onOpenCollabSettings={() => openDrawerTab("collab")}
+                    />
+                  ) : drawerTab === "sessions" ? (
+                    <SessionBrowser
+                      locale={locale}
+                      onResumeInTerminal={handleRunTerminalCommand}
                     />
                   ) : (
                     <Sidebar
