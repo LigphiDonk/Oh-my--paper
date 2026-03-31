@@ -1,6 +1,7 @@
 {
   "name": "omp",
   "description": "Oh My Paper research harness: memory system, Codex delegation, and pipeline commands for academic research projects.",
+  "version": "1.0.0",
   "author": {
     "name": "LigphiDonk"
   }
