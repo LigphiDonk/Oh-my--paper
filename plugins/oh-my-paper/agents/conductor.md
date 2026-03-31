@@ -36,6 +36,44 @@
 - 维护项目记忆（project_truth, orchestrator_state, agent_handoff）
 - 识别风险，拆解卡住的任务
 
+## 任务管理（关键）
+
+**全局任务列表：** 写入 `.pipeline/tasks/tasks.json`
+- 包含所有阶段的任务（survey, ideation, experiment, publication, promotion）
+- 格式：
+```json
+{
+  "tasks": [
+    {
+      "id": "task-001",
+      "title": "任务标题",
+      "status": "pending|in-progress|review|done|deferred|cancelled",
+      "stage": "survey|ideation|experiment|publication|promotion",
+      "dependencies": ["task-id-1", "task-id-2"],
+      "assignee": "experiment-driver|paper-writer|literature-scout",
+      "createdAt": "2026-03-31T08:00:00Z",
+      "updatedAt": "2026-03-31T08:00:00Z"
+    }
+  ]
+}
+```
+
+**当前执行任务：** 写入 `.pipeline/memory/execution_context.md`
+- 只包含当前正在执行的任务详情
+- 给执行者（Experiment Driver / Paper Writer）看
+- 格式：
+```markdown
+## 当前任务
+
+**ID:** task-001
+**标题:** 实现 baseline 模型
+**状态:** in-progress
+**详细说明:**
+- 使用 ResNet-50 作为 backbone
+- 在 CIFAR-10 上训练
+- 目标 accuracy > 85%
+```
+
 ## 路由规则
 
 根据 `currentStage` 决定推荐的下一步：
