@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "ViewerLeaf",
+  "productName": "Oh My Paper",
   "version": "0.2.2",
-  "identifier": "com.viewerleaf.desktop",
+  "identifier": "com.ohmypaper.desktop",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "ViewerLeaf",
+        "title": "Oh My Paper",
         "width": 1560,
         "height": 980,
         "minWidth": 1180,

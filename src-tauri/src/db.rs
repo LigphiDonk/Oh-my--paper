@@ -22,7 +22,7 @@ const REQUIRED_CHAT_TOOLS: &[&str] = &[
 
 pub fn init_db(app_data_dir: &Path) -> SqlResult<Connection> {
     std::fs::create_dir_all(app_data_dir).ok();
-    let db_path = app_data_dir.join("viewerleaf.db");
+    let db_path = app_data_dir.join("oh-my-paper.db");
     let conn = Connection::open(db_path)?;
 
     conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;

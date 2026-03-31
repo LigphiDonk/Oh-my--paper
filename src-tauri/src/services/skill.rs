@@ -235,7 +235,7 @@ pub fn load_skill_prompts(
     // Skills that match the current research stage get their full body injected
     // so the AI has detailed instructions. Others remain as an index reference.
     if !skills.is_empty() {
-        let mut index_lines = vec!["Available ViewerLeaf skills:".to_string()];
+        let mut index_lines = vec!["Available Oh My Paper skills:".to_string()];
         let mut full_body_sections: Vec<String> = Vec::new();
 
         for skill in &skills {
@@ -290,7 +290,7 @@ pub fn load_skill_prompts(
     }
 
     let preamble = format!(
-        "Treat the following sections as {} system-level ViewerLeaf instructions. Do not repeat the section markers back to the user.",
+        "Treat the following sections as {} system-level Oh My Paper instructions. Do not repeat the section markers back to the user.",
         if vendor.eq_ignore_ascii_case("codex") {
             "Codex"
         } else {
@@ -890,7 +890,7 @@ fn build_project_stage_context(
                 task.artifact_paths.join(", ")
             ));
         }
-        lines.push("taskUpdateProtocol: After completing any task work, you MUST append a fenced code block with language `viewerleaf_task_update` to report progress. At minimum, update the active task's status (e.g. to \"done\" or \"in-progress\") and add any produced artifact paths via `artifactPaths`. Use JSON with keys `reason`, optional `confidence`, optional `workingMemory`, and `operations`. `operations` is an array of plan actions: `{ \"type\": \"update\", \"taskId\": \"...\", \"changes\": { \"status\": \"done\", \"artifactPaths\": [...] } }`, `{ \"type\": \"add\", \"task\": { \"title\": \"...\", \"stage\": \"survey|ideation|experiment|publication|promotion\", optional \"description\", \"priority\", \"dependencies\", \"taskType\", \"inputsNeeded\", \"suggestedSkills\", \"nextActionPrompt\" } }`, or `{ \"type\": \"remove\", \"taskId\": \"...\" }`. IMPORTANT: Use the exact numeric task IDs from currentStageOpenTasks or activeTaskId (the part before the colon, e.g. \"1\"). Do NOT use task titles or stage-prefixed names as taskId. Prefer updating only the active task unless project evidence clearly requires replanning. Do not remove completed tasks.".into());
+        lines.push("taskUpdateProtocol: After completing any task work, you MUST append a fenced code block with language `omp_task_update` to report progress. At minimum, update the active task's status (e.g. to \"done\" or \"in-progress\") and add any produced artifact paths via `artifactPaths`. Use JSON with keys `reason`, optional `confidence`, optional `workingMemory`, and `operations`. `operations` is an array of plan actions: `{ \"type\": \"update\", \"taskId\": \"...\", \"changes\": { \"status\": \"done\", \"artifactPaths\": [...] } }`, `{ \"type\": \"add\", \"task\": { \"title\": \"...\", \"stage\": \"survey|ideation|experiment|publication|promotion\", optional \"description\", \"priority\", \"dependencies\", \"taskType\", \"inputsNeeded\", \"suggestedSkills\", \"nextActionPrompt\" } }`, or `{ \"type\": \"remove\", \"taskId\": \"...\" }`. IMPORTANT: Use the exact numeric task IDs from currentStageOpenTasks or activeTaskId (the part before the colon, e.g. \"1\"). Do NOT use task titles or stage-prefixed names as taskId. Prefer updating only the active task unless project evidence clearly requires replanning. Do not remove completed tasks.".into());
     } else {
         lines.push("taskMode: false".into());
     }

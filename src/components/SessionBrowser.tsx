@@ -11,18 +11,19 @@ import type {
 interface SessionBrowserProps {
   locale: AppLocale;
   onResumeInTerminal: (command: string) => void;
+  onOpenTerminalDrawer?: () => void;
 }
 
 const ROLE_CONFIG: Record<SessionRoleTag, { icon: string; label: string; labelEn: string; color: string }> = {
-  orchestrator: { icon: "🧠", label: "统筹", labelEn: "Plan", color: "var(--accent-blue, #60a5fa)" },
-  executor: { icon: "⚡", label: "执行", labelEn: "Exec", color: "var(--accent-green, #34d399)" },
-  research: { icon: "📚", label: "研究", labelEn: "Research", color: "var(--accent-purple, #a78bfa)" },
-  general: { icon: "📝", label: "通用", labelEn: "General", color: "var(--text-subtle, #9ca3af)" },
+  orchestrator: { icon: "🧠", label: "统筹", labelEn: "Plan", color: "#818cf8" },
+  executor: { icon: "⚡", label: "执行", labelEn: "Exec", color: "#34d399" },
+  research: { icon: "📚", label: "研究", labelEn: "Research", color: "#a78bfa" },
+  general: { icon: "📝", label: "通用", labelEn: "General", color: "#94a3b8" },
 };
 
-const PROVIDER_CONFIG: Record<string, { label: string; color: string }> = {
-  claude: { label: "Claude", color: "#f97316" },
-  codex: { label: "Codex", color: "#22d3ee" },
+const PROVIDER_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  claude: { label: "CLAUDE", color: "#f97316", bg: "rgba(249, 115, 22, 0.10)" },
+  codex: { label: "CODEX", color: "#06b6d4", bg: "rgba(6, 182, 212, 0.10)" },
 };
 
 function formatRelativeTime(ms: number | null): string {
@@ -45,7 +46,37 @@ function extractProjectName(dir: string | null): string {
   return parts[parts.length - 1] || "";
 }
 
-export function SessionBrowser({ locale, onResumeInTerminal }: SessionBrowserProps) {
+/** Reliable clipboard copy that works in Tauri webview */
+async function copyToClipboard(text: string): Promise<boolean> {
+  // Try modern API first
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // fallback below
+    }
+  }
+  // Fallback: hidden textarea
+  try {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    textarea.style.top = "-9999px";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(textarea);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+export function SessionBrowser({ locale, onResumeInTerminal, onOpenTerminalDrawer }: SessionBrowserProps) {
   const isZh = locale === "zh-CN";
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -147,10 +178,15 @@ export function SessionBrowser({ locale, onResumeInTerminal }: SessionBrowserPro
           sessionId: session.sessionId,
           projectDir: session.projectDir,
         });
-        await navigator.clipboard.writeText(command);
-        setToastText(isZh ? "已复制恢复命令" : "Resume command copied");
+        const ok = await copyToClipboard(command);
+        if (ok) {
+          setToastText(isZh ? "✓ 已复制恢复命令" : "✓ Resume command copied");
+        } else {
+          setToastText(isZh ? "✗ 复制失败" : "✗ Copy failed");
+        }
       } catch (err) {
         console.error("failed to copy resume command", err);
+        setToastText(isZh ? "✗ 获取命令失败" : "✗ Failed to get command");
       }
     },
     [isZh],
@@ -165,12 +201,15 @@ export function SessionBrowser({ locale, onResumeInTerminal }: SessionBrowserPro
           projectDir: session.projectDir,
         });
         onResumeInTerminal(command);
-        setToastText(isZh ? "已发送到终端" : "Sent to terminal");
+        // Switch to the AI drawer tab (sidebar terminal)
+        onOpenTerminalDrawer?.();
+        setToastText(isZh ? "✓ 已发送到终端" : "✓ Sent to terminal");
       } catch (err) {
         console.error("failed to resume in terminal", err);
+        setToastText(isZh ? "✗ 恢复失败" : "✗ Resume failed");
       }
     },
-    [onResumeInTerminal, isZh],
+    [onResumeInTerminal, onOpenTerminalDrawer, isZh],
   );
 
   const toggleRoleFilter = useCallback((role: SessionRoleTag) => {
@@ -198,7 +237,12 @@ export function SessionBrowser({ locale, onResumeInTerminal }: SessionBrowserPro
     <div className="session-browser">
       {/* Header */}
       <div className="sidebar-header session-browser__header">
-        <span>{isZh ? "会话浏览器" : "Sessions"}</span>
+        <span className="session-browser__header-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="15" height="15">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          {isZh ? "会话浏览器" : "Sessions"}
+        </span>
         <button
           className="session-browser__refresh-btn"
           type="button"
@@ -206,7 +250,7 @@ export function SessionBrowser({ locale, onResumeInTerminal }: SessionBrowserPro
           disabled={isLoading}
           title={isZh ? "刷新" : "Refresh"}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="13" height="13" className={isLoading ? "session-browser__spin" : ""}>
             <path d="M21.5 2v6h-6" /><path d="M2.5 22v-6h6" />
             <path d="M2.5 11.5A10 10 0 0 1 18.36 4.64L21.5 8" />
             <path d="M21.5 12.5A10 10 0 0 1 5.64 19.36L2.5 16" />
@@ -229,56 +273,58 @@ export function SessionBrowser({ locale, onResumeInTerminal }: SessionBrowserPro
           />
         </div>
 
-        {/* Filters */}
-        <div className="session-browser__filters">
-          {/* Role filters */}
-          <div className="session-browser__filter-row">
-            {(Object.keys(ROLE_CONFIG) as SessionRoleTag[]).map((role) => {
-              const config = ROLE_CONFIG[role];
-              const isActive = activeRoleFilters.has(role);
-              return (
-                <button
-                  key={role}
-                  type="button"
-                  className={clsx("session-browser__filter-pill", isActive && "is-active")}
-                  style={isActive ? { borderColor: config.color, color: config.color } : undefined}
-                  onClick={() => toggleRoleFilter(role)}
-                >
-                  <span className="session-browser__filter-pill-icon">{config.icon}</span>
-                  <span>{isZh ? config.label : config.labelEn}</span>
-                  {(roleCounts[role] ?? 0) > 0 && (
-                    <span className="session-browser__filter-count">{roleCounts[role]}</span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+        {/* Provider filter tabs */}
+        <div className="session-browser__provider-tabs">
+          {["all", "claude", "codex"].map((provider) => (
+            <button
+              key={provider}
+              type="button"
+              className={clsx(
+                "session-browser__provider-tab",
+                activeProviderFilter === provider && "is-active",
+              )}
+              onClick={() => setActiveProviderFilter(provider)}
+            >
+              {provider === "all"
+                ? isZh ? "全部" : "All"
+                : PROVIDER_CONFIG[provider]?.label ?? provider}
+            </button>
+          ))}
+        </div>
 
-          {/* Provider filter */}
-          <div className="session-browser__filter-row">
-            {["all", "claude", "codex"].map((provider) => (
+        {/* Role filters */}
+        <div className="session-browser__filter-row">
+          {(Object.keys(ROLE_CONFIG) as SessionRoleTag[]).map((role) => {
+            const config = ROLE_CONFIG[role];
+            const isActive = activeRoleFilters.has(role);
+            return (
               <button
-                key={provider}
+                key={role}
                 type="button"
-                className={clsx(
-                  "session-browser__filter-pill session-browser__filter-pill--provider",
-                  activeProviderFilter === provider && "is-active",
-                )}
-                onClick={() => setActiveProviderFilter(provider)}
+                className={clsx("session-browser__filter-pill", isActive && "is-active")}
+                style={isActive ? { borderColor: config.color, color: config.color, background: `${config.color}12` } : undefined}
+                onClick={() => toggleRoleFilter(role)}
               >
-                {provider === "all"
-                  ? isZh ? "全部" : "All"
-                  : PROVIDER_CONFIG[provider]?.label ?? provider}
+                <span className="session-browser__filter-pill-icon">{config.icon}</span>
+                <span>{isZh ? config.label : config.labelEn}</span>
+                {(roleCounts[role] ?? 0) > 0 && (
+                  <span className="session-browser__filter-count">{roleCounts[role]}</span>
+                )}
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
 
         {/* Session count */}
-        <div className="session-browser__count text-subtle text-xs">
-          {isLoading
-            ? isZh ? "扫描中..." : "Scanning..."
-            : `${filteredSessions.length} / ${sessions.length} ${isZh ? "条会话" : "sessions"}`}
+        <div className="session-browser__count">
+          {isLoading ? (
+            <span className="session-browser__count-loading">
+              <span className="session-browser__dot-pulse" />
+              {isZh ? "扫描中..." : "Scanning..."}
+            </span>
+          ) : (
+            <span>{filteredSessions.length} / {sessions.length} {isZh ? "条会话" : "sessions"}</span>
+          )}
         </div>
 
         {/* Session list */}
@@ -290,31 +336,31 @@ export function SessionBrowser({ locale, onResumeInTerminal }: SessionBrowserPro
             const isSelected = selectedSessionId === session.sessionId;
 
             return (
-              <div key={`${session.provider}:${session.sessionId}`}>
+              <div key={`${session.provider}:${session.sessionId}`} className="session-browser__card-group">
                 <button
                   type="button"
                   className={clsx("session-browser__item", isSelected && "is-selected")}
                   onClick={() => void handleSelectSession(session)}
                 >
                   <div className="session-browser__item-top">
-                    <span
-                      className="session-browser__role-badge"
-                      style={{ color: roleConfig.color }}
-                      title={roleConfig.label}
-                    >
+                    <span className="session-browser__role-icon" title={roleConfig.label}>
                       {roleConfig.icon}
                     </span>
-                    <span
-                      className="session-browser__provider-badge"
-                      style={{ color: providerConfig?.color }}
-                    >
-                      {providerConfig?.label}
-                    </span>
+                    {providerConfig && (
+                      <span
+                        className="session-browser__provider-badge"
+                        style={{ color: providerConfig.color, background: providerConfig.bg }}
+                      >
+                        {providerConfig.label}
+                      </span>
+                    )}
                     <span className="session-browser__item-title">{session.title}</span>
                   </div>
                   <div className="session-browser__item-meta">
                     {projectName && (
-                      <span className="session-browser__project-name">{projectName}</span>
+                      <span className="session-browser__project-name" title={session.projectDir ?? ""}>
+                        {projectName}
+                      </span>
                     )}
                     <span className="session-browser__time">
                       {formatRelativeTime(session.lastActiveAt)}
@@ -336,13 +382,13 @@ export function SessionBrowser({ locale, onResumeInTerminal }: SessionBrowserPro
                     {/* Meta */}
                     <div className="session-browser__detail-meta">
                       <div className="session-browser__detail-meta-row">
-                        <span className="text-subtle text-xs">
+                        <span className="session-browser__detail-id">
                           {selectedSession.provider.toUpperCase()} · {selectedSession.sessionId.slice(0, 12)}…
                         </span>
                       </div>
                       {selectedSession.projectDir && (
                         <div className="session-browser__detail-meta-row">
-                          <span className="text-subtle text-xs" title={selectedSession.projectDir}>
+                          <span className="session-browser__detail-path" title={selectedSession.projectDir}>
                             📂 {selectedSession.projectDir}
                           </span>
                         </div>
@@ -352,21 +398,27 @@ export function SessionBrowser({ locale, onResumeInTerminal }: SessionBrowserPro
                     {/* Action buttons */}
                     <div className="session-browser__detail-actions">
                       <button
-                        className="btn-secondary session-browser__action-btn"
+                        className="session-browser__action-btn session-browser__action-btn--copy"
                         type="button"
-                        onClick={() => void handleCopyResumeCommand(selectedSession)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleCopyResumeCommand(selectedSession);
+                        }}
                       >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="12" height="12">
                           <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                         </svg>
                         {isZh ? "复制命令" : "Copy"}
                       </button>
                       <button
-                        className="btn-primary session-browser__action-btn"
+                        className="session-browser__action-btn session-browser__action-btn--resume"
                         type="button"
-                        onClick={() => void handleResumeInTerminal(selectedSession)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleResumeInTerminal(selectedSession);
+                        }}
                       >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="12" height="12">
                           <polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" />
                         </svg>
                         {isZh ? "终端恢复" : "Resume"}
@@ -377,6 +429,7 @@ export function SessionBrowser({ locale, onResumeInTerminal }: SessionBrowserPro
                     <div className="session-browser__messages">
                       {isLoadingDetail ? (
                         <div className="session-browser__loading">
+                          <span className="session-browser__dot-pulse" />
                           {isZh ? "加载中..." : "Loading..."}
                         </div>
                       ) : detailMessages.length === 0 ? (
@@ -411,7 +464,7 @@ export function SessionBrowser({ locale, onResumeInTerminal }: SessionBrowserPro
                         ))
                       )}
                       {detailMessages.length > 50 && (
-                        <div className="session-browser__loading text-subtle text-xs">
+                        <div className="session-browser__loading">
                           {isZh
                             ? `还有 ${detailMessages.length - 50} 条消息未显示`
                             : `${detailMessages.length - 50} more messages`}
@@ -425,14 +478,19 @@ export function SessionBrowser({ locale, onResumeInTerminal }: SessionBrowserPro
           })}
 
           {!isLoading && filteredSessions.length === 0 && (
-            <div className="sidebar-empty-state">
-              {sessions.length === 0
-                ? isZh
-                  ? "未发现本地 AI 会话记录。请确认 Claude Code 或 Codex 已使用过。"
-                  : "No local AI sessions found."
-                : isZh
-                  ? "没有匹配的会话"
-                  : "No matching sessions"}
+            <div className="session-browser__empty">
+              <div className="session-browser__empty-icon">
+                {sessions.length === 0 ? "💬" : "🔍"}
+              </div>
+              <div className="session-browser__empty-text">
+                {sessions.length === 0
+                  ? isZh
+                    ? "未发现本地 AI 会话记录\n请确认 Claude Code 或 Codex 已使用过"
+                    : "No local AI sessions found"
+                  : isZh
+                    ? "没有匹配的会话"
+                    : "No matching sessions"}
+              </div>
             </div>
           )}
         </div>

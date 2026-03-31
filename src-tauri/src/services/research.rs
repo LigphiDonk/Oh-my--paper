@@ -36,6 +36,51 @@ const MEMORY_EXECUTION_CONTEXT: &str =
 const MEMORY_REVIEW_LOG: &str =
     include_str!("../../../templates/research/memory/review_log.md");
 
+// ── Harness templates ────────────────────────────────────────────────────────
+const HARNESS_SETTINGS: &str = include_str!("../../../templates/harness/settings.json");
+
+const HARNESS_CMD_DELEGATE: &str =
+    include_str!("../../../templates/harness/commands/delegate.md");
+const HARNESS_CMD_RESEARCH_PLAN: &str =
+    include_str!("../../../templates/harness/commands/research-plan.md");
+const HARNESS_CMD_SURVEY_BLITZ: &str =
+    include_str!("../../../templates/harness/commands/survey-blitz.md");
+const HARNESS_CMD_IDEA_FORGE: &str =
+    include_str!("../../../templates/harness/commands/idea-forge.md");
+const HARNESS_CMD_EXPERIMENT_LOOP: &str =
+    include_str!("../../../templates/harness/commands/experiment-loop.md");
+const HARNESS_CMD_PAPER_SPRINT: &str =
+    include_str!("../../../templates/harness/commands/paper-sprint.md");
+const HARNESS_CMD_REVIEW_GATE: &str =
+    include_str!("../../../templates/harness/commands/review-gate.md");
+
+const HARNESS_AGENT_CONDUCTOR: &str =
+    include_str!("../../../templates/harness/agents/conductor.md");
+const HARNESS_AGENT_LIT_SCOUT: &str =
+    include_str!("../../../templates/harness/agents/literature-scout.md");
+const HARNESS_AGENT_EXP_DRIVER: &str =
+    include_str!("../../../templates/harness/agents/experiment-driver.md");
+const HARNESS_AGENT_PAPER_WRITER: &str =
+    include_str!("../../../templates/harness/agents/paper-writer.md");
+const HARNESS_AGENT_REVIEWER: &str =
+    include_str!("../../../templates/harness/agents/reviewer.md");
+
+const HARNESS_HOOK_ON_TASK_COMPLETE: &str =
+    include_str!("../../../templates/harness/hooks/on-task-complete.mjs");
+const HARNESS_HOOK_ON_STAGE_TRANSITION: &str =
+    include_str!("../../../templates/harness/hooks/on-stage-transition.mjs");
+const HARNESS_HOOK_ON_SESSION_START: &str =
+    include_str!("../../../templates/harness/hooks/on-session-start.mjs");
+
+const HARNESS_MEM_LITERATURE_BANK: &str =
+    include_str!("../../../templates/harness/memory/literature_bank.md");
+const HARNESS_MEM_DECISION_LOG: &str =
+    include_str!("../../../templates/harness/memory/decision_log.md");
+const HARNESS_MEM_EXPERIMENT_LEDGER: &str =
+    include_str!("../../../templates/harness/memory/experiment_ledger.md");
+const HARNESS_MEM_AGENT_HANDOFF: &str =
+    include_str!("../../../templates/harness/memory/agent_handoff.md");
+
 #[derive(Debug, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct PipelineMeta {
@@ -1032,6 +1077,80 @@ fn write_memory_files(root: &Path) -> Result<()> {
         MEMORY_EXECUTION_CONTEXT,
     )?;
     write_if_missing(&memory_dir.join("review_log.md"), MEMORY_REVIEW_LOG)?;
+    // Harness memory files
+    write_if_missing(&memory_dir.join("literature_bank.md"), HARNESS_MEM_LITERATURE_BANK)?;
+    write_if_missing(&memory_dir.join("decision_log.md"), HARNESS_MEM_DECISION_LOG)?;
+    write_if_missing(
+        &memory_dir.join("experiment_ledger.md"),
+        HARNESS_MEM_EXPERIMENT_LEDGER,
+    )?;
+    write_if_missing(&memory_dir.join("agent_handoff.md"), HARNESS_MEM_AGENT_HANDOFF)?;
+    Ok(())
+}
+
+/// Write the harness files (slash commands, agent personas, hooks, settings)
+/// into .claude/, .agents/, and .codex/ so every project has the full harness
+/// available from day one.
+fn write_harness_files(root: &Path) -> Result<()> {
+    let targets: &[&str] = &[".claude", ".agents", ".codex"];
+
+    for target_dir_name in targets {
+        let base = root.join(target_dir_name);
+
+        // settings.json (only for .claude and .agents)
+        if *target_dir_name == ".claude" || *target_dir_name == ".agents" {
+            write_if_missing(&base.join("settings.json"), HARNESS_SETTINGS)?;
+        }
+
+        // Slash commands
+        let cmd_dir = base.join("commands");
+        fs::create_dir_all(&cmd_dir)?;
+        write_if_missing(&cmd_dir.join("delegate.md"), HARNESS_CMD_DELEGATE)?;
+        write_if_missing(&cmd_dir.join("research-plan.md"), HARNESS_CMD_RESEARCH_PLAN)?;
+        write_if_missing(&cmd_dir.join("survey-blitz.md"), HARNESS_CMD_SURVEY_BLITZ)?;
+        write_if_missing(&cmd_dir.join("idea-forge.md"), HARNESS_CMD_IDEA_FORGE)?;
+        write_if_missing(
+            &cmd_dir.join("experiment-loop.md"),
+            HARNESS_CMD_EXPERIMENT_LOOP,
+        )?;
+        write_if_missing(&cmd_dir.join("paper-sprint.md"), HARNESS_CMD_PAPER_SPRINT)?;
+        write_if_missing(&cmd_dir.join("review-gate.md"), HARNESS_CMD_REVIEW_GATE)?;
+
+        // Agent personas
+        let agents_dir = base.join("agents");
+        fs::create_dir_all(&agents_dir)?;
+        write_if_missing(&agents_dir.join("conductor.md"), HARNESS_AGENT_CONDUCTOR)?;
+        write_if_missing(
+            &agents_dir.join("literature-scout.md"),
+            HARNESS_AGENT_LIT_SCOUT,
+        )?;
+        write_if_missing(
+            &agents_dir.join("experiment-driver.md"),
+            HARNESS_AGENT_EXP_DRIVER,
+        )?;
+        write_if_missing(
+            &agents_dir.join("paper-writer.md"),
+            HARNESS_AGENT_PAPER_WRITER,
+        )?;
+        write_if_missing(&agents_dir.join("reviewer.md"), HARNESS_AGENT_REVIEWER)?;
+
+        // Hook scripts
+        let hooks_dir = base.join("hooks");
+        fs::create_dir_all(&hooks_dir)?;
+        write_if_missing(
+            &hooks_dir.join("on-task-complete.mjs"),
+            HARNESS_HOOK_ON_TASK_COMPLETE,
+        )?;
+        write_if_missing(
+            &hooks_dir.join("on-stage-transition.mjs"),
+            HARNESS_HOOK_ON_STAGE_TRANSITION,
+        )?;
+        write_if_missing(
+            &hooks_dir.join("on-session-start.mjs"),
+            HARNESS_HOOK_ON_SESSION_START,
+        )?;
+    }
+
     Ok(())
 }
 
@@ -1107,13 +1226,14 @@ pub fn ensure_research_scaffold(
 
     write_templates(root)?;
     write_memory_files(root)?;
+    write_harness_files(root)?;
     copy_bundled_skill_set(skills_dir, &root.join("skills"))?;
     write_skill_views(skills_dir, root)?;
 
     let project_title = root
         .file_name()
         .and_then(|value| value.to_str())
-        .unwrap_or("ViewerLeaf Project");
+        .unwrap_or("Oh My Paper Project");
 
     write_json_if_missing(&root.join("instance.json"), &default_instance(root))?;
     write_json_if_missing(
@@ -1419,7 +1539,7 @@ pub fn load_research_snapshot(root: &Path) -> Result<ResearchCanvasSnapshot> {
         .unwrap_or_else(|| {
             root.file_name()
                 .and_then(|value| value.to_str())
-                .unwrap_or("ViewerLeaf Project")
+                .unwrap_or("Oh My Paper Project")
                 .to_string()
         });
     let brief_goal = brief
@@ -1799,7 +1919,7 @@ mod tests {
     fn scaffold_is_idempotent_and_preserves_main_tex() {
         let root = make_temp_project("research-idempotent");
         let app_root = make_app_root();
-        fs::create_dir_all(root.join(".viewerleaf")).expect("viewerleaf dir");
+        fs::create_dir_all(root.join(".omp")).expect("viewerleaf dir");
         fs::write(root.join("main.tex"), "% existing main tex").expect("main tex");
 
         ensure_research_scaffold(&app_root, &root, Some("survey")).expect("first scaffold");

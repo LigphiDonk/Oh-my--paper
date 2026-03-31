@@ -1,0 +1,21 @@
+{
+  "name": "oh-my-paper",
+  "owner": {
+    "name": "LigphiDonk"
+  },
+  "metadata": {
+    "description": "AI-powered academic research harness for Claude Code. Orchestrate literature surveys, idea generation, experiments, and paper writing with Codex delegation.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "oh-my-paper",
+      "description": "Research harness: delegate to Codex, track memory across sessions, drive the full survey→ideation→experiment→publication pipeline.",
+      "version": "1.0.0",
+      "author": {
+        "name": "LigphiDonk"
+      },
+      "source": "./plugins/oh-my-paper"
+    }
+  ]
+}

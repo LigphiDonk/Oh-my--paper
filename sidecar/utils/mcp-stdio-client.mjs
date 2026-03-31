@@ -60,7 +60,7 @@ export class McpStdioClient {
       protocolVersion: "2024-11-05",
       capabilities: {},
       clientInfo: {
-        name: "viewerleaf-sidecar",
+        name: "oh-my-paper-sidecar",
         version: "0.2.1",
       },
     });

@@ -2174,6 +2174,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "oh-my-paper"
+version = "0.2.2"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "dirs",
+ "libc",
+ "muda",
+ "objc2",
+ "objc2-app-kit",
+ "portable-pty",
+ "regex",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-shell",
+ "thiserror 2.0.18",
+ "tokio",
+ "ureq",
+ "uuid",
+ "walkdir",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4392,34 +4420,6 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
-
-[[package]]
-name = "viewerleaf"
-version = "0.2.2"
-dependencies = [
- "anyhow",
- "chrono",
- "dirs",
- "libc",
- "muda",
- "objc2",
- "objc2-app-kit",
- "portable-pty",
- "regex",
- "rusqlite",
- "serde",
- "serde_json",
- "serde_yaml",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-shell",
- "thiserror 2.0.18",
- "tokio",
- "ureq",
- "uuid",
- "walkdir",
-]
 
 [[package]]
 name = "vswhom"

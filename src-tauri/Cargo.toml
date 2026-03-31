@@ -1,12 +1,12 @@
 [package]
-name = "viewerleaf"
+name = "oh-my-paper"
 version = "0.2.2"
-description = "ViewerLeaf academic writing workbench"
+description = "Oh My Paper - AI academic research workbench"
 authors = ["donkfeng"]
 edition = "2021"
 
 [lib]
-name = "viewerleaf_lib"
+name = "oh_my_paper_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

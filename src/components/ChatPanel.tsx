@@ -485,7 +485,7 @@ function parseStreamBlocks(raw: string): StreamBlock {
   return { blocks, text, toolCalls, thoughtText };
 }
 
-const TASK_UPDATE_BLOCK_RE = /```viewerleaf_task_update\s*([\s\S]*?)```/gi;
+const TASK_UPDATE_BLOCK_RE = /```omp_task_update\s*([\s\S]*?)```/gi;
 type SuggestionOperation = TaskUpdateSuggestion["operations"][number];
 
 function isStringArray(value: unknown): value is string[] {

@@ -16,7 +16,7 @@ import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
-const NODES_CONFIG_PATH = path.join(os.homedir(), ".viewerleaf", "compute-nodes.json");
+const NODES_CONFIG_PATH = path.join(os.homedir(), ".oh-my-paper", "compute-nodes.json");
 
 // Helper to get active node
 async function getActiveNode() {
@@ -92,7 +92,7 @@ class ExperimentServer {
   constructor() {
     this.server = new Server(
       {
-        name: "viewerleaf-experiment-mcp",
+        name: "oh-my-paper-experiment-mcp",
         version: "1.0.0",
       },
       {
@@ -240,7 +240,7 @@ class ExperimentServer {
             const syncSource = localPath.endsWith('/') ? localPath : `${localPath}/`;
             
             // Exclude common cache and dist directories
-            const rsyncCmd = `rsync -avz --exclude '.git' --exclude 'node_modules' --exclude '__pycache__' --exclude '.viewerleaf' -e '${rsyncAuthCmd}' "${syncSource}" "${node.user}@${node.host}:${targetPath}"`;
+            const rsyncCmd = `rsync -avz --exclude '.git' --exclude 'node_modules' --exclude '__pycache__' --exclude '.oh-my-paper' -e '${rsyncAuthCmd}' "${syncSource}" "${node.user}@${node.host}:${targetPath}"`;
             
             const { stdout, stderr } = await execAsync(rsyncCmd, { timeout: EXEC_TIMEOUT_MS });
             return {

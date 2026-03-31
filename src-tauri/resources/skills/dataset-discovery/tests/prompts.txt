@@ -1,0 +1,13 @@
+# Dataset Discovery Skill — Test Prompts
+# Run each prompt in a Claude Code session to verify end-to-end behavior.
+
+1. Find datasets for image classification
+2. Search ML datasets for sentiment analysis on product reviews
+3. What datasets exist for medical image segmentation?
+4. Discover training data for speech emotion recognition
+5. Find tabular datasets for fraud detection with permissive licenses
+6. Search for large-scale text summarization datasets on HuggingFace
+7. What are the most popular object detection datasets?
+8. Find datasets for graph neural network benchmarks
+9. Search for multilingual NLP datasets across HuggingFace and GitHub
+10. Discover audio datasets for music genre classification, preferably under CC license

@@ -4210,6 +4210,7 @@ function App() {
                     <SessionBrowser
                       locale={locale}
                       onResumeInTerminal={handleRunTerminalCommand}
+                      onOpenTerminalDrawer={() => openDrawerTab("ai")}
                     />
                   ) : (
                     <Sidebar

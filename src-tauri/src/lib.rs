@@ -188,7 +188,7 @@ pub fn run() {
             commands::get_session_resume_command,
         ])
         .run(tauri::generate_context!())
-        .expect("failed to start ViewerLeaf");
+        .expect("failed to start Oh My Paper");
 }
 
 fn resolve_launch_workspace() -> LaunchWorkspace {
@@ -450,7 +450,7 @@ mod tests {
 
     impl TempDir {
         fn new() -> Self {
-            let path = std::env::temp_dir().join(format!("viewerleaf-{}", Uuid::new_v4()));
+            let path = std::env::temp_dir().join(format!("oh-my-paper-{}", Uuid::new_v4()));
             fs::create_dir_all(&path).expect("failed to create temp dir");
             Self { path }
         }

@@ -1551,7 +1551,7 @@ export const mockRuntime = {
     });
 
     const taskUpdateBlock = taskMode && taskContext
-      ? `\n\n\`\`\`viewerleaf_task_update\n${JSON.stringify({
+      ? `\n\n\`\`\`omp_task_update\n${JSON.stringify({
         taskId: taskContext.taskId,
         reason: `Advance the ${taskContext.title} task based on the latest discussion.`,
         confidence: 0.82,

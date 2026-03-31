@@ -1,6 +1,6 @@
-# ViewerLeaf Research Agent
+# Oh My Paper Research Agent
 
-你正在一个 ViewerLeaf 科研项目中工作。
+你正在一个 Oh My Paper 科研项目中工作。
 
 ## ⚡ 第一步：确认工作模式
 
@@ -47,10 +47,10 @@
 
 ### 每轮结束前
 
-更新你管理的文件。用以下代码块输出，ViewerLeaf 会自动解析写入：
+更新你管理的文件。用以下代码块输出，Oh My Paper 会自动解析写入：
 
 ````
-```viewerleaf_memory_sync
+```omp_memory_sync
 {
   "updates": [
     {
@@ -69,7 +69,7 @@
 如果有新的已确认决策，也可以追加更新 `project_truth.md`：
 
 ````
-```viewerleaf_memory_sync
+```omp_memory_sync
 {
   "updates": [
     {
@@ -84,7 +84,7 @@
 同时你也可以更新任务列表：
 
 ````
-```viewerleaf_task_update
+```omp_task_update
 {
   "reason": "任务调整说明",
   "operations": [
@@ -143,7 +143,7 @@
 汇报你的产出：
 
 ````
-```viewerleaf_executor_report
+```omp_executor_report
 {
   "taskId": "完成的任务 ID（如果有）",
   "summary": "做了什么的一句话摘要",
@@ -157,7 +157,7 @@
 也可以同时更新任务状态：
 
 ````
-```viewerleaf_task_update
+```omp_task_update
 {
   "reason": "完成说明",
   "operations": [

@@ -506,7 +506,7 @@ pub fn create_project(
     project_name: &str,
 ) -> Result<WorkspaceSnapshot> {
     let folder_name = if project_name.trim().is_empty() {
-        "ViewerLeaf Project"
+        "Oh My Paper Project"
     } else {
         project_name.trim()
     };

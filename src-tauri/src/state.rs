@@ -54,7 +54,7 @@ pub fn default_compile_result(project_root: &Path, main_tex: &str) -> CompileRes
         ),
         diagnostics: Vec::new(),
         log_path: project_root
-            .join(".viewerleaf/logs/latest.log")
+            .join(".omp/logs/latest.log")
             .to_string_lossy()
             .to_string(),
         log_output: "Compile service is idle.".into(),
@@ -78,7 +78,7 @@ pub fn save_project_config(root: &Path, config: &ProjectConfig) -> std::io::Resu
         return Ok(());
     }
 
-    let config_path = root.join(".viewerleaf").join("project.json");
+    let config_path = root.join(".omp").join("project.json");
     if let Some(parent) = config_path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -99,7 +99,7 @@ pub fn load_project_config(root: &Path) -> ProjectConfig {
         return empty_project_config();
     }
 
-    let config_path = root.join(".viewerleaf").join("project.json");
+    let config_path = root.join(".omp").join("project.json");
     if let Ok(raw) = fs::read_to_string(&config_path) {
         if let Ok(config) = serde_json::from_str::<ProjectConfig>(&raw) {
             return config;
@@ -178,12 +178,12 @@ pub fn initialize_project(root: &Path, project_name: &str) -> std::io::Result<()
     fs::create_dir_all(root.join("paper/sections"))?;
     fs::create_dir_all(root.join("paper/refs"))?;
     fs::create_dir_all(root.join("experiment"))?;
-    fs::create_dir_all(root.join(".viewerleaf"))?;
+    fs::create_dir_all(root.join(".omp"))?;
 
     let title = if project_name.trim().is_empty() {
         root.file_name()
             .map(|name| name.to_string_lossy().to_string())
-            .unwrap_or_else(|| "ViewerLeaf Project".into())
+            .unwrap_or_else(|| "Oh My Paper Project".into())
     } else {
         project_name.trim().to_string()
     };

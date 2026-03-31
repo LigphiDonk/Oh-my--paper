@@ -11,7 +11,7 @@ const CLI_CONFIG = {
     label: "Claude Code",
     command: "claude",
     envKeys: [
-      "VIEWERLEAF_CLAUDE_PATH",
+      "OMP_CLAUDE_PATH",
       "CLAUDE_CLI_PATH",
       "CLAUDE_CODE_PATH",
     ],
@@ -19,7 +19,7 @@ const CLI_CONFIG = {
   codex: {
     label: "Codex",
     command: "codex",
-    envKeys: ["VIEWERLEAF_CODEX_PATH", "CODEX_CLI_PATH"],
+    envKeys: ["OMP_CODEX_PATH", "CODEX_CLI_PATH"],
   },
 };
 
