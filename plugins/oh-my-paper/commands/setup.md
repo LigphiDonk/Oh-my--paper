@@ -48,7 +48,8 @@ which codex 2>/dev/null && codex --version 2>/dev/null || echo "Codex not found"
 ## 第三步：创建目录结构
 
 ```bash
-mkdir -p .pipeline/memory .pipeline/tasks .pipeline/docs .pipeline/.hook-events
+mkdir -p .pipeline/memory .pipeline/tasks .pipeline/docs .pipeline/.hook-events .claude/skills
+cp -rn "${CLAUDE_PLUGIN_ROOT}/skills/." .claude/skills/
 ```
 
 ## 第四步：写入初始文件
