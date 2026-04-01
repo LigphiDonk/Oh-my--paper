@@ -51,6 +51,7 @@ sidecar/dist
 
 # OMC files
 .omc
+.claude
 
 # ViewerLeaf opencode runtime data
 .viewerleaf/opencode-home/

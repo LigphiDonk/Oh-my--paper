@@ -69,8 +69,14 @@ async function main() {
   lines.push("");
   lines.push("用户选择后，读取对应角色的记忆文件，以该角色身份开始工作。");
 
+  const output = lines.join("\n");
+
+  // 输出到 stdout 供 Claude Code SessionStart hook 读取
+  process.stdout.write(output + "\n");
+
+  // 同时写文件备用
   await fs.mkdir(path.dirname(SESSION_CONTEXT), { recursive: true });
-  await fs.writeFile(SESSION_CONTEXT, lines.join("\n"), "utf8");
+  await fs.writeFile(SESSION_CONTEXT, output, "utf8");
 }
 
 main().catch(() => process.exit(0));
