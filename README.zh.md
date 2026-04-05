@@ -376,11 +376,52 @@ Conductor 可以把代码和实验任务交给 Codex 执行：
 
 ---
 
+## Codex CLI 支持
+
+Oh My Paper 同时提供 **Codex CLI 插件**（`omp-codex`），功能与 Claude Code 插件完全对等。
+
+### 在 Codex 上安装
+
+```bash
+# 1. 克隆仓库（如果尚未克隆）
+git clone https://github.com/LigphiDonk/Oh-my--paper.git /tmp/oh-my-paper
+
+# 2. 在 Codex CLI 中，浏览到仓库目录，运行：
+codex /plugins
+# → 找到 "omp-codex" → Install
+
+# 或者手动复制插件：
+cp -r /tmp/oh-my-paper/plugins/oh-my-paper-codex ~/.codex/plugins/omp-codex
+```
+
+### 包含内容
+
+| 功能 | Claude Code | Codex CLI |
+|:---|:---|:---|
+| Agent 角色（5 个） | `agents/*.md` | `agents/*.toml` |
+| 斜杠命令（9 个） | `/omp:xxx` | `/omp-xxx` |
+| SessionStart Hook | 原生 hook | `AGENTS.md`（自动读取） |
+| 技能（34 个） | ✅ 共享 | ✅ 共享 |
+| `.pipeline/` 记忆 | ✅ | ✅ |
+| Codex 任务委派 | `/omp:delegate` → 新终端 | 原生 `/agent` 子代理 |
+
+### 关键差异
+
+- **Hooks**：Codex 没有原生 hook 系统。SessionStart 等价功能通过 `AGENTS.md` 实现（Codex 启动时自动读取）。阶段转换检测嵌入在 agent 指令中。
+- **命令命名**：Codex 用 `/omp-setup`（横杠），Claude Code 用 `/omp:setup`（冒号）。
+- **可以共存**：Codex 插件（`plugins/oh-my-paper-codex/`）与 Claude Code 插件（`plugins/oh-my-paper/`）完全独立，互不影响。
+
+---
+
 ## 卸载
 
+**Claude Code：**
 ```bash
 /plugin uninstall omp@oh-my-paper
 ```
+
+**Codex CLI：**
+删除 `~/.codex/plugins/omp-codex/` 或通过 `codex /plugins` 卸载。
 
 ---
 

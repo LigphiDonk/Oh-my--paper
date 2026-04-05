@@ -1,0 +1,8 @@
+{
+  "name": "omp-codex",
+  "description": "Oh My Paper research harness for Codex CLI: 5 agent roles, 9 commands, 34 research skills, and a structured memory system for academic research projects.",
+  "version": "1.0.0",
+  "author": {
+    "name": "LigphiDonk"
+  }
+}

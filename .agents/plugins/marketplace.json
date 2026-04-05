@@ -1,0 +1,16 @@
+{
+  "name": "Oh My Paper Codex Marketplace",
+  "plugins": [
+    {
+      "name": "omp-codex",
+      "description": "Oh My Paper research harness: 5 agent roles, 9 commands, 34 research skills for academic research. Provides a structured pipeline from literature survey to paper publication.",
+      "source": {
+        "path": "../../plugins/oh-my-paper-codex"
+      },
+      "policy": {
+        "installation": "AVAILABLE"
+      },
+      "category": "research"
+    }
+  ]
+}

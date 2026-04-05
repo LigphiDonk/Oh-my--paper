@@ -375,11 +375,52 @@ Any change to cached content requires version bumps in **both**:
 
 ---
 
+## Codex CLI Support
+
+Oh My Paper also ships a **Codex CLI plugin** (`omp-codex`) that mirrors the Claude Code plugin's capabilities.
+
+### Install on Codex
+
+```bash
+# 1. Clone the repo (if not already)
+git clone https://github.com/LigphiDonk/Oh-my--paper.git /tmp/oh-my-paper
+
+# 2. In Codex CLI, browse to the repo and run:
+codex /plugins
+# → Find "omp-codex" → Install
+
+# Or manually copy the plugin:
+cp -r /tmp/oh-my-paper/plugins/oh-my-paper-codex ~/.codex/plugins/omp-codex
+```
+
+### What's Included
+
+| Feature | Claude Code | Codex CLI |
+|:---|:---|:---|
+| Agent Roles (5) | `agents/*.md` | `agents/*.toml` |
+| Slash Commands (9) | `/omp:xxx` | `/omp-xxx` |
+| SessionStart Hook | Native hook | `AGENTS.md` (auto-read) |
+| Skills (34) | ✅ shared | ✅ shared |
+| `.pipeline/` Memory | ✅ | ✅ |
+| Codex Delegation | `/omp:delegate` → new terminal | Native `/agent` subagent |
+
+### Key Differences
+
+- **Hooks**: Codex doesn't have native hooks. The `SessionStart` equivalent is handled by `AGENTS.md` which Codex reads automatically. Stage transition detection is embedded in the agent instructions.
+- **Command naming**: Codex uses `/omp-setup` (hyphen) vs Claude Code's `/omp:setup` (colon).
+- **Both can coexist**: The Codex plugin (`plugins/oh-my-paper-codex/`) is completely separate from the Claude Code plugin (`plugins/oh-my-paper/`). Installing one does not affect the other.
+
+---
+
 ## Uninstall
 
+**Claude Code:**
 ```bash
 /plugin uninstall omp@oh-my-paper
 ```
+
+**Codex CLI:**
+Remove `~/.codex/plugins/omp-codex/` or uninstall via `codex /plugins`.
 
 ---
 
