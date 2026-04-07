@@ -1,4 +1,10 @@
 <p align="center">
+  <img src="./src/assets/qrcode.jpg" alt="交流群二维码" width="180" />
+  <br/>
+  <em>扫码加入交流群</em>
+</p>
+
+<p align="center">
   <img src="./icons/icon.png" alt="Oh My Paper" width="120" height="120" />
 </p>
 
