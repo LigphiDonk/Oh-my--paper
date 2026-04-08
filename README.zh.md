@@ -384,7 +384,7 @@ Conductor 可以把代码和实验任务交给 Codex 执行：
 
 ## Codex CLI 支持
 
-Oh My Paper 同时提供 **Codex CLI 插件**（`omp-codex`），功能与 Claude Code 插件完全对等。
+Oh My Paper 同时提供 **Codex 插件**（`oh-my-paper-codex`），功能与 Claude Code 插件完全对等。
 
 ### 在 Codex 上安装
 
@@ -392,13 +392,43 @@ Oh My Paper 同时提供 **Codex CLI 插件**（`omp-codex`），功能与 Claud
 # 1. 克隆仓库（如果尚未克隆）
 git clone https://github.com/LigphiDonk/Oh-my--paper.git /tmp/oh-my-paper
 
-# 2. 在 Codex CLI 中，浏览到仓库目录，运行：
-codex /plugins
-# → 找到 "omp-codex" → Install
+# 2. 按 Codex 本地 marketplace 规范安装
+mkdir -p ~/.agents/plugins ~/plugins/oh-my-paper-codex
+rsync -aL /tmp/oh-my-paper/plugins/oh-my-paper-codex/ ~/plugins/oh-my-paper-codex/
 
-# 或者手动复制插件：
-cp -r /tmp/oh-my-paper/plugins/oh-my-paper-codex ~/.codex/plugins/omp-codex
+cat > ~/.agents/plugins/marketplace.json <<'EOF'
+{
+  "name": "oh-my-paper-local",
+  "interface": {
+    "displayName": "Local Codex Plugins"
+  },
+  "plugins": [
+    {
+      "name": "oh-my-paper-codex",
+      "source": {
+        "source": "local",
+        "path": "./plugins/oh-my-paper-codex"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
+EOF
 ```
+
+然后还需要：
+
+```bash
+# 3. 重启 Codex，让它重新加载本地 marketplace
+# 4. 打开 Codex 的 Plugins 页面，安装 "Oh My Paper"
+#    仅注册 marketplace 只会让插件“可发现”，不会自动变成已安装状态。
+```
+
+如果你在插件页里搜索，优先搜 `Oh My Paper` 或 `oh-my-paper-codex`，不要只搜 `omp`。
 
 ### 包含内容
 
@@ -416,6 +446,8 @@ cp -r /tmp/oh-my-paper/plugins/oh-my-paper-codex ~/.codex/plugins/omp-codex
 - **Hooks**：Codex 没有原生 hook 系统。SessionStart 等价功能通过 `AGENTS.md` 实现（Codex 启动时自动读取）。阶段转换检测嵌入在 agent 指令中。
 - **命令命名**：Codex 用 `/omp-setup`（横杠），Claude Code 用 `/omp:setup`（冒号）。
 - **可以共存**：Codex 插件（`plugins/oh-my-paper-codex/`）与 Claude Code 插件（`plugins/oh-my-paper/`）完全独立，互不影响。
+- **Codex 的发现机制**：Codex 需要 `~/.agents/plugins/marketplace.json` 里有合法条目，同时插件目录位于 `~/plugins/<plugin-name>/`。只把文件复制到 `~/.codex/plugins/`，UI 不会收录。
+- **Codex 的安装状态**：marketplace 里有条目，只代表插件会出现在 Plugins 页面；你仍然需要在页面里点一次 Install，它才会变成已安装、已启用。
 
 ---
 
@@ -427,7 +459,7 @@ cp -r /tmp/oh-my-paper/plugins/oh-my-paper-codex ~/.codex/plugins/omp-codex
 ```
 
 **Codex CLI：**
-删除 `~/.codex/plugins/omp-codex/` 或通过 `codex /plugins` 卸载。
+删除 `~/plugins/oh-my-paper-codex/`，并从 `~/.agents/plugins/marketplace.json` 里删掉对应条目。
 
 ---
 

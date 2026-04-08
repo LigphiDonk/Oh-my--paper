@@ -383,7 +383,7 @@ Any change to cached content requires version bumps in **both**:
 
 ## Codex CLI Support
 
-Oh My Paper also ships a **Codex CLI plugin** (`omp-codex`) that mirrors the Claude Code plugin's capabilities.
+Oh My Paper also ships a **Codex plugin** (`oh-my-paper-codex`) that mirrors the Claude Code plugin's capabilities.
 
 ### Install on Codex
 
@@ -391,13 +391,44 @@ Oh My Paper also ships a **Codex CLI plugin** (`omp-codex`) that mirrors the Cla
 # 1. Clone the repo (if not already)
 git clone https://github.com/LigphiDonk/Oh-my--paper.git /tmp/oh-my-paper
 
-# 2. In Codex CLI, browse to the repo and run:
-codex /plugins
-# → Find "omp-codex" → Install
+# 2. Install the plugin into Codex's home-local marketplace layout
+mkdir -p ~/.agents/plugins ~/plugins/oh-my-paper-codex
+rsync -aL /tmp/oh-my-paper/plugins/oh-my-paper-codex/ ~/plugins/oh-my-paper-codex/
 
-# Or manually copy the plugin:
-cp -r /tmp/oh-my-paper/plugins/oh-my-paper-codex ~/.codex/plugins/omp-codex
+cat > ~/.agents/plugins/marketplace.json <<'EOF'
+{
+  "name": "oh-my-paper-local",
+  "interface": {
+    "displayName": "Local Codex Plugins"
+  },
+  "plugins": [
+    {
+      "name": "oh-my-paper-codex",
+      "source": {
+        "source": "local",
+        "path": "./plugins/oh-my-paper-codex"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
+EOF
 ```
+
+After that:
+
+```bash
+# 3. Restart Codex so it reloads the local marketplace
+# 4. Open the Plugins page in Codex and install "Oh My Paper"
+#    Registering the marketplace only makes the plugin discoverable.
+#    It is still not installed until you click Install.
+```
+
+If you search in the plugin UI, search for `Oh My Paper` or `oh-my-paper-codex`, not `omp`.
 
 ### What's Included
 
@@ -415,6 +446,8 @@ cp -r /tmp/oh-my-paper/plugins/oh-my-paper-codex ~/.codex/plugins/omp-codex
 - **Hooks**: Codex doesn't have native hooks. The `SessionStart` equivalent is handled by `AGENTS.md` which Codex reads automatically. Stage transition detection is embedded in the agent instructions.
 - **Command naming**: Codex uses `/omp-setup` (hyphen) vs Claude Code's `/omp:setup` (colon).
 - **Both can coexist**: The Codex plugin (`plugins/oh-my-paper-codex/`) is completely separate from the Claude Code plugin (`plugins/oh-my-paper/`). Installing one does not affect the other.
+- **Codex discovery**: Codex expects a valid `~/.agents/plugins/marketplace.json` entry plus a plugin directory under `~/plugins/<plugin-name>/`. Copying files only into `~/.codex/plugins/` is not enough for the plugin UI to discover it.
+- **Codex install state**: A marketplace entry only makes the plugin appear in the Plugins page. You must still install it there before it becomes enabled and usable.
 
 ---
 
@@ -426,7 +459,7 @@ cp -r /tmp/oh-my-paper/plugins/oh-my-paper-codex ~/.codex/plugins/omp-codex
 ```
 
 **Codex CLI:**
-Remove `~/.codex/plugins/omp-codex/` or uninstall via `codex /plugins`.
+Remove `~/plugins/oh-my-paper-codex/` and delete the matching entry from `~/.agents/plugins/marketplace.json`.
 
 ---
 
