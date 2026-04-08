@@ -44,7 +44,7 @@ Restart Claude Code. Run `/omp:setup` inside your research project, then drive t
 
 - [Why This Exists](#why-this-exists)
 - [Install](#install)
-- [Slash Commands](#slash-commands)
+- [Claude Code Slash Commands](#claude-code-slash-commands)
 - [The Agent Team](#the-agent-team)
 - [34 Research Skills](#34-research-skills)
 - [Hooks](#hooks)
@@ -132,7 +132,10 @@ git clone https://github.com/LigphiDonk/Oh-my--paper.git /tmp/oh-my-paper
 
 ---
 
-## Slash Commands
+## Claude Code Slash Commands
+
+These slash commands are provided by the **Claude Code plugin**.
+The Codex plugin does **not** currently auto-register `/omp-*` commands in the Codex CLI.
 
 All commands are prefixed with `/omp:`.
 
@@ -383,7 +386,7 @@ Any change to cached content requires version bumps in **both**:
 
 ## Codex Support
 
-Oh My Paper also ships a **Codex plugin** (`oh-my-paper-codex`) that mirrors the Claude Code plugin's capabilities.
+Oh My Paper also ships a **Codex plugin** (`oh-my-paper-codex`) that shares the same research harness concepts, agents, and skills as the Claude Code plugin.
 
 ### Install on Codex
 
@@ -418,12 +421,28 @@ What the installer does:
 
 If `codex` is not available on your `PATH`, the script still registers the plugin and then tells you to finish the last step in Codex's Plugins page. If you search there, search for `Oh My Paper` or `oh-my-paper-codex`, not `omp`.
 
+### Use in Codex CLI
+
+After installation, start Codex in your research project directory:
+
+```bash
+cd /path/to/your/research-project
+codex
+```
+
+Then use one of these two patterns:
+
+- Ask naturally, for example: `Use Oh My Paper to initialize this research project and scaffold .pipeline/`
+- Reuse the workflow prompt templates under `plugins/oh-my-paper-codex/prompts/` by copying or adapting them inside the Codex session
+
+Codex CLI does **not** currently auto-register the files in `plugins/oh-my-paper-codex/prompts/` as slash commands, so `/omp-setup` and similar commands will **not** appear in the CLI command palette.
+
 ### What's Included
 
 | Feature | Claude Code | Codex CLI |
 |:---|:---|:---|
 | Agent Roles (5) | `agents/*.md` | `agents/*.toml` |
-| Slash Commands (9) | `/omp:xxx` | `/omp-xxx` |
+| Workflow entrypoints | `/omp:...` slash commands | Natural-language prompts + `prompts/*.md` templates |
 | SessionStart Hook | Native hook | `AGENTS.md` (auto-read) |
 | Skills (34) | ✅ shared | ✅ shared |
 | `.pipeline/` Memory | ✅ | ✅ |
@@ -432,7 +451,7 @@ If `codex` is not available on your `PATH`, the script still registers the plugi
 ### Key Differences
 
 - **Hooks**: Codex doesn't have native hooks. The `SessionStart` equivalent is handled by `AGENTS.md` which Codex reads automatically. Stage transition detection is embedded in the agent instructions.
-- **Command naming**: Codex uses `/omp-setup` (hyphen) vs Claude Code's `/omp:setup` (colon).
+- **CLI command model**: Claude Code exposes `/omp:...` slash commands. Codex CLI currently does not auto-register the plugin's `prompts/*.md` files as `/omp-*` slash commands, so you use natural-language prompts or copy/adapt the templates manually.
 - **Both can coexist**: The Codex plugin (`plugins/oh-my-paper-codex/`) is completely separate from the Claude Code plugin (`plugins/oh-my-paper/`). Installing one does not affect the other.
 - **Installer scripts**: Use `scripts/install-codex-plugin.sh` on macOS/Linux or `scripts/install-codex-plugin.ps1` on Windows. They merge the marketplace entry instead of overwriting your existing local plugins.
 - **Codex discovery**: Codex expects a valid `~/.agents/plugins/marketplace.json` entry plus a plugin directory under `~/plugins/<plugin-name>/`. Copying files only into `~/.codex/plugins/` is not enough for the plugin UI to discover it.

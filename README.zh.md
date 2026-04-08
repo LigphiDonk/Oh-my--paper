@@ -44,7 +44,7 @@
 
 - [为什么做这个](#为什么做这个)
 - [安装](#安装)
-- [命令列表](#命令列表)
+- [Claude Code 命令列表](#claude-code-命令列表)
 - [Agent 团队](#agent-团队)
 - [34 个研究技能](#34-个研究技能)
 - [Hooks](#hooks)
@@ -132,7 +132,10 @@ git clone https://github.com/LigphiDonk/Oh-my--paper.git /tmp/oh-my-paper
 
 ---
 
-## 命令列表
+## Claude Code 命令列表
+
+这些命令由 **Claude Code 插件**提供。
+Codex 插件目前**不会**在 Codex CLI 里自动注册 `/omp-*` 命令。
 
 所有命令以 `/omp:` 开头。
 
@@ -384,7 +387,7 @@ Conductor 可以把代码和实验任务交给 Codex 执行：
 
 ## Codex 支持
 
-Oh My Paper 同时提供 **Codex 插件**（`oh-my-paper-codex`），功能与 Claude Code 插件完全对等。
+Oh My Paper 同时提供 **Codex 插件**（`oh-my-paper-codex`），共享同一套科研 harness 思路、agent 和 skills，但交互方式与 Claude Code 不完全相同。
 
 ### 在 Codex 上安装
 
@@ -419,12 +422,28 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-codex-plugin.ps1
 
 如果你的环境里 `codex` 不在 `PATH` 上，脚本仍会先把插件注册进去，然后提示你去 Codex 的 Plugins 页面完成最后一步。若需要搜索，优先搜 `Oh My Paper` 或 `oh-my-paper-codex`，不要只搜 `omp`。
 
+### 在 Codex CLI 里怎么用
+
+安装完成后，在你的科研项目目录里启动 Codex：
+
+```bash
+cd /path/to/your/research-project
+codex
+```
+
+然后用下面两种方式之一：
+
+- 直接自然语言描述，例如：`Use Oh My Paper to initialize this research project and scaffold .pipeline/`
+- 打开 `plugins/oh-my-paper-codex/prompts/` 里的工作流模板，在 Codex 会话里复制或改写后使用
+
+Codex CLI 目前**不会**把 `plugins/oh-my-paper-codex/prompts/` 下的文件自动注册成斜杠命令，所以你在 CLI 里看不到 `/omp-setup` 这类命令。
+
 ### 包含内容
 
 | 功能 | Claude Code | Codex CLI |
 |:---|:---|:---|
 | Agent 角色（5 个） | `agents/*.md` | `agents/*.toml` |
-| 斜杠命令（9 个） | `/omp:xxx` | `/omp-xxx` |
+| 工作流入口 | `/omp:...` 斜杠命令 | 自然语言 + `prompts/*.md` 模板 |
 | SessionStart Hook | 原生 hook | `AGENTS.md`（自动读取） |
 | 技能（34 个） | ✅ 共享 | ✅ 共享 |
 | `.pipeline/` 记忆 | ✅ | ✅ |
@@ -433,7 +452,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-codex-plugin.ps1
 ### 关键差异
 
 - **Hooks**：Codex 没有原生 hook 系统。SessionStart 等价功能通过 `AGENTS.md` 实现（Codex 启动时自动读取）。阶段转换检测嵌入在 agent 指令中。
-- **命令命名**：Codex 用 `/omp-setup`（横杠），Claude Code 用 `/omp:setup`（冒号）。
+- **CLI 命令模型**：Claude Code 提供 `/omp:...` 斜杠命令；Codex CLI 目前不会把插件里的 `prompts/*.md` 自动注册成 `/omp-*` 命令，因此需要用自然语言或手动复用模板。
 - **可以共存**：Codex 插件（`plugins/oh-my-paper-codex/`）与 Claude Code 插件（`plugins/oh-my-paper/`）完全独立，互不影响。
 - **安装脚本**：macOS/Linux 用 `scripts/install-codex-plugin.sh`，Windows 用 `scripts/install-codex-plugin.ps1`。脚本会合并 marketplace 条目，不会直接覆盖你已有的本地插件列表。
 - **Codex 的发现机制**：Codex 需要 `~/.agents/plugins/marketplace.json` 里有合法条目，同时插件目录位于 `~/plugins/<plugin-name>/`。只把文件复制到 `~/.codex/plugins/`，UI 不会收录。
