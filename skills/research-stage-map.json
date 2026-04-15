@@ -1,6 +1,7 @@
 {
   "survey": {
     "base": [
+      "literature-pdf-ocr-library",
       "inno-deep-research",
       "gemini-deep-research",
       "academic-researcher",
@@ -9,11 +10,13 @@
     ],
     "byTaskType": {
       "analysis": [
+        "literature-pdf-ocr-library",
         "inno-deep-research",
         "gemini-deep-research",
         "academic-researcher"
       ],
       "exploration": [
+        "literature-pdf-ocr-library",
         "inno-deep-research",
         "gemini-deep-research",
         "dataset-discovery",

@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { cp, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { access, cp, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,6 +37,17 @@ async function main() {
     return;
   }
 
+  if (args.command === "status") {
+    await printStatus({
+      sourceDir,
+      pluginDir,
+      marketplacePath,
+      cwd: path.resolve(args.cwd ?? repoRoot),
+      skipAppServer: args.skipAppServer,
+    });
+    return;
+  }
+
   if (args.command === "uninstall") {
     await uninstallPlugin({ pluginDir, marketplacePath, skipAppServer: args.skipAppServer });
     return;
@@ -47,9 +58,9 @@ async function main() {
 
 function parseArgs(argv) {
   const [command, ...rest] = argv;
-  if (!command || !["install", "uninstall"].includes(command)) {
+  if (!command || !["install", "status", "uninstall"].includes(command)) {
     throw new Error(
-      "Usage: node scripts/manage-codex-plugin.mjs <install|uninstall> [--home <dir>] [--source <dir>] [--plugin-dir <dir>] [--marketplace <path>] [--skip-app-server]",
+      "Usage: node scripts/manage-codex-plugin.mjs <install|status|uninstall> [--home <dir>] [--source <dir>] [--plugin-dir <dir>] [--marketplace <path>] [--cwd <dir>] [--skip-app-server]",
     );
   }
 
@@ -59,6 +70,7 @@ function parseArgs(argv) {
     source: null,
     pluginDir: null,
     marketplace: null,
+    cwd: null,
     skipAppServer: false,
   };
 
@@ -78,6 +90,10 @@ function parseArgs(argv) {
     }
     if (arg === "--marketplace") {
       parsed.marketplace = requireValue(rest, ++i, "--marketplace");
+      continue;
+    }
+    if (arg === "--cwd") {
+      parsed.cwd = requireValue(rest, ++i, "--cwd");
       continue;
     }
     if (arg === "--skip-app-server") {
@@ -156,6 +172,76 @@ async function uninstallPlugin({ pluginDir, marketplacePath, skipAppServer }) {
   }
 }
 
+async function printStatus({ sourceDir, pluginDir, marketplacePath, cwd, skipAppServer }) {
+  const sourceManifestPath = path.join(sourceDir, ".codex-plugin", "plugin.json");
+  const [sourceDirExists, sourceManifestExists, pluginDirExists, marketplaceFileExists] = await Promise.all([
+    pathExists(sourceDir),
+    pathExists(sourceManifestPath),
+    pathExists(pluginDir),
+    pathExists(marketplacePath),
+  ]);
+
+  const { marketplace, exists } = await loadMarketplace(marketplacePath);
+  const fileStatus = {
+    sourceDir,
+    sourceDirExists,
+    sourceManifestPath,
+    sourceManifestExists,
+    pluginDir,
+    pluginDirExists,
+    marketplacePath,
+    marketplaceExists: exists,
+    marketplaceName: marketplace.name,
+    marketplaceDisplayName: marketplace.interface.displayName,
+    marketplaceHasEntry: marketplace.plugins.some((plugin) => plugin?.name === PLUGIN_NAME),
+    cwd,
+  };
+
+  if (skipAppServer) {
+    console.log(
+      JSON.stringify(
+        {
+          fileStatus,
+          codexStatus: null,
+          note: "Skipped Codex app-server checks.",
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+
+  let codexStatus;
+  try {
+    codexStatus = await withCodexAppServer(async (client) => {
+      const [homeList, cwdList] = await Promise.all([
+        client.request("plugin/list", { forceRemoteSync: false }),
+        client.request("plugin/list", { cwds: [cwd], forceRemoteSync: false }),
+      ]);
+      return {
+        homeOnly: summarizePluginEntries(homeList),
+        withCwd: summarizePluginEntries(cwdList),
+      };
+    });
+  } catch (error) {
+    codexStatus = {
+      error: formatError(error),
+    };
+  }
+
+  console.log(
+    JSON.stringify(
+      {
+        fileStatus,
+        codexStatus,
+      },
+      null,
+      2,
+    ),
+  );
+}
+
 async function loadMarketplace(marketplacePath) {
   try {
     const raw = await readFile(marketplacePath, "utf8");
@@ -193,6 +279,28 @@ async function loadMarketplace(marketplacePath) {
       },
     };
   }
+}
+
+function summarizePluginEntries(listing) {
+  const matches = [];
+  for (const marketplace of listing?.marketplaces ?? []) {
+    for (const plugin of marketplace?.plugins ?? []) {
+      if (plugin?.name !== PLUGIN_NAME) {
+        continue;
+      }
+      matches.push({
+        marketplaceName: marketplace.name,
+        marketplacePath: marketplace.path,
+        pluginId: plugin.id,
+        sourcePath: plugin.source?.path ?? null,
+        installed: Boolean(plugin.installed),
+        enabled: Boolean(plugin.enabled),
+        installPolicy: plugin.installPolicy ?? null,
+        authPolicy: plugin.authPolicy ?? null,
+      });
+    }
+  }
+  return matches;
 }
 
 function upsertPluginEntry(plugins) {
@@ -379,6 +487,15 @@ function formatError(error) {
     return error.message;
   }
   return String(error);
+}
+
+async function pathExists(targetPath) {
+  try {
+    await access(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 main().catch((error) => {

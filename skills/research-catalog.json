@@ -7,6 +7,57 @@
   },
   "skills": [
     {
+      "id": "literature-pdf-ocr-library",
+      "name": "literature-pdf-ocr-library",
+      "version": "1.0.0",
+      "description": "Search traceable academic papers, download open-access PDFs from arXiv, convert to Markdown via PaddleOCR API or pdfminer fallback, and organize into a structured literature corpus.",
+      "summary": "Downloads real papers by arXiv ID or query, OCR-converts PDFs to readable Markdown, and stores them in .pipeline/literature/<corpus>/. Use when you need actual paper content for literature review or idea generation — not just metadata.",
+      "stages": [
+        "survey",
+        "ideation"
+      ],
+      "tools": [
+        "bash",
+        "read_file",
+        "write_file"
+      ],
+      "primaryIntent": "research",
+      "intents": [
+        "research",
+        "analysis"
+      ],
+      "capabilities": [
+        "pdf-download",
+        "ocr",
+        "search-retrieval"
+      ],
+      "domains": [
+        "cs-ai",
+        "general"
+      ],
+      "keywords": [
+        "literature",
+        "pdf",
+        "ocr",
+        "arxiv",
+        "download",
+        "corpus",
+        "papers",
+        "pdfminer",
+        "paddleocr",
+        "survey"
+      ],
+      "source": "local",
+      "status": "verified",
+      "resourceFlags": {
+        "hasReferences": true,
+        "hasScripts": true,
+        "hasTemplates": false,
+        "hasAssets": false,
+        "hasAgents": false
+      }
+    },
+    {
       "id": "academic-researcher",
       "name": "academic-researcher",
       "version": "1.0.0",

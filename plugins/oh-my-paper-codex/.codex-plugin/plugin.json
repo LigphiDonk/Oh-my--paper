@@ -1,8 +1,44 @@
 {
-  "name": "omp-codex",
-  "description": "Oh My Paper research harness for Codex CLI: 5 agent roles, 9 commands, 34 research skills, and a structured memory system for academic research projects.",
+  "name": "oh-my-paper-codex",
   "version": "1.0.0",
+  "description": "Oh My Paper research harness for Codex: research roles, slash commands, shared skills, and a structured memory system for academic projects.",
   "author": {
-    "name": "LigphiDonk"
+    "name": "LigphiDonk",
+    "url": "https://github.com/LigphiDonk"
+  },
+  "homepage": "https://github.com/LigphiDonk/Oh-my--paper",
+  "repository": "https://github.com/LigphiDonk/Oh-my--paper",
+  "license": "MIT",
+  "keywords": [
+    "research",
+    "academic-writing",
+    "literature-review",
+    "paper-writing",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Oh My Paper",
+    "shortDescription": "Research pipeline for Codex projects",
+    "longDescription": "Run literature surveys, ideation, experiments, and paper writing inside Codex with structured prompts, role-specific agents, and shared research skills.",
+    "developerName": "LigphiDonk",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/LigphiDonk/Oh-my--paper",
+    "privacyPolicyURL": "https://github.com/LigphiDonk/Oh-my--paper",
+    "termsOfServiceURL": "https://github.com/LigphiDonk/Oh-my--paper",
+    "defaultPrompt": [
+      "Set up a research project with Oh My Paper",
+      "Run a literature survey for my paper topic",
+      "Plan the next experiment for this project"
+    ],
+    "brandColor": "#2F6B5F",
+    "composerIcon": "./assets/32x32.png",
+    "logo": "./assets/icon.png",
+    "screenshots": []
   }
 }

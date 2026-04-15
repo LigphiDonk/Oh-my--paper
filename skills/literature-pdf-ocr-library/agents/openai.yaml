@@ -1,0 +1,7 @@
+interface:
+  display_name: "Literature PDF OCR Library"
+  short_description: "Find papers, fetch PDFs, OCR to Markdown."
+  default_prompt: "Use $literature-pdf-ocr-library to find real papers, download open PDFs, OCR them into Markdown, and organize an AI-readable literature library."
+
+policy:
+  allow_implicit_invocation: true
